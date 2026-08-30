@@ -1,0 +1,1928 @@
+openapi: 3.0.3
+
+info:
+  title: SafeStep / هم‌قدم — API
+  version: 1.0.0
+  description: |
+    قرارداد API سامانه‌ی «هم‌قدم» (SafeStep).
+
+    این همان قراردادی است که **هر سه کلاینت** روی آن کار می‌کنند: اپ Flutter،
+    داشبورد وب، و پنل مدیریت. هیچ endpoint اختصاصیِ یک کلاینت وجود ندارد.
+
+    ## احراز هویت
+
+    همه‌ی مسیرها به‌جز `/auth/register`، `/auth/login` و `/auth/refresh` به
+    هدر `Authorization: Bearer <accessToken>` نیاز دارند.
+
+    توکن دسترسی ۱۵ دقیقه اعتبار دارد. با انقضا، کلاینت باید با
+    `POST /auth/refresh` توکن تازه بگیرد. توکن تازه‌سازی **می‌چرخد**: با هر
+    استفاده، توکن قبلی باطل و توکن تازه صادر می‌شود. یعنی اگر دو درخواست
+    هم‌زمان تازه‌سازی کنند، دومی شکست می‌خورد — کلاینت باید تازه‌سازی را
+    تک‌مسیره کند.
+
+    ## کنترل دسترسی
+
+    دسترسی به داده‌ی یک کاربر از **رابطه‌ی سرپرستی** می‌آید، نه از نقش حساب.
+    سه سطح وجود دارد و در لایه‌ی کوئری دیتابیس اعمال می‌شود:
+
+    | سطح | چه چیزی می‌دهد |
+    |---|---|
+    | `view_location` | موقعیت فعلی و تاریخچه‌ی مسیر |
+    | `receive_alerts` | هشدارهای خروج از محدوده، توقف طولانی، باتری |
+    | `emergency` | هشدار SOS |
+
+    نقش `admin` به موقعیت هیچ کاربری دسترسی **ندارد**؛ اختیارش مدیریت
+    حساب‌ها، دستگاه‌ها و لاگ‌هاست.
+
+    ## قالب خطا
+
+    همه‌ی خطاها یک شکل دارند و پیامشان فارسی و آماده‌ی نمایش به کاربر است:
+
+    ```json
+    { "error": { "code": "BAD_REQUEST", "message": "...", "details": [] } }
+    ```
+
+    ## شناسه‌ی درخواست
+
+    هر پاسخ هدر `X-Request-Id` دارد. کلاینت می‌تواند خودش هم این هدر را
+    بفرستد تا یک عملیات از اپ تا جدول `request_logs` سرور قابل ردیابی باشد.
+
+  contact:
+    name: مستندات پروژه
+    url: https://github.com/MortezaPZ/safestep-demo
+
+servers:
+  - url: http://localhost:4000/api/v1
+    description: اجرای محلی
+  - url: http://10.0.2.2:4000/api/v1
+    description: شبیه‌ساز اندروید (میزبان از دید شبیه‌ساز)
+
+tags:
+  - name: احراز هویت
+    description: ثبت‌نام، ورود، تازه‌سازی توکن
+  - name: سرپرستی
+    description: کد دعوت و مدیریت دسترسی‌ها
+  - name: موقعیت
+    description: ارسال و خواندن موقعیت
+  - name: محدوده‌های امن
+  - name: هشدارها
+  - name: SOS
+  - name: تنظیمات و دستگاه
+  - name: مدیریت
+    description: فقط برای نقش `admin`
+  - name: شبیه‌ساز
+    description: حالت نمایش — با `DEMO_MODE=false` غیرفعال می‌شود
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ═══════════════════════════ احراز هویت ═══════════════════════════
+
+  /auth/register:
+    post:
+      tags: [احراز هویت]
+      summary: ثبت‌نام
+      description: |
+        نقش `admin` عمداً پذیرفته نمی‌شود؛ هیچ‌کس نمی‌تواند خودش را مدیر
+        سامانه ثبت کند. ادمین فقط با اسکریپت سرور ساخته می‌شود.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, password, fullName]
+              properties:
+                phone:
+                  type: string
+                  example: '09123456789'
+                  description: ارقام فارسی هم پذیرفته می‌شود و نرمال‌سازی می‌گردد
+                password:
+                  type: string
+                  minLength: 8
+                  example: 'Test@1234'
+                fullName:
+                  type: string
+                  minLength: 2
+                  example: 'مریم رضایی'
+                role:
+                  type: string
+                  enum: [primary, guardian]
+                  default: primary
+      responses:
+        '201':
+          description: حساب ساخته شد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: شماره قبلاً ثبت شده است
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/login:
+    post:
+      tags: [احراز هویت]
+      summary: ورود
+      description: |
+        پیام خطا برای «کاربر وجود ندارد» و «رمز نادرست» عمداً یکسان است تا
+        نتوان با آزمون‌وخطا فهمید کدام شماره در سامانه ثبت شده است.
+
+        حساب معلق پیام روشن `403` می‌گیرد، نه پیام مبهم.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, password]
+              properties:
+                phone: { type: string, example: '09123456789' }
+                password: { type: string, example: 'Test@1234' }
+      responses:
+        '200':
+          description: ورود موفق
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthSession' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: حساب معلق یا حذف‌شده
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/refresh:
+    post:
+      tags: [احراز هویت]
+      summary: تازه‌سازی توکن
+      description: |
+        توکن تازه‌سازی می‌چرخد: پس از این تماس، توکن قبلی باطل است.
+        کلاینت باید مقدار تازه را جایگزین کند.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: توکن تازه
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [احراز هویت]
+      summary: خروج از این دستگاه
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: انجام شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+
+  /auth/logout-all:
+    post:
+      tags: [احراز هویت]
+      summary: خروج از همه‌ی دستگاه‌ها
+      responses:
+        '200':
+          description: تعداد نشست‌های باطل‌شده
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revoked: { type: integer, example: 3 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/me:
+    get:
+      tags: [احراز هویت]
+      summary: پروفایل کاربر واردشده
+      responses:
+        '200':
+          description: کاربر
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ═══════════════════════════ سرپرستی ═══════════════════════════
+
+  /guardianships/invites:
+    post:
+      tags: [سرپرستی]
+      summary: ساخت کد دعوت
+      description: |
+        کد شش‌رقمی **فقط در همین پاسخ** برمی‌گردد. سرور آن را با
+        HMAC-SHA256 هش‌شده ذخیره می‌کند و بازیابی‌اش ممکن نیست؛ فهرست کدها
+        هرگز خودِ کد را برنمی‌گرداند.
+
+        اعتبار: ۱۵ دقیقه، یک‌بارمصرف.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissions]
+              properties:
+                permissions:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/Permission' }
+      responses:
+        '201':
+          description: کد ساخته شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: '482917'
+                    description: فقط همین یک بار برمی‌گردد
+                  invite: { $ref: '#/components/schemas/Invite' }
+                  expiresInMinutes: { type: integer, example: 15 }
+                  permissionLabels:
+                    type: array
+                    items: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+    get:
+      tags: [سرپرستی]
+      summary: فهرست کدهای ساخته‌شده
+      responses:
+        '200':
+          description: فهرست
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invites:
+                    type: array
+                    items: { $ref: '#/components/schemas/Invite' }
+
+  /guardianships/invites/{id}:
+    delete:
+      tags: [سرپرستی]
+      summary: لغو کد دعوت
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: لغو شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /guardianships/redeem:
+    post:
+      tags: [سرپرستی]
+      summary: مصرف کد دعوت
+      description: |
+        پیام خطا برای «کد اشتباه»، «کد منقضی» و «کد مصرف‌شده» عمداً یکسان
+        است تا نتوان با آزمون‌وخطا فهمید کدام کدها زمانی معتبر بوده‌اند.
+
+        مصرف کد اتمیک است: اگر دو نفر هم‌زمان بفرستند، فقط یکی موفق می‌شود.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, example: '482917' }
+      responses:
+        '201':
+          description: اتصال برقرار شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  guardianship: { $ref: '#/components/schemas/Guardianship' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: از قبل به این کاربر دسترسی دارید
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /guardianships:
+    get:
+      tags: [سرپرستی]
+      summary: فهرست دسترسی‌ها از هر دو سمت
+      description: |
+        یک نفر می‌تواند هم‌زمان در هر دو فهرست باشد: مادری که موقعیتش را با
+        فرزندش به اشتراک می‌گذارد و خودش هم مراقب مادرِ خودش است.
+      responses:
+        '200':
+          description: دو فهرست
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  guardians:
+                    description: کسانی که موقعیت **من** را می‌بینند
+                    type: array
+                    items: { $ref: '#/components/schemas/Guardianship' }
+                  primaries:
+                    description: کسانی که **من** موقعیتشان را می‌بینم
+                    type: array
+                    items: { $ref: '#/components/schemas/Guardianship' }
+
+  /guardianships/{id}:
+    patch:
+      tags: [سرپرستی]
+      summary: تغییر سطح دسترسی
+      description: فقط کاربر اصلی می‌تواند سطح دسترسی را تغییر دهد.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissions]
+              properties:
+                permissions:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/Permission' }
+      responses:
+        '200':
+          description: به‌روزرسانی شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  guardianship: { $ref: '#/components/schemas/Guardianship' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+    delete:
+      tags: [سرپرستی]
+      summary: قطع دسترسی
+      description: هر دو طرف می‌توانند قطع کنند.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: قطع شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+
+  # ═══════════════════════════ موقعیت ═══════════════════════════
+
+  /locations/ping:
+    post:
+      tags: [موقعیت]
+      summary: ارسال یک نمونه‌ی موقعیت
+      description: |
+        خط لوله‌ی اصلی سیستم. هر پینگ از این مسیر عبور می‌کند و به‌ترتیب:
+        ذخیره می‌شود، به‌روزرسانی باتری انجام می‌شود، به مراقبان مجاز پخش
+        می‌گردد، موتور Geofence اجرا می‌شود، توقف طولانی و باتری کم بررسی
+        می‌شوند.
+
+        **بی‌اثرسازی تکرار:** اگر `clientUuid` بدهید و همان مقدار قبلاً ثبت
+        شده باشد، ردیف تکراری ساخته نمی‌شود و همان ردیف قبلی برمی‌گردد —
+        با کد ۲۰۱، تا کلاینت صف آفلاینش را خالی کند.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PingInput' }
+      responses:
+        '201':
+          description: ثبت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ping: { $ref: '#/components/schemas/Ping' }
+                  status:
+                    type: object
+                    description: خلاصه‌ی وضعیت نسبت به محدوده‌های امن
+                  alerts:
+                    type: array
+                    items: { $ref: '#/components/schemas/Alert' }
+                  sharingEnabled: { type: boolean }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /locations/batch:
+    post:
+      tags: [موقعیت]
+      summary: تخلیه‌ی صف آفلاین
+      description: |
+        تا ۲۰۰ نقطه در یک درخواست. با بازه‌ی پیش‌فرض ۳۰ ثانیه یعنی حدود
+        ۱۰۰ دقیقه قطعی اینترنت در یک درخواست جبران می‌شود.
+
+        **فقط جدیدترین نقطه** وارد خط لوله‌ی هشدار می‌شود. دلیلش این است که
+        دسته معمولاً دقایقی از حرکتِ گذشته است؛ اگر موتور Geofence روی
+        تک‌تکشان اجرا شود، کاربری که نیم‌ساعت پیش بیرون رفته و برگشته،
+        همین حالا چند هشدارِ منقضی تولید می‌کند. تاریخچه کامل ذخیره
+        می‌شود، اما وضعیت لحظه‌ای فقط از آخرین نقطه می‌آید.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pings]
+              properties:
+                pings:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { $ref: '#/components/schemas/PingInput' }
+      responses:
+        '201':
+          description: نتیجه‌ی درج دسته‌ای
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted: { type: integer, example: 5 }
+                  duplicates:
+                    type: integer
+                    example: 0
+                    description: نقاطی که قبلاً با همان `clientUuid` ثبت شده بودند
+                  processMs: { type: integer }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /locations/status:
+    get:
+      tags: [موقعیت]
+      summary: وضعیت خودِ کاربر
+      description: |
+        توجه: در این پاسخ فیلد `status` یک **رشته** است
+        (`inside` / `outside` / `unknown`). در `/locations/current` و
+        `/locations/watching` همان نام یک **شیء** است.
+      responses:
+        '200':
+          description: وضعیت
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnStatus' }
+
+  /locations/watching:
+    get:
+      tags: [موقعیت]
+      summary: فهرست افراد تحت پایش با آخرین موقعیتشان
+      description: |
+        یک درخواست، همه‌ی اطلاعات صفحه‌ی خانه‌ی مراقب را می‌دهد.
+        فقط کسانی برمی‌گردند که سطح `view_location` داده‌اند.
+      responses:
+        '200':
+          description: فهرست
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  watching:
+                    type: array
+                    items: { $ref: '#/components/schemas/WatchedPerson' }
+
+  /locations/current:
+    get:
+      tags: [موقعیت]
+      summary: موقعیت فعلی یک کاربر
+      description: |
+        اگر کاربر اشتراک‌گذاری را خاموش کرده باشد، پاسخ **موفق** با
+        `hidden: true` و یک پیام محترمانه برمی‌گردد — نه خطا. این عمدی
+        است: خاموش کردن اشتراک‌گذاری یک انتخاب معتبر است، نه خرابی.
+      parameters:
+        - name: userId
+          in: query
+          schema: { type: string, format: uuid }
+          description: اگر ندهید، موقعیت خودتان برمی‌گردد
+      responses:
+        '200':
+          description: موقعیت
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WatchedPerson' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /locations/history:
+    get:
+      tags: [موقعیت]
+      summary: تاریخچه‌ی مسیر یک بازه
+      parameters:
+        - name: userId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 5000, default: 2000 }
+      responses:
+        '200':
+          description: نقاط مسیر و خلاصه‌ی آماری
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hidden: { type: boolean }
+                  points:
+                    type: array
+                    items: { $ref: '#/components/schemas/Ping' }
+                  stats:
+                    type: object
+                    nullable: true
+                    properties:
+                      pingCount: { type: integer }
+                      firstAt: { type: string, format: date-time, nullable: true }
+                      lastAt: { type: string, format: date-time, nullable: true }
+                      avgSpeedMps: { type: number, nullable: true }
+                      minBattery: { type: integer, nullable: true }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /locations/history/days:
+    get:
+      tags: [موقعیت]
+      summary: روزهایی که تاریخچه دارند
+      parameters:
+        - name: userId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: فهرست روزها
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  days:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        day: { type: string, format: date-time }
+                        pingCount: { type: integer }
+                        firstAt: { type: string, format: date-time }
+                        lastAt: { type: string, format: date-time }
+                        hasSimulated: { type: boolean }
+
+  /locations/sharing:
+    put:
+      tags: [موقعیت]
+      summary: روشن/خاموش کردن اشتراک‌گذاری موقعیت
+      description: |
+        کلید اصلی استقلال کاربر. با خاموش شدن:
+
+        | رفتار | نتیجه |
+        |---|---|
+        | ثبت پینگ در دیتابیس | ادامه دارد — تاریخچه‌ی خودِ کاربر مال خودِ اوست |
+        | پخش موقعیت به مراقبان | متوقف |
+        | هشدار خروج از محدوده | متوقف — چون خودِ این هشدار هم یک نشت موقعیت است |
+        | دکمه‌ی اضطراری (SOS) | **همچنان کار می‌کند** — کاربر خودش آغازش کرده |
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200':
+          description: تنظیمات به‌روزشده
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings: { $ref: '#/components/schemas/Settings' }
+
+  /locations/history/delete:
+    delete:
+      tags: [موقعیت]
+      summary: حذف تاریخچه‌ی موقعیت خود
+      description: |
+        مسیر واقعی این endpoint در سرور `DELETE /locations/history` است.
+        ردیف‌ها **واقعاً حذف می‌شوند**، نه اینکه پرچم «حذف‌شده» بخورند —
+        یکی از تعهدهای صریح محصول.
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: تعداد ردیف‌های حذف‌شده
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: integer }
+
+  # ═══════════════════════════ محدوده‌های امن ═══════════════════════════
+
+  /safe-zones:
+    get:
+      tags: [محدوده‌های امن]
+      summary: فهرست محدوده‌ها
+      responses:
+        '200':
+          description: فهرست
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  zones:
+                    type: array
+                    items: { $ref: '#/components/schemas/SafeZone' }
+
+    post:
+      tags: [محدوده‌های امن]
+      summary: ساخت محدوده‌ی امن
+      description: |
+        کف شعاع ۵۰ متر است. کمتر از آن با خطای معمول GPS شهری (۱۰ تا ۳۰
+        متر) هم‌مرتبه می‌شود و حتی با هیسترزیس هم هشدار کاذب تولید می‌کند.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, centerLat, centerLng, radiusM]
+              properties:
+                name: { type: string, maxLength: 60, example: 'خانه' }
+                centerLat: { type: number, format: double, example: 35.7219 }
+                centerLng: { type: number, format: double, example: 51.3347 }
+                radiusM: { type: integer, minimum: 50, maximum: 5000, example: 200 }
+                color: { type: string, example: '#2F6FED' }
+                icon: { type: string, example: 'home' }
+      responses:
+        '201':
+          description: ساخته شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  zone: { $ref: '#/components/schemas/SafeZone' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /safe-zones/{id}:
+    patch:
+      tags: [محدوده‌های امن]
+      summary: ویرایش محدوده
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                centerLat: { type: number, format: double }
+                centerLng: { type: number, format: double }
+                radiusM: { type: integer, minimum: 50, maximum: 5000 }
+                isActive: { type: boolean }
+      responses:
+        '200':
+          description: به‌روزرسانی شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  zone: { $ref: '#/components/schemas/SafeZone' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    delete:
+      tags: [محدوده‌های امن]
+      summary: حذف محدوده
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: حذف شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+
+  # ═══════════════════════════ هشدارها ═══════════════════════════
+
+  /alerts:
+    get:
+      tags: [هشدارها]
+      summary: فهرست هشدارها
+      parameters:
+        - name: userId
+          in: query
+          schema: { type: string, format: uuid }
+          description: فیلتر روی یک کاربر خاص (باید دسترسی داشته باشید)
+        - name: types
+          in: query
+          schema: { type: string, example: 'sos,zone_exit' }
+        - name: unreadOnly
+          in: query
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: فهرست
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items: { $ref: '#/components/schemas/Alert' }
+                  unreadCount: { type: integer }
+                  countsByType:
+                    type: object
+                    additionalProperties: { type: integer }
+
+  /alerts/{id}/read:
+    post:
+      tags: [هشدارها]
+      summary: علامت‌گذاری به‌عنوان خوانده‌شده
+      description: |
+        این فقط یک پرچم رابط کاربری نیست: سرور همین لحظه را در جدول
+        `alert_deliveries` به‌عنوان «زمان اطلاعِ انسان» ثبت می‌کند — همان
+        عددی که تأخیر واقعی سامانه را در گزارش ارزیابی می‌سازد.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: ثبت شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /alerts/read-all:
+    post:
+      tags: [هشدارها]
+      summary: خواندن همه‌ی هشدارها
+      responses:
+        '200':
+          description: انجام شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+
+  /alerts/{id}/resolve:
+    post:
+      tags: [هشدارها]
+      summary: بستن هشدار («رسیدگی شد»)
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: بسته شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+
+  # ═══════════════════════════ SOS ═══════════════════════════
+
+  /sos:
+    post:
+      tags: [SOS]
+      summary: فعال کردن هشدار اضطراری
+      description: |
+        اگر مختصات ندهید، سرور از آخرین موقعیت شناخته‌شده استفاده می‌کند و
+        در پاسخ با `isStale` علامتش می‌زند. «موقعیت قدیمی» بهتر از «هیچ
+        موقعیتی» است.
+
+        SOS حتی وقتی اشتراک‌گذاری موقعیت خاموش است هم کار می‌کند، چون خودِ
+        کاربر آغازش کرده است.
+
+        محدودیت نرخ: پیش‌فرض ۳ بار در دقیقه.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lat: { type: number, format: double }
+                lng: { type: number, format: double }
+                accuracyM: { type: number }
+                batteryLevel: { type: integer, minimum: 0, maximum: 100 }
+                note: { type: string, maxLength: 280 }
+      responses:
+        '201':
+          description: هشدار ثبت و توزیع شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alert: { $ref: '#/components/schemas/Alert' }
+                  recipients:
+                    type: array
+                    items: { $ref: '#/components/schemas/PersonSummary' }
+                  locationSource:
+                    type: string
+                    enum: [live, last_known, none]
+                  isStale: { type: boolean }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /sos/contacts:
+    get:
+      tags: [SOS]
+      summary: کسانی که هشدار اضطراری را دریافت می‌کنند
+      responses:
+        '200':
+          description: فهرست
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contacts:
+                    type: array
+                    items: { $ref: '#/components/schemas/PersonSummary' }
+
+  /sos/active:
+    get:
+      tags: [SOS]
+      summary: هشدار اضطراری فعال (رسیدگی‌نشده)
+      parameters:
+        - name: userId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: هشدار فعال یا null
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alert:
+                    nullable: true
+                    allOf: [{ $ref: '#/components/schemas/Alert' }]
+
+  # ═══════════════════════════ تنظیمات و دستگاه ═══════════════════════════
+
+  /settings:
+    get:
+      tags: [تنظیمات و دستگاه]
+      summary: تنظیمات کاربر
+      responses:
+        '200':
+          description: تنظیمات
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings: { $ref: '#/components/schemas/Settings' }
+
+    patch:
+      tags: [تنظیمات و دستگاه]
+      summary: ویرایش تنظیمات
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                locationSharingEnabled: { type: boolean }
+                longStopMinutes: { type: integer, minimum: 1, maximum: 240 }
+                longStopRadiusM: { type: integer, minimum: 5, maximum: 500 }
+                alertTypes:
+                  type: array
+                  items: { $ref: '#/components/schemas/AlertType' }
+                theme: { type: string, enum: [light, dark, system] }
+                pingIntervalSec: { type: integer, minimum: 5, maximum: 900 }
+                backgroundTrackingEnabled: { type: boolean }
+                textScale: { type: number, minimum: 0.8, maximum: 2 }
+                highContrastEnabled: { type: boolean }
+                hapticFeedbackEnabled: { type: boolean }
+                locationRetentionDays: { type: integer, minimum: 0, maximum: 3650 }
+      responses:
+        '200':
+          description: تنظیمات به‌روزشده
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings: { $ref: '#/components/schemas/Settings' }
+
+  /config/client:
+    get:
+      tags: [تنظیمات و دستگاه]
+      summary: پیکربندی کلاینت
+      description: |
+        اپ این را هنگام راه‌اندازی می‌خواند تا بازه‌ی ارسال موقعیت،
+        آستانه‌های Geofence و نام رویدادهای WebSocket از سرور بیایند — نه
+        از ثابت‌های داخل بیلد. تغییرشان نباید انتشار نسخه‌ی جدید در
+        فروشگاه را لازم کند.
+      responses:
+        '200':
+          description: پیکربندی
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  apiVersion: { type: string, example: v1 }
+                  tracking:
+                    type: object
+                    properties:
+                      pingIntervalSec: { type: integer, example: 30 }
+                      backgroundTrackingEnabled: { type: boolean }
+                      maxBatchSize: { type: integer, example: 200 }
+                      gpsLostAfterSec: { type: integer, example: 180 }
+                  geofence:
+                    type: object
+                    properties:
+                      hysteresisM: { type: integer, example: 25 }
+                      debounceCount: { type: integer, example: 2 }
+                      cooldownSec: { type: integer, example: 60 }
+                  accessibility:
+                    type: object
+                    properties:
+                      textScale: { type: number }
+                      highContrastEnabled: { type: boolean }
+                      hapticFeedbackEnabled: { type: boolean }
+                  realtime:
+                    type: object
+                    description: نام رویدادهای WebSocket، مشترک بین سرور و کلاینت‌ها
+                  features:
+                    type: object
+                    properties:
+                      demoMode: { type: boolean }
+                      pushNotifications:
+                        type: boolean
+                        description: فاز دوم — با گذاشتن کلید FCM فعال می‌شود
+                      fallDetection:
+                        type: boolean
+                        description: فاز سوم — فعلاً همیشه false
+
+  /devices:
+    post:
+      tags: [تنظیمات و دستگاه]
+      summary: ثبت یا به‌روزرسانی دستگاه
+      description: |
+        `installId` شناسه‌ی پایدارِ نصب است که خودِ اپ می‌سازد و در
+        Keychain/Keystore نگه می‌دارد. توکن FCM با پاک کردن داده یا نصب
+        مجدد عوض می‌شود؛ اگر یکتاسازی فقط بر آن استوار باشد، فهرست
+        دستگاه‌های کاربر پر از ردیف مرده می‌شود.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platform]
+              properties:
+                platform: { type: string, enum: [android, ios, web] }
+                installId: { type: string, format: uuid }
+                pushToken: { type: string, maxLength: 512 }
+                deviceName: { type: string, maxLength: 80 }
+                model: { type: string, maxLength: 64 }
+                osVersion: { type: string, maxLength: 48 }
+                appVersion: { type: string, maxLength: 24 }
+                batteryLevel: { type: integer, minimum: 0, maximum: 100 }
+      responses:
+        '201':
+          description: ثبت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device: { $ref: '#/components/schemas/Device' }
+
+    get:
+      tags: [تنظیمات و دستگاه]
+      summary: دستگاه‌های من
+      responses:
+        '200':
+          description: فهرست
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items: { $ref: '#/components/schemas/Device' }
+
+  /devices/{id}:
+    delete:
+      tags: [تنظیمات و دستگاه]
+      summary: حذف دستگاه
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: حذف شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  # ═══════════════════════════ مدیریت ═══════════════════════════
+
+  /admin/overview:
+    get:
+      tags: [مدیریت]
+      summary: نمای کلی سامانه
+      responses:
+        '200':
+          description: آمار و آخرین هشدارها
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    type: object
+                    properties:
+                      users:
+                        type: object
+                        properties:
+                          total: { type: integer }
+                          active: { type: integer }
+                          suspended: { type: integer }
+                          new7d: { type: integer }
+                          byRole:
+                            type: object
+                            properties:
+                              primary: { type: integer }
+                              guardian: { type: integer }
+                              admin: { type: integer }
+                      devicesActive: { type: integer }
+                      guardianshipsActive: { type: integer }
+                      alerts24h: { type: integer }
+                      sos24h: { type: integer }
+                      pings24h: { type: integer }
+                      pings24hSimulated:
+                        type: integer
+                        description: چند درصد داده‌ی امروز از شبیه‌ساز آمده
+                  recentAlerts:
+                    type: array
+                    description: بدون مختصات — ادمین به موقعیت دسترسی ندارد
+                    items:
+                      type: object
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/users:
+    get:
+      tags: [مدیریت]
+      summary: فهرست کاربران
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 60 }
+        - name: role
+          in: query
+          schema: { type: string, enum: [primary, guardian, admin] }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, suspended, deleted] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: فهرست
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items: { $ref: '#/components/schemas/AdminUser' }
+                  total: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/users/{id}:
+    get:
+      tags: [مدیریت]
+      summary: جزئیات یک کاربر
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: کاربر
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/AdminUser' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    delete:
+      tags: [مدیریت]
+      summary: حذف نرم حساب
+      description: |
+        ردیف کاربر باقی می‌ماند چون لاگ‌های سنجش و هشدارها به آن ارجاع
+        دارند و حذف سختش یعنی از دست رفتن داده‌ی ارزیابی.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: حذف شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/AdminUser' }
+        '409':
+          description: آخرین مدیر فعال را نمی‌توان حذف کرد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /admin/users/{id}/suspend:
+    post:
+      tags: [مدیریت]
+      summary: تعلیق حساب
+      description: |
+        تعلیق **فوری** اثر می‌کند: نقش و وضعیت در هر درخواست از دیتابیس
+        خوانده می‌شود (با حافظه‌ی نهانِ ۱۵ ثانیه‌ای که با همین عملیات پاک
+        می‌شود). یعنی توکن ۱۵ دقیقه‌ای که کاربر در دست دارد، بی‌درنگ
+        بی‌اثر می‌شود.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: معلق شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/AdminUser' }
+        '400':
+          description: نمی‌توانید حساب خودتان را معلق کنید
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /admin/users/{id}/activate:
+    post:
+      tags: [مدیریت]
+      summary: فعال‌سازی مجدد حساب
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: فعال شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/AdminUser' }
+
+  /admin/users/{id}/role:
+    patch:
+      tags: [مدیریت]
+      summary: تغییر نقش کاربر
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [primary, guardian, admin] }
+      responses:
+        '200':
+          description: نقش تغییر کرد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/AdminUser' }
+        '409':
+          description: نقش آخرین مدیر فعال را نمی‌توان برداشت
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /admin/devices:
+    get:
+      tags: [مدیریت]
+      summary: فهرست دستگاه‌ها
+      parameters:
+        - name: userId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: platform
+          in: query
+          schema: { type: string, enum: [android, ios, web] }
+        - name: includeRevoked
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: فهرست
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items: { $ref: '#/components/schemas/Device' }
+                  total: { type: integer }
+
+  /admin/devices/{id}/revoke:
+    post:
+      tags: [مدیریت]
+      summary: ابطال دستگاه
+      description: |
+        ردیف حذف نمی‌شود و فقط `revokedAt` پر و توکن Push پاک می‌شود:
+        تاریخچه‌ی «این دستگاه وجود داشته» برای حسابرسی لازم است، ولی از آن
+        لحظه هیچ نوتیفیکیشنی به آن نمی‌رود.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: ابطال شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device: { $ref: '#/components/schemas/Device' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/logs/requests:
+    get:
+      tags: [مدیریت]
+      summary: لاگ درخواست‌های سرور
+      description: |
+        ابزار سنجش «تأخیر سیستم». مسیر به‌صورت **الگو** ذخیره می‌شود
+        (`/api/v1/alerts/:id/read`) نه مسیر واقعی، و IP فقط به‌صورت HMAC.
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - name: route
+          in: query
+          schema: { type: string }
+        - name: minStatus
+          in: query
+          schema: { type: integer, minimum: 100, maximum: 599 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: فهرست لاگ‌ها
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items: { $ref: '#/components/schemas/RequestLog' }
+                  total: { type: integer }
+
+  /admin/logs/audit:
+    get:
+      tags: [مدیریت]
+      summary: لاگ حسابرسی
+      description: چه کسی چه کاری کرد. بدون مختصات و بدون داده‌ی حساس.
+      parameters:
+        - name: action
+          in: query
+          schema: { type: string, example: 'admin.user.suspend' }
+        - name: actorUserId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: فهرست
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditLog' }
+                  total: { type: integer }
+
+  /admin/logs/purge:
+    post:
+      tags: [مدیریت]
+      summary: پاک‌سازی لاگ‌های قدیمی
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [olderThanDays]
+              properties:
+                olderThanDays: { type: integer, minimum: 1, maximum: 3650 }
+      responses:
+        '200':
+          description: تعداد ردیف‌های حذف‌شده
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestLogs: { type: integer }
+                  locationTelemetry: { type: integer }
+
+  /admin/metrics:
+    get:
+      tags: [مدیریت]
+      summary: جدول ارزیابی سامانه
+      description: |
+        همان اعدادی که در فصل نتایج پایان‌نامه گزارش می‌شوند: **دقت
+        موقعیت‌یابی** و **تأخیر سیستم**.
+
+        علاوه بر میانگین، صدک‌های ۵۰/۹۵/۹۹ هم برمی‌گردند — میانگین
+        به‌تنهایی وضعیت بدترین کاربران را پنهان می‌کند.
+
+        پینگ‌هایی که از صف آفلاین با تأخیر آمده‌اند از محاسبه‌ی تأخیر کنار
+        گذاشته می‌شوند (تأخیرشان اندازه‌ی قطعیِ اینترنت است، نه کندی
+        سیستم) و تعدادشان جداگانه گزارش می‌شود تا حذفشان پنهان نماند.
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: سنجه‌ها
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Metrics' }
+
+  # ═══════════════════════════ شبیه‌ساز ═══════════════════════════
+
+  /simulator/routes:
+    get:
+      tags: [شبیه‌ساز]
+      summary: مسیرهای آماده‌ی شبیه‌سازی
+      responses:
+        '200':
+          description: فهرست مسیرها
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  routes: { type: array, items: { type: object } }
+                  demoMode: { type: boolean }
+
+  /simulator/start:
+    post:
+      tags: [شبیه‌ساز]
+      summary: شروع شبیه‌سازی حرکت
+      description: |
+        پینگ‌های شبیه‌سازی‌شده از همان endpoint واقعی عبور می‌کنند و همان
+        موتور Geofence رویشان اجرا می‌شود؛ اما در دیتابیس با
+        `isSimulated: true` و `source: simulator` برای همیشه قابل تشخیص
+        می‌مانند.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [routeId]
+              properties:
+                routeId: { type: string }
+                speedMultiplier: { type: number, minimum: 1, maximum: 40, default: 8 }
+                batteryLevel: { type: integer, default: 78 }
+      responses:
+        '200':
+          description: شروع شد
+          content:
+            application/json:
+              schema: { type: object }
+
+  /simulator/stop:
+    post:
+      tags: [شبیه‌ساز]
+      summary: توقف شبیه‌سازی
+      responses:
+        '200':
+          description: متوقف شد
+          content:
+            application/json:
+              schema: { type: object }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: ورودی نامعتبر
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: احراز هویت لازم است یا توکن نامعتبر است
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: دسترسی ندارید
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: یافت نشد
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: تعداد درخواست بیش از حد مجاز
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Ok:
+      type: object
+      properties:
+        ok: { type: boolean, example: true }
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string, example: 'BAD_REQUEST' }
+            message:
+              type: string
+              example: 'اطلاعات واردشده معتبر نیست.'
+              description: پیام فارسی و آماده‌ی نمایش به کاربر
+            details:
+              type: array
+              description: خطاهای فیلد‌به‌فیلد اعتبارسنجی
+              items:
+                type: object
+                properties:
+                  field: { type: string }
+                  message: { type: string }
+
+    Permission:
+      type: string
+      enum: [view_location, receive_alerts, emergency]
+
+    AlertType:
+      type: string
+      enum: [sos, zone_exit, zone_enter, long_stop, gps_lost, low_battery, fall_detected]
+      description: |
+        `fall_detected` مربوط به فاز سوم است. در فاز اول هیچ منطقی تولیدش
+        نمی‌کند، اما شما و رابط کاربری از همین حالا پذیرایش هستند.
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        phone: { type: string, example: '09123456789' }
+        fullName: { type: string, example: 'مریم رضایی' }
+        role: { type: string, enum: [primary, guardian, admin] }
+        status: { type: string, enum: [active, suspended, deleted] }
+        avatarColor: { type: string, example: '#2F6FED' }
+        createdAt: { type: string, format: date-time }
+
+    AdminUser:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            lastLoginAt: { type: string, format: date-time, nullable: true }
+            suspendedReason: { type: string, nullable: true }
+            deviceCount: { type: integer }
+            guardianCount: { type: integer }
+            watchingCount: { type: integer }
+            lastPingAt: { type: string, format: date-time, nullable: true }
+
+    PersonSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+        phone: { type: string }
+        avatarColor: { type: string }
+
+    AuthSession:
+      type: object
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        settings: { $ref: '#/components/schemas/Settings' }
+        accessToken: { type: string }
+        refreshToken: { type: string }
+
+    Settings:
+      type: object
+      properties:
+        locationSharingEnabled: { type: boolean }
+        longStopMinutes: { type: integer }
+        longStopRadiusM: { type: integer }
+        alertTypes:
+          type: array
+          items: { $ref: '#/components/schemas/AlertType' }
+        theme: { type: string, enum: [light, dark, system] }
+        pingIntervalSec: { type: integer, example: 30 }
+        backgroundTrackingEnabled: { type: boolean }
+        textScale: { type: number, example: 1.0 }
+        highContrastEnabled: { type: boolean }
+        hapticFeedbackEnabled: { type: boolean }
+        locationRetentionDays: { type: integer, example: 90 }
+
+    Invite:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        permissions:
+          type: array
+          items: { $ref: '#/components/schemas/Permission' }
+        expiresAt: { type: string, format: date-time }
+        usedAt: { type: string, format: date-time, nullable: true }
+        isUsed: { type: boolean }
+        isExpired: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    Guardianship:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        primaryUserId: { type: string, format: uuid }
+        guardianUserId: { type: string, format: uuid }
+        permissions:
+          type: array
+          items: { $ref: '#/components/schemas/Permission' }
+        status: { type: string, enum: [active, revoked] }
+        primaryUser: { $ref: '#/components/schemas/PersonSummary' }
+        guardianUser: { $ref: '#/components/schemas/PersonSummary' }
+        createdAt: { type: string, format: date-time }
+
+    PingInput:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number, format: double, minimum: -90, maximum: 90 }
+        lng: { type: number, format: double, minimum: -180, maximum: 180 }
+        accuracyM: { type: number, minimum: 0, maximum: 10000 }
+        speedMps: { type: number, minimum: 0, maximum: 200 }
+        headingDeg: { type: number, minimum: 0, maximum: 360 }
+        batteryLevel: { type: integer, minimum: 0, maximum: 100 }
+        clientUuid:
+          type: string
+          format: uuid
+          description: |
+            شناسه‌ای که اپ در **لحظه‌ی ثبت روی گوشی** می‌سازد (نه هنگام
+            ارسال). پایه‌ی بی‌اثرسازی تکرار.
+        provider:
+          type: string
+          enum: [gps, fused, network, passive]
+          description: برای تفکیک خطای GPS خالص از موقعیت ترکیبی
+        isQueuedReplay:
+          type: boolean
+          default: false
+          description: از صف آفلاین آمده — از محاسبه‌ی تأخیر کنار گذاشته می‌شود
+        isSimulated: { type: boolean, default: false }
+        recordedAt: { type: string, format: date-time }
+
+    Ping:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        userId: { type: string, format: uuid }
+        lat: { type: number, format: double }
+        lng: { type: number, format: double }
+        accuracyM: { type: number, nullable: true }
+        speedMps: { type: number, nullable: true }
+        batteryLevel: { type: integer, nullable: true }
+        isSimulated: { type: boolean }
+        source: { type: string, enum: [device, simulator, import] }
+        provider: { type: string, nullable: true }
+        isQueuedReplay: { type: boolean }
+        clientUuid: { type: string, format: uuid, nullable: true }
+        recordedAt: { type: string, format: date-time }
+        receivedAt: { type: string, format: date-time, nullable: true }
+
+    OwnStatus:
+      type: object
+      properties:
+        location:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/Ping' }]
+        status:
+          type: string
+          enum: [inside, outside, unknown]
+          description: در این endpoint یک رشته است، نه شیء
+        statusReason: { type: string }
+        gps:
+          type: object
+          properties:
+            isStale: { type: boolean }
+            silentSeconds: { type: integer }
+        sharing:
+          type: object
+          properties:
+            enabled: { type: boolean }
+            viewerCount: { type: integer }
+            viewers:
+              type: array
+              items: { $ref: '#/components/schemas/PersonSummary' }
+        batteryLevel: { type: integer, nullable: true }
+
+    WatchedPerson:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        user: { $ref: '#/components/schemas/PersonSummary' }
+        guardianshipId: { type: string, format: uuid }
+        permissions:
+          type: array
+          items: { $ref: '#/components/schemas/Permission' }
+        hidden:
+          type: boolean
+          description: کاربر اشتراک‌گذاری را خاموش کرده است
+        message:
+          type: string
+          description: پیام محترمانه برای حالت `hidden`
+        location:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/Ping' }]
+        status:
+          type: object
+          description: در این endpoint یک شیء است، نه رشته
+          properties:
+            status: { type: string, enum: [inside, outside, unknown] }
+            reason: { type: string }
+            insideZones:
+              type: array
+              items:
+                type: object
+                properties:
+                  zoneId: { type: string, format: uuid }
+                  zoneName: { type: string }
+        gps:
+          type: object
+          properties:
+            isStale: { type: boolean }
+            silentSeconds: { type: integer }
+        isOnline:
+          type: boolean
+          description: اتصال زنده‌ی WebSocket دارد
+
+    SafeZone:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        centerLat: { type: number, format: double }
+        centerLng: { type: number, format: double }
+        radiusM: { type: integer }
+        isActive: { type: boolean }
+        color: { type: string }
+        icon: { type: string }
+
+    Alert:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/AlertType' }
+        severity: { type: string, enum: [info, warning, critical] }
+        title: { type: string }
+        body: { type: string }
+        lat: { type: number, nullable: true }
+        lng: { type: number, nullable: true }
+        zoneName: { type: string, nullable: true }
+        isRead: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        subject: { $ref: '#/components/schemas/PersonSummary' }
+
+    Device:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        platform: { type: string, enum: [android, ios, web] }
+        deviceName: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        osVersion: { type: string, nullable: true }
+        appVersion: { type: string, nullable: true }
+        installId: { type: string, format: uuid, nullable: true }
+        hasPushToken:
+          type: boolean
+          description: خودِ توکن هرگز به کلاینت برنمی‌گردد
+        batteryLevel: { type: integer, nullable: true }
+        lastSeenAt: { type: string, format: date-time }
+        lastPingAt: { type: string, format: date-time, nullable: true }
+        revokedAt: { type: string, format: date-time, nullable: true }
+
+    RequestLog:
+      type: object
+      properties:
+        id: { type: integer }
+        requestId: { type: string, format: uuid }
+        userId: { type: string, format: uuid, nullable: true }
+        userName: { type: string, nullable: true }
+        method: { type: string }
+        route: { type: string, example: '/api/v1/alerts/:id/read' }
+        statusCode: { type: integer }
+        latencyMs: { type: integer }
+        errorCode: { type: string, nullable: true }
+        clientKind: { type: string, nullable: true, example: 'flutter-android' }
+        createdAt: { type: string, format: date-time }
+
+    AuditLog:
+      type: object
+      properties:
+        id: { type: integer }
+        actorUserId: { type: string, format: uuid, nullable: true }
+        actorName: { type: string, nullable: true }
+        actorRole: { type: string, nullable: true }
+        action: { type: string, example: 'admin.user.suspend' }
+        entityType: { type: string, nullable: true }
+        entityId: { type: string, nullable: true }
+        metadata: { type: object }
+        createdAt: { type: string, format: date-time }
+
+    Metrics:
+      type: object
+      properties:
+        range:
+          type: object
+          properties:
+            from: { type: string, format: date-time, nullable: true }
+            to: { type: string, format: date-time, nullable: true }
+        requests:
+          type: object
+          description: تأخیر سرور
+          properties:
+            total: { type: integer }
+            serverErrors: { type: integer }
+            clientErrors: { type: integer }
+            avgMs: { type: number, nullable: true }
+            p50Ms: { type: number, nullable: true }
+            p95Ms: { type: number, nullable: true }
+            p99Ms: { type: number, nullable: true }
+            maxMs: { type: number, nullable: true }
+        location:
+          type: object
+          description: دقت موقعیت‌یابی و تأخیر سرتاسری
+          properties:
+            total: { type: integer }
+            users: { type: integer }
+            queuedReplays:
+              type: integer
+              description: از محاسبه‌ی تأخیر کنار گذاشته شده‌اند
+            simulated: { type: integer }
+            accuracy:
+              type: object
+              properties:
+                avgM: { type: number, nullable: true }
+                p50M: { type: number, nullable: true }
+                p95M: { type: number, nullable: true }
+            latency:
+              type: object
+              properties:
+                avgE2eMs: { type: number, nullable: true }
+                p50E2eMs: { type: number, nullable: true }
+                p95E2eMs: { type: number, nullable: true }
+                avgProcessMs: { type: number, nullable: true }
+        deliveries:
+          type: array
+          description: تأخیر تحویل هشدار، به تفکیک کانال
+          items:
+            type: object
+            properties:
+              channel: { type: string, enum: [websocket, fcm, log, sms] }
+              total: { type: integer }
+              failed: { type: integer }
+              acknowledged:
+                type: integer
+                description: مراقب واقعاً هشدار را باز کرد
+              avgMs: { type: number, nullable: true }
+              p95Ms: { type: number, nullable: true }
+        slowestRoutes:
+          type: array
+          items:
+            type: object
+            properties:
+              route: { type: string }
+              count: { type: integer }
+              avgMs: { type: number, nullable: true }
+              p95Ms: { type: number, nullable: true }
+        dailySeries:
+          type: array
+          items:
+            type: object
+            properties:
+              day: { type: string, format: date-time }
+              count: { type: integer }
+              avgMs: { type: number, nullable: true }
+              errors: { type: integer }
