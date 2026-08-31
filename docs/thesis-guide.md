@@ -88,26 +88,16 @@
 
 ```mermaid
 flowchart TB
-    subgraph clients["کلاینت‌ها"]
-        direction RL
-        A["اپ Flutter<br/>کاربر اصلی"]
-        B["اپ Flutter<br/>مراقب"]
-        C["داشبورد وب"]
-        D["پنل ادمین"]
-    end
+    A["کلاینت‌ها<br/>اپ Flutter (کاربر اصلی) · اپ Flutter (مراقب)<br/>داشبورد وب · پنل ادمین"]
+    B["سرور — Node.js + Express<br/>احراز هویت · موتور Geofence<br/>توزیع هشدار · تله‌متری و لاگ سنجش"]
+    C[("PostgreSQL ۱۶<br/>۱۶ جدول")]
 
-    subgraph server["سرور — Node.js + Express"]
-        direction RL
-        E["احراز هویت"]
-        F["موتور Geofence"]
-        G["توزیع هشدار"]
-        H["تله‌متری و لاگ سنجش"]
-    end
+    A -->|"HTTPS (REST) + WebSocket"| B
+    B -->|SQL| C
 
-    DB[("PostgreSQL ۱۶<br/>۱۶ جدول")]
-
-    clients -->|"HTTPS (REST) + WebSocket"| server
-    server -->|SQL| DB
+    style A fill:#eef4ff,stroke:#2f6fed,stroke-width:1.5px
+    style B fill:#eef4ff,stroke:#2f6fed,stroke-width:1.5px
+    style C fill:#fff7e6,stroke:#e0a92f,stroke-width:1.5px
 ```
 
 <div dir="rtl" align="right">
