@@ -110,6 +110,18 @@ Xcode هر ماشین وابسته است. `flutter create` روی پوشه‌ی
 
 <div align="right">
 
+## آموزش پایان‌نامه
+
+اگر می‌خواهید سیستم را بفهمید، ارائه کنید و از آن دفاع کنید، از اینجا شروع کنید:
+
+**[`docs/thesis-guide.md`](docs/thesis-guide.md)**
+
+سیستم را از صفر توضیح می‌دهد — بدون نیاز به دانستن Node.js یا Flutter — و
+شامل سفر یک نقطه از GPS تا نقشه، دلیل هر تصمیم فنی، سناریوی نمایش زنده در
+جلسه، و بیست سؤال محتمل داور با جوابشان است.
+
+---
+
 ## مستندات API
 
 پس از بالا آمدن سرور:
@@ -227,7 +239,9 @@ safestep/
 │       ├── core/             theme · accessibility · network · storage · widgets
 │       └── features/         auth · pairing · tracking · sos · watching · alerts
 ├── web/                      داشبورد + پنل ادمین (بدون مرحله‌ی بیلد)
-├── docs/phase1/              مستندات گام‌به‌گام فاز اول
+├── docs/
+│   ├── thesis-guide.md       آموزش پایان‌نامه — فهم، ارائه و دفاع
+│   └── phase1/               مستندات گام‌به‌گام فاز اول
 └── docker-compose.yml
 ```
 
