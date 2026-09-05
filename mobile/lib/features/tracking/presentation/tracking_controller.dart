@@ -456,10 +456,8 @@ class TrackingController extends StateNotifier<TrackingState> {
   Future<Position?> currentPositionForEmergency() async {
     try {
       return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 6),
-        ),
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 6),
       );
     } catch (_) {
       // آخرین موقعیت شناخته‌شده، بهتر از هیچ است
