@@ -9,6 +9,7 @@ import '../../../core/theme/app_motion.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/fa.dart';
 import '../../../core/widgets/app_snackbar.dart';
+import '../data/sos_repository.dart';
 import 'sos_controller.dart';
 
 /// دکمه‌ی درخواست کمک اضطراری.
