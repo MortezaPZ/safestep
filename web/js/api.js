@@ -261,6 +261,24 @@ export const api = {
   stopSimulator: () => request('/simulator/stop', { method: 'POST' }),
   simulatorStatus: () => request('/simulator/status'),
 
+  /* ─── مدیریت سامانه ─── */
+  adminOverview: () => request('/admin/overview'),
+  adminUsers: (query = {}) => request('/admin/users', { query }),
+  adminUser: (id) => request(`/admin/users/${id}`),
+  adminSuspendUser: (id, reason) =>
+    request(`/admin/users/${id}/suspend`, { method: 'POST', body: { reason } }),
+  adminActivateUser: (id) => request(`/admin/users/${id}/activate`, { method: 'POST' }),
+  adminDeleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
+  adminChangeRole: (id, role) =>
+    request(`/admin/users/${id}/role`, { method: 'PATCH', body: { role } }),
+  adminDevices: (query = {}) => request('/admin/devices', { query }),
+  adminRevokeDevice: (id) => request(`/admin/devices/${id}/revoke`, { method: 'POST' }),
+  adminRequestLogs: (query = {}) => request('/admin/logs/requests', { query }),
+  adminAuditLogs: (query = {}) => request('/admin/logs/audit', { query }),
+  adminPurgeLogs: (olderThanDays) =>
+    request('/admin/logs/purge', { method: 'POST', body: { olderThanDays } }),
+  adminMetrics: (query = {}) => request('/admin/metrics', { query }),
+
   /* ─── سلامت ─── */
   health: () => fetch('/health').then((r) => r.json()),
 };
