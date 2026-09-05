@@ -16,7 +16,7 @@ dependencies:
   # بدون این، حتی با تنظیم Locale، دکمه‌های سیستمی انگلیسی می‌مانند.
   flutter_localizations:
     sdk: flutter
-  intl: ^0.19.0
+  intl: ^0.20.3
 
   # ── مدیریت حالت ───────────────────────────────────────────────────────
   # انتخاب: Riverpod. دلیل کامل در docs/phase1/03-flutter-foundation.md
