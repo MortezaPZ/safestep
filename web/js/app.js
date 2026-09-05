@@ -19,6 +19,7 @@ import { mountZones } from './views/zones.js';
 import { mountHistory } from './views/history.js';
 import { mountSettings } from './views/settings.js';
 import { mountDemo } from './views/demo.js';
+import { mountAdmin } from './views/admin.js';
 
 const root = $('#root');
 
@@ -36,27 +37,30 @@ const state = {
 /* ─────────────────────── تعریف تب‌ها ─────────────────────── */
 
 const VIEWS = {
+  admin: { label: 'مدیریت سامانه', icon: '🛡️', mount: mountAdmin, forAdmin: true },
   dashboard: { label: 'داشبورد', icon: '🏠', mount: mountDashboard, forPrimary: true },
   guardian: { label: 'تحت مراقبت', icon: '👀', mount: mountGuardian, forGuardian: true },
   alerts: { label: 'هشدارها', icon: '🔔', mount: mountAlerts, always: true, badge: true },
   zones: { label: 'محدوده‌های امن', icon: '📍', mount: mountZones, forPrimary: true },
   family: { label: 'اعضای خانواده', icon: '👨‍👩‍👧', mount: mountFamily, always: true },
-  history: { label: 'تاریخچه‌ی مسیر', icon: '🗺️', mount: mountHistory, always: true },
+  history: { label: 'تاریخچه‌ی مسیر', icon: '🗺️', mount: mountHistory, forHistory: true },
   demo: { label: 'حالت نمایش', icon: '🎬', mount: mountDemo, forPrimary: true },
   settings: { label: 'تنظیمات', icon: '⚙️', mount: mountSettings, always: true },
 };
 
 /**
  * تعیین تب‌های قابل نمایش.
- * «کاربر اصلی بودن» یعنی نقش primary دارد یا محدوده‌ی امن ساخته است.
- * «عضو خانواده بودن» یعنی حداقل یک رابطه‌ی فعال با کاربر دیگری دارد.
+ * ادمین تب‌های موقعیت‌محور را نمی‌بیند مگر خودش هم رابطه‌ی سرپرستی داشته باشد.
  */
 function visibleViews() {
+  const isAdmin = state.user?.role === 'admin';
   const isPrimary = state.user?.role === 'primary';
   const isGuardian = state.links.primaries.length > 0;
 
   return Object.entries(VIEWS).filter(([, view]) => {
+    if (view.forAdmin) return isAdmin;
     if (view.always) return true;
+    if (view.forHistory) return isPrimary || isGuardian;
     if (view.forPrimary && isPrimary) return true;
     if (view.forGuardian && isGuardian) return true;
     return false;
@@ -65,6 +69,7 @@ function visibleViews() {
 
 /** نمای پیش‌فرض بر اساس نقش. */
 function defaultView() {
+  if (state.user?.role === 'admin') return 'admin';
   if (state.user?.role === 'guardian' || state.links.primaries.length > 0) {
     return state.user?.role === 'primary' ? 'dashboard' : 'guardian';
   }
