@@ -1826,6 +1826,13 @@ components:
         isActive: { type: boolean }
         color: { type: string }
         icon: { type: string }
+        shape: { type: string, enum: [circle, polygon] }
+        polygon: { type: array, items: { type: array, items: { type: number } } }
+        schedule: { type: object, nullable: true }
+        alertOnEnter: { type: boolean }
+        alertOnExit: { type: boolean }
+        dwellAlertMinutes: { type: integer, nullable: true }
+        scheduleActive: { type: boolean }
 
     Alert:
       type: object

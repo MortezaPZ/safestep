@@ -32,6 +32,7 @@ import {
   LOCATION_PROVIDERS,
   AUDIT_ACTIONS,
   PLATFORMS,
+  ALL_ZONE_SHAPES,
 } from '../config/constants.js';
 
 const router = Router();
@@ -239,21 +240,51 @@ router.put(
 
 /* ═══════════════════════ محدوده‌های امن ═══════════════════════ */
 
+const latLngPair = z.union([
+  z.tuple([schemas.lat, schemas.lng]),
+  z.object({ lat: schemas.lat, lng: schemas.lng }),
+]);
+
+const scheduleSchema = z.object({
+  timezone: z.string().min(1).max(64).optional(),
+  windows: z.array(z.object({
+    days: z.array(z.number().int().min(0).max(6)).min(1),
+    from: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    to: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  })).min(1),
+}).optional().nullable();
+
 const safeZoneBody = {
   name: z.string().trim().min(1, 'نام محدوده را وارد کنید.').max(60, 'نام بیش از حد طولانی است.'),
-  centerLat: schemas.lat,
-  centerLng: schemas.lng,
-  radiusM: schemas.radiusM,
+  shape: z.enum(ALL_ZONE_SHAPES).optional(),
+  centerLat: schemas.lat.optional(),
+  centerLng: schemas.lng.optional(),
+  radiusM: schemas.radiusM.optional(),
+  polygon: z.array(latLngPair).min(3).max(60).optional(),
+  schedule: scheduleSchema,
+  alertOnEnter: z.boolean().optional(),
+  alertOnExit: z.boolean().optional(),
+  dwellAlertMinutes: z.number().int().min(1).max(1440).optional().nullable(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'کد رنگ معتبر نیست.').optional(),
   icon: z.string().max(32).optional(),
 };
+
+const safeZoneCreate = z.object(safeZoneBody).superRefine((val, ctx) => {
+  const shape = val.shape ?? 'circle';
+  if (shape === 'polygon' && !val.polygon) {
+    ctx.addIssue({ code: 'custom', message: 'برای چندضلعی آرایه‌ی رأس لازم است.', path: ['polygon'] });
+  }
+  if (shape === 'circle' && (val.centerLat == null || val.centerLng == null || val.radiusM == null)) {
+    ctx.addIssue({ code: 'custom', message: 'برای دایره مرکز و شعاع لازم است.', path: ['radiusM'] });
+  }
+});
 
 router.get('/safe-zones', requireAuth, safeZone.list);
 
 router.post(
   '/safe-zones',
   requireAuth,
-  validate({ body: z.object(safeZoneBody) }),
+  validate({ body: safeZoneCreate }),
   safeZone.create,
 );
 
@@ -262,9 +293,11 @@ router.post(
   requireAuth,
   validate({
     body: z.object({
-      centerLat: schemas.lat,
-      centerLng: schemas.lng,
-      radiusM: schemas.radiusM,
+      shape: z.enum(ALL_ZONE_SHAPES).optional(),
+      centerLat: schemas.lat.optional(),
+      centerLng: schemas.lng.optional(),
+      radiusM: schemas.radiusM.optional(),
+      polygon: z.array(latLngPair).min(3).max(60).optional(),
     }),
   }),
   safeZone.preview,
@@ -277,9 +310,15 @@ router.patch(
     params: z.object({ id: schemas.uuid }),
     body: z.object({
       name: safeZoneBody.name.optional(),
+      shape: z.enum(ALL_ZONE_SHAPES).optional(),
       centerLat: schemas.lat.optional(),
       centerLng: schemas.lng.optional(),
       radiusM: schemas.radiusM.optional(),
+      polygon: z.array(latLngPair).min(3).max(60).optional(),
+      schedule: scheduleSchema,
+      alertOnEnter: z.boolean().optional(),
+      alertOnExit: z.boolean().optional(),
+      dwellAlertMinutes: z.number().int().min(1).max(1440).optional().nullable(),
       isActive: z.boolean().optional(),
       color: safeZoneBody.color,
       icon: safeZoneBody.icon,
@@ -388,6 +427,8 @@ router.patch(
       highContrastEnabled: z.boolean().optional(),
       hapticFeedbackEnabled: z.boolean().optional(),
       locationRetentionDays: z.number().int().min(0).max(3650).optional(),
+      adaptivePingEnabled: z.boolean().optional(),
+      pingIntervalStationarySec: z.number().int().min(30).max(1800).optional(),
     }),
   }),
   settings.update,

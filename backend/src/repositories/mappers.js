@@ -44,6 +44,8 @@ export function mapSettings(row) {
     highContrastEnabled: row.high_contrast_enabled,
     hapticFeedbackEnabled: row.haptic_feedback_enabled,
     locationRetentionDays: row.location_retention_days,
+    adaptivePingEnabled: row.adaptive_ping_enabled !== false,
+    pingIntervalStationarySec: row.ping_interval_stationary_sec ?? 120,
     updatedAt: d(row.updated_at),
   };
 }
@@ -132,6 +134,12 @@ export function mapSafeZone(row) {
     isActive: row.is_active,
     color: row.color,
     icon: row.icon,
+    shape: row.shape ?? 'circle',
+    polygon: row.polygon ?? null,
+    schedule: row.schedule ?? null,
+    alertOnEnter: row.alert_on_enter !== false,
+    alertOnExit: row.alert_on_exit !== false,
+    dwellAlertMinutes: row.dwell_alert_minutes ?? null,
     createdAt: d(row.created_at),
     updatedAt: d(row.updated_at),
   };
@@ -149,6 +157,7 @@ export function mapZoneState(row) {
     lastTransitionAt: d(row.last_transition_at),
     lastAlertAt: d(row.last_alert_at),
     lastEvaluatedAt: d(row.last_evaluated_at),
+    lastDwellAlertAt: d(row.last_dwell_alert_at),
     ...(row.zone_name !== undefined
       ? { zoneName: row.zone_name, radiusM: row.radius_m, isActive: row.is_active }
       : {}),

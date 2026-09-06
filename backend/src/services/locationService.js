@@ -31,7 +31,7 @@ import * as guardianshipRepository from '../repositories/guardianshipRepository.
 import * as userRepository from '../repositories/userRepository.js';
 import * as deviceRepository from '../repositories/deviceRepository.js';
 import * as alertRepository from '../repositories/alertRepository.js';
-import { evaluateZone, isCooldownElapsed, summarizeState } from './geofenceEngine.js';
+import { evaluateZone, isCooldownElapsed, summarizeState, isScheduleActive } from './geofenceEngine.js';
 import { detectStop, shouldAlertStop, detectGpsLost } from './stopDetector.js';
 import { raiseAlert } from './alertService.js';
 import telemetryService from './telemetryService.js';
@@ -283,10 +283,28 @@ async function evaluateGeofences(userId, ping, { allowAlerts }) {
   for (const zone of zones) {
     const previous = stateByZone.get(zone.id) ?? null;
     const result = evaluateZone({ lat: ping.lat, lng: ping.lng }, zone, previous, geofenceConfig);
+    const scheduleOn = isScheduleActive(zone.schedule, new Date());
+    const enterOk = zone.alertOnEnter !== false;
+    const exitOk = zone.alertOnExit !== false;
 
-    const reportable = result.event === 'exit' || result.event === 'enter';
+    const reportable = (result.event === 'exit' && exitOk) || (result.event === 'enter' && enterOk);
     const cooldownOk = isCooldownElapsed(previous?.lastAlertAt, geofenceConfig);
-    const willAlert = Boolean(allowAlerts && reportable && cooldownOk);
+    const willAlert = Boolean(allowAlerts && scheduleOn && reportable && cooldownOk);
+
+    let dwellAlerted = false;
+    if (
+      allowAlerts &&
+      scheduleOn &&
+      zone.dwellAlertMinutes &&
+      result.state === 'outside'
+    ) {
+      const since = previous?.lastTransitionAt ? new Date(previous.lastTransitionAt).getTime() : null;
+      const dwellMs = zone.dwellAlertMinutes * 60 * 1000;
+      const lastDwell = previous?.lastDwellAlertAt ? new Date(previous.lastDwellAlertAt).getTime() : 0;
+      if (since && Date.now() - since >= dwellMs && lastDwell < since) {
+        dwellAlerted = true;
+      }
+    }
 
     await safeZoneRepository.upsertZoneState({
       userId,
@@ -297,6 +315,7 @@ async function evaluateGeofences(userId, ping, { allowAlerts }) {
       lastDistanceM: result.distanceM,
       transitioned: result.transitioned,
       alerted: willAlert,
+      dwellAlerted,
     });
 
     states.push({
@@ -347,6 +366,19 @@ async function evaluateGeofences(userId, ping, { allowAlerts }) {
       });
     } else if (reportable && !cooldownOk) {
       log.debug('هشدار به دلیل دوره‌ی خاموشی صادر نشد', { userId, zoneId: zone.id });
+    }
+
+    if (dwellAlerted && !willAlert) {
+      const minutes = zone.dwellAlertMinutes;
+      const { alert } = await raiseAlert({
+        userId,
+        type: ALERT_TYPES.ZONE_EXIT,
+        location: { lat: ping.lat, lng: ping.lng },
+        zoneId: zone.id,
+        context: { zoneName: zone.name, dwell: true, dwellMinutes: minutes },
+        metadata: { dwellMinutes: minutes, isSimulated: ping.isSimulated },
+      });
+      alerts.push(alert);
     }
   }
 

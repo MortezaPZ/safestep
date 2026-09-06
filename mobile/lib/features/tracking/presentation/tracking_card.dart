@@ -308,10 +308,14 @@ class _Visual {
       case TrackingStatus.live:
         final DateTime? sentAt = state.lastSentAt;
         return _Visual(
-          title: 'موقعیت شما در حال ارسال است',
-          detail: sentAt == null
-              ? 'در انتظار اولین موقعیت…'
-              : 'آخرین ارسال: ${Fa.timeAgo(sentAt)}',
+          title: state.powerSave
+              ? 'حالت صرفه‌جویی باتری'
+              : 'موقعیت شما در حال ارسال است',
+          detail: state.powerSave
+              ? 'حرکت کمی است؛ بازه‌ی ارسال طولانی‌تر شده است.'
+              : sentAt == null
+                  ? 'در انتظار اولین موقعیت…'
+                  : 'آخرین ارسال: ${Fa.timeAgo(sentAt)}',
           icon: Icons.location_on_rounded,
           color: AppColors.success,
         );

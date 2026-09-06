@@ -137,27 +137,42 @@ export class SafeMap {
 
     for (const zone of zones) {
       const group = L.layerGroup();
+      const color = zone.color ?? '#2F6FED';
+      const opacity = zone.isActive === false ? 0.35 : 0.9;
 
-      L.circle([zone.centerLat, zone.centerLng], {
-        radius: zone.radiusM,
-        color: zone.color ?? '#2F6FED',
-        weight: 2,
-        opacity: zone.isActive === false ? 0.35 : 0.9,
-        fillColor: zone.color ?? '#2F6FED',
-        fillOpacity: zone.isActive === false ? 0.04 : 0.1,
-      })
-        .bindTooltip(zone.name, { permanent: false, direction: 'center' })
-        .addTo(group);
-
-      if (showThresholds && zone.thresholds) {
+      if (zone.shape === 'polygon' && Array.isArray(zone.polygon) && zone.polygon.length >= 3) {
+        const latlngs = zone.polygon.map((p) => (Array.isArray(p) ? [p[0], p[1]] : [p.lat, p.lng]));
+        L.polygon(latlngs, {
+          color,
+          weight: 2,
+          opacity,
+          fillColor: color,
+          fillOpacity: zone.isActive === false ? 0.04 : 0.1,
+        })
+          .bindTooltip(zone.name, { permanent: false, direction: 'center' })
+          .addTo(group);
+      } else {
         L.circle([zone.centerLat, zone.centerLng], {
-          radius: zone.thresholds.exitThresholdM,
-          color: zone.color ?? '#2F6FED',
-          weight: 1,
-          opacity: 0.45,
-          dashArray: '5 6',
-          fill: false,
-        }).addTo(group);
+          radius: zone.radiusM,
+          color,
+          weight: 2,
+          opacity,
+          fillColor: color,
+          fillOpacity: zone.isActive === false ? 0.04 : 0.1,
+        })
+          .bindTooltip(zone.name, { permanent: false, direction: 'center' })
+          .addTo(group);
+
+        if (showThresholds && zone.thresholds) {
+          L.circle([zone.centerLat, zone.centerLng], {
+            radius: zone.thresholds.exitThresholdM,
+            color,
+            weight: 1,
+            opacity: 0.45,
+            dashArray: '5 6',
+            fill: false,
+          }).addTo(group);
+        }
       }
 
       group.addTo(this.map);
