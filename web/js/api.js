@@ -172,6 +172,12 @@ export const api = {
     return saveSession(data);
   },
 
+  requestOtp: (phone, purpose) =>
+    request('/auth/otp/request', { method: 'POST', body: { phone, purpose }, auth: false }),
+  verifyOtp: (phone, code, purpose) =>
+    request('/auth/otp/verify', { method: 'POST', body: { phone, code, purpose }, auth: false }),
+  publicConfig: () => request('/config/public', { auth: false }),
+
   async login(phone, password) {
     const data = await request('/auth/login', {
       method: 'POST',

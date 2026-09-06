@@ -135,7 +135,18 @@ class AuthController extends StateNotifier<AuthState> {
     required String password,
     required String fullName,
     required UserRole role,
+    String? verificationToken,
   }) async {
+    state = state.copyWith(busy: true, clearError: true);
+
+    try {
+      final AuthSession session = await _repository.register(
+        phone: phone,
+        password: password,
+        fullName: fullName,
+        role: role,
+        verificationToken: verificationToken,
+      );
     state = state.copyWith(busy: true, clearError: true);
 
     try {

@@ -22,7 +22,19 @@ class AuthRepository {
     required String password,
     required String fullName,
     required UserRole role,
+    String? verificationToken,
   }) async {
+    final AuthSession session = await _api.post<AuthSession>(
+      ApiEndpoints.register,
+      (dynamic data) => AuthSession.fromJson(_asMap(data)),
+      body: <String, dynamic>{
+        'phone': Fa.normalizePhone(phone),
+        'password': password,
+        'fullName': fullName.trim(),
+        'role': role == UserRole.guardian ? 'guardian' : 'primary',
+        if (verificationToken != null) 'verificationToken': verificationToken,
+      },
+    );
     final AuthSession session = await _api.post<AuthSession>(
       ApiEndpoints.register,
       (dynamic data) => AuthSession.fromJson(_asMap(data)),
@@ -159,6 +171,42 @@ class AuthRepository {
   Future<void> cacheUser(AppUser user) => _tokenStore.saveUser(user.toJson());
 
   Future<void> clearLocal() => _tokenStore.clearSession();
+
+  Future<Map<String, dynamic>> publicConfig() {
+    return _api.get<Map<String, dynamic>>(
+      ApiEndpoints.publicConfig,
+      (dynamic data) => data is Map<String, dynamic> ? data : <String, dynamic>{},
+    );
+  }
+
+  Future<String?> requestOtp(String phone, String purpose) async {
+    final Map<String, dynamic> data = await _api.post<Map<String, dynamic>>(
+      ApiEndpoints.otpRequest,
+      (dynamic d) => d is Map<String, dynamic> ? d : <String, dynamic>{},
+      body: <String, dynamic>{
+        'phone': Fa.normalizePhone(phone),
+        'purpose': purpose,
+      },
+    );
+    return data['hint'] as String?;
+  }
+
+  Future<String> verifyOtp(String phone, String code, String purpose) {
+    return _api.post<String>(
+      ApiEndpoints.otpVerify,
+      (dynamic d) {
+        if (d is Map<String, dynamic> && d['verificationToken'] is String) {
+          return d['verificationToken'] as String;
+        }
+        throw const AppException(message: 'تأیید شماره ناموفق بود.', code: 'OTP');
+      },
+      body: <String, dynamic>{
+        'phone': Fa.normalizePhone(phone),
+        'code': code,
+        'purpose': purpose,
+      },
+    );
+  }
 
   Future<void> _persist(AuthSession session) async {
     await _tokenStore.saveTokens(

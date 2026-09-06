@@ -24,6 +24,7 @@ export function mapUser(row) {
     avatarColor: row.avatar_color,
     createdAt: d(row.created_at),
     lastLoginAt: d(row.last_login_at),
+    phoneVerifiedAt: d(row.phone_verified_at),
   };
 }
 

@@ -71,6 +71,13 @@ const env = {
     refreshTtl: str('JWT_REFRESH_TTL', '30d'),
     invitePepper: str('INVITE_CODE_PEPPER', 'dev-only-invite-pepper-change-me-in-production'),
     bcryptRounds: num('BCRYPT_ROUNDS', 10),
+    phoneVerificationRequired: bool('PHONE_VERIFICATION_REQUIRED', false),
+  },
+
+  sms: {
+    driver: str('SMS_DRIVER', 'console'),
+    apiKey: str('SMS_API_KEY', ''),
+    template: str('SMS_TEMPLATE', 'safestep-verify'),
   },
 
   rateLimit: {

@@ -309,7 +309,10 @@ class ApiClient {
   static bool _isPublic(String path) {
     return path == ApiEndpoints.login ||
         path == ApiEndpoints.register ||
-        path == ApiEndpoints.refresh;
+        path == ApiEndpoints.refresh ||
+        path == ApiEndpoints.otpRequest ||
+        path == ApiEndpoints.otpVerify ||
+        path == ApiEndpoints.publicConfig;
   }
 
   static String get _clientKind {
