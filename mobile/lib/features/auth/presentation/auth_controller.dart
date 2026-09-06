@@ -147,15 +147,6 @@ class AuthController extends StateNotifier<AuthState> {
         role: role,
         verificationToken: verificationToken,
       );
-    state = state.copyWith(busy: true, clearError: true);
-
-    try {
-      final AuthSession session = await _repository.register(
-        phone: phone,
-        password: password,
-        fullName: fullName,
-        role: role,
-      );
 
       state = AuthState(
         status: AuthStatus.authenticated,

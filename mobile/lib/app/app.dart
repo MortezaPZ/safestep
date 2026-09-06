@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:safestep/l10n/app_localizations.dart';
+
 import '../core/accessibility/accessibility_settings.dart';
 import '../core/constants/app_config.dart';
 import '../core/push/push_service.dart';
@@ -55,9 +57,10 @@ class _SafeStepAppState extends ConsumerState<SafeStepApp> {
       darkTheme: AppTheme.dark(highContrast: a11y.highContrast),
       themeMode: a11y.themeMode,
 
-      locale: const Locale('fa', 'IR'),
-      supportedLocales: const <Locale>[Locale('fa', 'IR')],
+      locale: Locale(a11y.localeCode),
+      supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -74,7 +77,9 @@ class _SafeStepAppState extends ConsumerState<SafeStepApp> {
         return MediaQuery(
           data: media.copyWith(textScaler: TextScaler.linear(effective)),
           child: Directionality(
-            textDirection: TextDirection.rtl,
+            textDirection: a11y.localeCode == 'en'
+                ? TextDirection.ltr
+                : TextDirection.rtl,
             child: child ?? const SizedBox.shrink(),
           ),
         );

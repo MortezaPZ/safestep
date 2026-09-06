@@ -1,0 +1,22 @@
+{
+  "@@locale": "en",
+  "login": "Log in",
+  "register": "Sign up",
+  "roleSelect": "Choose your role",
+  "home": "Home",
+  "alerts": "Alerts",
+  "welcomeBack": "Welcome back",
+  "loginHint": "Sign in with the phone number you registered.",
+  "phoneLabel": "Mobile number",
+  "passwordLabel": "Password",
+  "noAccount": "No account? Sign up",
+  "language": "Language",
+  "alertSos": "Help request",
+  "alertZoneExit": "Left the safe zone",
+  "alertZoneEnter": "Returned to the safe zone",
+  "alertLongStop": "Long stop",
+  "alertGpsLost": "Location lost",
+  "alertLowBattery": "Low battery",
+  "alertFall": "Fall detected",
+  "alertGeneric": "Alert"
+}

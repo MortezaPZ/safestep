@@ -9,7 +9,7 @@ import api, { loadSession, getAccessToken, clearSession, patchStoredSettings } f
 import realtime, { WS_EVENTS, CONNECTION_LABELS } from './realtime.js';
 import { el, render, toast, $, applyTheme, getTheme, cycleTheme, THEME_ICONS, THEME_LABELS } from './ui.js';
 import { faNumber, initials } from './format.js';
-
+import { t } from './i18n.js';
 import { mountAuth } from './views/auth.js';
 import { mountDashboard } from './views/dashboard.js';
 import { mountGuardian } from './views/guardian.js';
@@ -37,15 +37,15 @@ const state = {
 /* ─────────────────────── تعریف تب‌ها ─────────────────────── */
 
 const VIEWS = {
-  admin: { label: 'مدیریت سامانه', icon: '🛡️', mount: mountAdmin, forAdmin: true },
-  dashboard: { label: 'داشبورد', icon: '🏠', mount: mountDashboard, forPrimary: true },
-  guardian: { label: 'تحت مراقبت', icon: '👀', mount: mountGuardian, forGuardian: true },
-  alerts: { label: 'هشدارها', icon: '🔔', mount: mountAlerts, always: true, badge: true },
-  zones: { label: 'محدوده‌های امن', icon: '📍', mount: mountZones, forPrimary: true },
-  family: { label: 'اعضای خانواده', icon: '👨‍👩‍👧', mount: mountFamily, always: true },
-  history: { label: 'تاریخچه‌ی مسیر', icon: '🗺️', mount: mountHistory, forHistory: true },
-  demo: { label: 'حالت نمایش', icon: '🎬', mount: mountDemo, forPrimary: true },
-  settings: { label: 'تنظیمات', icon: '⚙️', mount: mountSettings, always: true },
+  admin: { labelKey: 'navAdmin', icon: '🛡️', mount: mountAdmin, forAdmin: true },
+  dashboard: { labelKey: 'navDashboard', icon: '🏠', mount: mountDashboard, forPrimary: true },
+  guardian: { labelKey: 'navGuardian', icon: '👀', mount: mountGuardian, forGuardian: true },
+  alerts: { labelKey: 'alerts', icon: '🔔', mount: mountAlerts, always: true, badge: true },
+  zones: { labelKey: 'navZones', icon: '📍', mount: mountZones, forPrimary: true },
+  family: { labelKey: 'navFamily', icon: '👨‍👩‍👧', mount: mountFamily, always: true },
+  history: { labelKey: 'navHistory', icon: '🗺️', mount: mountHistory, forHistory: true },
+  demo: { labelKey: 'navDemo', icon: '🎬', mount: mountDemo, forPrimary: true },
+  settings: { labelKey: 'navSettings', icon: '⚙️', mount: mountSettings, always: true },
 };
 
 /**
@@ -140,7 +140,7 @@ function renderTabs() {
           onClick: () => navigate(key),
         },
         el('span', { text: view.icon, ariaHidden: 'true' }),
-        el('span', { text: view.label }),
+        el('span', { text: t(view.labelKey) }),
         view.badge && state.unreadCount > 0
           ? el('span.nav-tab__badge', { text: faNumber(state.unreadCount) })
           : null,

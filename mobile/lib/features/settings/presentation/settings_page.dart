@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:safestep/l10n/app_localizations.dart';
 
 import '../../../app/router.dart';
 import '../../../core/constants/app_config.dart';
@@ -10,10 +11,12 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/accessibility/accessibility_settings.dart';
 import '../../../core/utils/fa.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../fall/data/fall_repository.dart';
+import '../../tracking/presentation/tracking_controller.dart';
 
 /// تنظیمات.
 ///
@@ -105,6 +108,37 @@ class SettingsPage extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.md),
           ],
+
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(AppLocalizations.of(context)?.language ?? 'زبان',
+                    style: theme.textTheme.titleSmall),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: 8,
+                  children: <Widget>[
+                    ChoiceChip(
+                      label: const Text('فارسی'),
+                      selected: ref.watch(accessibilityProvider).localeCode == 'fa',
+                      onSelected: (_) => ref
+                          .read(accessibilityProvider.notifier)
+                          .setLocaleCode('fa'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('English'),
+                      selected: ref.watch(accessibilityProvider).localeCode == 'en',
+                      onSelected: (_) => ref
+                          .read(accessibilityProvider.notifier)
+                          .setLocaleCode('en'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
 
           AppCard(
             padding: EdgeInsets.zero,

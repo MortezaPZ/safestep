@@ -12,6 +12,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
+import 'package:safestep/l10n/app_localizations.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_models.dart';
 import 'auth_controller.dart';
@@ -163,7 +164,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     final ThemeData theme = Theme.of(context);
 
     return AppScaffold(
-      title: 'ثبت‌نام',
+      title: AppLocalizations.of(context)!.register,
       scrollable: true,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
