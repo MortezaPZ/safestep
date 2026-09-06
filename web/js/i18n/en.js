@@ -1,0 +1,17 @@
+export default {
+  language: 'Language',
+  persian: 'Persian',
+  english: 'English',
+  login: 'Log in',
+  register: 'Sign up',
+  home: 'Home',
+  alerts: 'Alerts',
+  navAdmin: 'Admin',
+  navDashboard: 'Dashboard',
+  navGuardian: 'People I watch',
+  navZones: 'Safe zones',
+  navFamily: 'Family',
+  navHistory: 'Route history',
+  navDemo: 'Demo mode',
+  navSettings: 'Settings',
+};

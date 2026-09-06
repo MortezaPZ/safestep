@@ -16,6 +16,7 @@ class AccessibilitySettings {
     this.highContrast = false,
     this.hapticFeedback = true,
     this.themeMode = ThemeMode.system,
+    this.localeCode = 'fa',
   });
 
   /// ضریب بزرگ‌نمایی متنِ داخل اپ (۰٫۸ تا ۲٫۰).
@@ -33,6 +34,9 @@ class AccessibilitySettings {
 
   final ThemeMode themeMode;
 
+  /// `fa` یا `en`. پیش‌فرض فارسی است.
+  final String localeCode;
+
   /// کف و سقف ضریب. زیر ۰٫۸ متن ناخوانا می‌شود و بالای ۲٫۰ چیدمان
   /// صفحه‌ها می‌شکند — و صفحه‌ی شکسته، از متن کوچک هم بدتر است.
   static const double minScale = 0.8;
@@ -46,12 +50,14 @@ class AccessibilitySettings {
     bool? highContrast,
     bool? hapticFeedback,
     ThemeMode? themeMode,
+    String? localeCode,
   }) {
     return AccessibilitySettings(
       textScale: textScale ?? this.textScale,
       highContrast: highContrast ?? this.highContrast,
       hapticFeedback: hapticFeedback ?? this.hapticFeedback,
       themeMode: themeMode ?? this.themeMode,
+      localeCode: localeCode ?? this.localeCode,
     );
   }
 
@@ -61,11 +67,12 @@ class AccessibilitySettings {
         other.textScale == textScale &&
         other.highContrast == highContrast &&
         other.hapticFeedback == hapticFeedback &&
-        other.themeMode == themeMode;
+        other.themeMode == themeMode &&
+        other.localeCode == localeCode;
   }
 
   @override
-  int get hashCode => Object.hash(textScale, highContrast, hapticFeedback, themeMode);
+  int get hashCode => Object.hash(textScale, highContrast, hapticFeedback, themeMode, localeCode);
 }
 
 /* ════════════════════════════ نگهدارنده‌ی حالت ════════════════════════════ */
@@ -74,6 +81,7 @@ const String _kTextScale = 'a11y.textScale';
 const String _kHighContrast = 'a11y.highContrast';
 const String _kHaptic = 'a11y.haptic';
 const String _kThemeMode = 'a11y.themeMode';
+const String _kLocale = 'a11y.locale';
 
 class AccessibilityController extends StateNotifier<AccessibilitySettings> {
   AccessibilityController(this._prefs) : super(const AccessibilitySettings()) {
@@ -87,12 +95,14 @@ class AccessibilityController extends StateNotifier<AccessibilitySettings> {
     final bool? contrast = _prefs.getBool(_kHighContrast);
     final bool? haptic = _prefs.getBool(_kHaptic);
     final String? mode = _prefs.getString(_kThemeMode);
+    final String locale = _prefs.getString(_kLocale) == 'en' ? 'en' : 'fa';
 
     state = AccessibilitySettings(
       textScale: _clamp(scale ?? 1.0),
       highContrast: contrast ?? false,
       hapticFeedback: haptic ?? true,
       themeMode: _parseMode(mode),
+      localeCode: locale,
     );
   }
 
@@ -173,6 +183,12 @@ class AccessibilityController extends StateNotifier<AccessibilitySettings> {
   Future<void> setThemeMode(ThemeMode mode) async {
     state = state.copyWith(themeMode: mode);
     await _prefs.setString(_kThemeMode, _modeName(mode));
+  }
+
+  Future<void> setLocaleCode(String code) async {
+    final String next = code == 'en' ? 'en' : 'fa';
+    state = state.copyWith(localeCode: next);
+    await _prefs.setString(_kLocale, next);
   }
 
   /// اعمال مقادیر آمده از سرور.

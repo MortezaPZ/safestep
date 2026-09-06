@@ -1,0 +1,17 @@
+export default {
+  language: 'زبان',
+  persian: 'فارسی',
+  english: 'English',
+  login: 'ورود',
+  register: 'ثبت‌نام',
+  home: 'خانه',
+  alerts: 'هشدارها',
+  navAdmin: 'مدیریت سامانه',
+  navDashboard: 'داشبورد',
+  navGuardian: 'تحت مراقبت',
+  navZones: 'محدوده‌های امن',
+  navFamily: 'اعضای خانواده',
+  navHistory: 'تاریخچه‌ی مسیر',
+  navDemo: 'حالت نمایش',
+  navSettings: 'تنظیمات',
+};

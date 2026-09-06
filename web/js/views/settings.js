@@ -7,7 +7,7 @@
  */
 import api from '../api.js';
 import { el, render, toast, confirmDialog, skeleton, errorState, getTheme, applyTheme, THEME_LABELS } from '../ui.js';
-import { faNumber, faDistance, faDuration, ALERT_LABELS } from '../format.js';
+import { t, getLang, setLang } from '../i18n.js';
 
 const CONFIGURABLE_ALERTS = ['zone_exit', 'long_stop', 'gps_lost', 'low_battery'];
 
@@ -227,10 +227,30 @@ export function mountSettings(container, ctx) {
           ),
         ),
         el('div.field', {},
-          el('label.field__label', { text: 'زبان' }),
+          el('label.field__label', { text: t('language') }),
           el('div.chip-row', {},
-            el('span.chip.chip--accent', { text: 'فارسی' }),
-            el('span.chip', { text: 'English (به‌زودی)' }),
+            el('button', {
+              class: 'chip chip--button',
+              type: 'button',
+              ariaPressed: String(getLang() === 'fa'),
+              text: t('persian'),
+              onClick: async () => {
+                setLang('fa');
+                await api.updateSettings({ language: 'fa' });
+                renderAll();
+              },
+            }),
+            el('button', {
+              class: 'chip chip--button',
+              type: 'button',
+              ariaPressed: String(getLang() === 'en'),
+              text: t('english'),
+              onClick: async () => {
+                setLang('en');
+                await api.updateSettings({ language: 'en' });
+                renderAll();
+              },
+            }),
           ),
         ),
       ),

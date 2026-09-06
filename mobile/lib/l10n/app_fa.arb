@@ -1,0 +1,22 @@
+{
+  "@@locale": "fa",
+  "login": "ورود",
+  "register": "ثبت‌نام",
+  "roleSelect": "نقش خود را انتخاب کنید",
+  "home": "خانه",
+  "alerts": "هشدارها",
+  "welcomeBack": "خوش برگشتید",
+  "loginHint": "با شماره‌ای که با آن ثبت‌نام کرده‌اید وارد شوید.",
+  "phoneLabel": "شماره موبایل",
+  "passwordLabel": "رمز عبور",
+  "noAccount": "حساب ندارم؛ ثبت‌نام می‌کنم",
+  "language": "زبان",
+  "alertSos": "درخواست کمک",
+  "alertZoneExit": "خروج از محدوده",
+  "alertZoneEnter": "بازگشت به محدوده",
+  "alertLongStop": "توقف طولانی",
+  "alertGpsLost": "قطع موقعیت",
+  "alertLowBattery": "باتری کم",
+  "alertFall": "تشخیص سقوط",
+  "alertGeneric": "هشدار"
+}

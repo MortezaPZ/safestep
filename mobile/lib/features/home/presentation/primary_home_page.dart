@@ -12,6 +12,7 @@ import '../../../core/widgets/animated_entrance.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import 'package:safestep/l10n/app_localizations.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -79,7 +80,7 @@ class _PrimaryHomePageState extends ConsumerState<PrimaryHomePage> {
     );
 
     return AppScaffold(
-      title: 'وضعیت من',
+      title: AppLocalizations.of(context)?.home ?? 'وضعیت من',
       showBackButton: false,
       scrollable: true,
       onRefresh: () => ref.read(pairingControllerProvider.notifier).load(),

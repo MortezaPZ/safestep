@@ -35,19 +35,6 @@ class AuthRepository {
         if (verificationToken != null) 'verificationToken': verificationToken,
       },
     );
-    final AuthSession session = await _api.post<AuthSession>(
-      ApiEndpoints.register,
-      (dynamic data) => AuthSession.fromJson(_asMap(data)),
-      body: <String, dynamic>{
-        // نرمال‌سازی سمت کلاینت هم انجام می‌شود تا کاربر با «+۹۸» ثبت‌نام
-        // نکند و بعد با «۰۹» نتواند وارد شود. سرور هم همین کار را می‌کند؛
-        // این دومی حرف آخر را می‌زند.
-        'phone': Fa.normalizePhone(phone),
-        'password': password,
-        'fullName': fullName.trim(),
-        'role': role == UserRole.guardian ? 'guardian' : 'primary',
-      },
-    );
 
     await _persist(session);
     return session;
