@@ -20,6 +20,7 @@ import * as userRepository from '../repositories/userRepository.js';
 import hub from '../realtime/hub.js';
 import telemetryService from './telemetryService.js';
 import notificationAdapter from './notificationAdapter.js';
+import notificationOutbox from './notificationOutbox.js';
 import logger from '../utils/logger.js';
 import { forbidden, notFound } from '../utils/errors.js';
 
@@ -136,7 +137,7 @@ export async function raiseAlert({ userId, type, location, zoneId, context = {},
   // درباره‌اش به خانواده گزارش شده است. شفافیت، شرط استقلال است.
   hub.emitToUsers([...recipientIds, userId], WS_EVENTS.ALERT_NEW, enriched);
 
-  const delivery = await notificationAdapter.notify(recipientIds, {
+  const pushPayload = {
     title,
     body,
     severity,
@@ -146,7 +147,19 @@ export async function raiseAlert({ userId, type, location, zoneId, context = {},
       subjectId: userId,
       ...(zoneId ? { zoneId } : {}),
     },
-  });
+  };
+
+  let delivery;
+  if (notificationAdapter.activeDriver() === 'local') {
+    delivery = await notificationAdapter.notify(recipientIds, pushPayload);
+  } else {
+    notificationAdapter.emitInApp(recipientIds, pushPayload, 'fcm');
+    await notificationOutbox.enqueueForRecipients(recipientIds, {
+      alertId: alert.id,
+      ...pushPayload,
+    });
+    delivery = { driver: 'fcm', sent: 0, failed: 0, fellBack: false };
+  }
 
   // ── ثبت سنجه‌ی تحویل ──────────────────────────────────────────────
   // تأخیر از لحظه‌ی ساخته شدن هشدار در دیتابیس تا لحظه‌ی واگذاری آن به کانال

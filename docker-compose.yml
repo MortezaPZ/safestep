@@ -87,9 +87,11 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-only-refresh-secret-change-me-in-production}
       INVITE_CODE_PEPPER: ${INVITE_CODE_PEPPER:-dev-only-invite-pepper-change-me-in-production}
 
-      # اگر کلید FCM بگذارید، ارسال واقعی نوتیفیکیشن بدون تغییر کد فعال می‌شود
+      # حساب سرویس Firebase (FCM HTTP v1). کلید قدیمی Server Key دیگر کار نمی‌کند.
       NOTIFICATION_DRIVER: auto
-      FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
+      FCM_SERVICE_ACCOUNT_PATH: ${FCM_SERVICE_ACCOUNT_PATH:-}
+      FCM_SERVICE_ACCOUNT_JSON: ${FCM_SERVICE_ACCOUNT_JSON:-}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
 
       # مسیر وب‌اپ داخل کانتینر (با volume زیر هم‌خوان است)
       WEB_ROOT: /app/web

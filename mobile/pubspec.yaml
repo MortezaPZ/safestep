@@ -58,6 +58,9 @@ dependencies:
   device_info_plus: ^10.1.2
   package_info_plus: ^8.0.2
   uuid: ^4.4.2
+  firebase_core: ^3.8.1
+  firebase_messaging: ^15.1.6
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:

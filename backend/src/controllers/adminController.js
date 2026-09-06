@@ -9,6 +9,7 @@
  * هشِ IP نیاز دارد — نه به بدنه‌ی درخواست.
  */
 import adminService from '../services/adminService.js';
+import notificationOutbox from '../services/notificationOutbox.js';
 import { asyncHandler } from '../middleware/error.js';
 
 const actorOf = (req) => ({ id: req.user.id, role: req.user.role });
@@ -77,6 +78,15 @@ export const metrics = asyncHandler(async (req, res) => {
   res.json(await adminService.metrics({ from: req.query.from, to: req.query.to }));
 });
 
+export const listOutbox = asyncHandler(async (req, res) => {
+  const { status, limit, offset } = req.query;
+  res.json(await notificationOutbox.listOutbox({ status, limit, offset }));
+});
+
+export const retryOutbox = asyncHandler(async (req, res) => {
+  res.json(await notificationOutbox.retryOutbox(req.params.id));
+});
+
 export default {
   overview,
   listUsers,
@@ -91,4 +101,6 @@ export default {
   auditLogs,
   purgeLogs,
   metrics,
+  listOutbox,
+  retryOutbox,
 };

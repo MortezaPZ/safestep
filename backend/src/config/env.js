@@ -98,8 +98,9 @@ const env = {
 
   notification: {
     driver: str('NOTIFICATION_DRIVER', 'auto'),
-    fcmServerKey: str('FCM_SERVER_KEY', ''),
     fcmProjectId: str('FCM_PROJECT_ID', ''),
+    fcmServiceAccountPath: str('FCM_SERVICE_ACCOUNT_PATH', ''),
+    fcmServiceAccountJson: str('FCM_SERVICE_ACCOUNT_JSON', ''),
   },
 
   demo: {
