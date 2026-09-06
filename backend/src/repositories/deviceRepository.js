@@ -67,7 +67,25 @@ export async function register({
      RETURNING *`,
     params,
   );
-  return mapDevice(rows[0]);
+  const device = mapDevice(rows[0]);
+  if (pushToken) {
+    await db.query(
+      `UPDATE devices SET push_token = NULL
+        WHERE push_token = $1 AND id <> $2`,
+      [pushToken, device.id],
+    );
+  }
+  return device;
+}
+
+/** ابطال توکنی که FCM دیگر آن را نمی‌شناسد. */
+export async function clearPushToken(token) {
+  if (!token) return 0;
+  const { rowCount } = await db.query(
+    'UPDATE devices SET push_token = NULL WHERE push_token = $1',
+    [token],
+  );
+  return rowCount;
 }
 
 export async function listByUser(userId) {

@@ -1446,7 +1446,47 @@ paths:
           description: سنجه‌ها
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Metrics' }
+                  schema: { $ref: '#/components/schemas/Metrics' }
+
+  /admin/notifications/outbox:
+    get:
+      tags: [مدیریت]
+      summary: فهرست صف نوتیفیکیشن FCM
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, sent, failed, abandoned] }
+        - name: limit
+          in: query
+          schema: { type: integer }
+        - name: offset
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: ردیف‌های صف
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  /admin/notifications/outbox/{id}/retry:
+    post:
+      tags: [مدیریت]
+      summary: بازگرداندن یک ردیف صف به حالت pending
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: ردیف به‌روزشده
+        '404':
+          description: یافت نشد
 
   # ═══════════════════════════ شبیه‌ساز ═══════════════════════════
 

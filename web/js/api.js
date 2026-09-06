@@ -278,6 +278,9 @@ export const api = {
   adminPurgeLogs: (olderThanDays) =>
     request('/admin/logs/purge', { method: 'POST', body: { olderThanDays } }),
   adminMetrics: (query = {}) => request('/admin/metrics', { query }),
+  adminOutbox: (query = {}) => request('/admin/notifications/outbox', { query }),
+  adminRetryOutbox: (id) =>
+    request(`/admin/notifications/outbox/${id}/retry`, { method: 'POST' }),
 
   /* ─── سلامت ─── */
   health: () => fetch('/health').then((r) => r.json()),

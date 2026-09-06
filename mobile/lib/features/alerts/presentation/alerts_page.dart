@@ -169,7 +169,9 @@ final Provider<int> unreadAlertsProvider = Provider<int>((ref) {
 /// نشان داده می‌شود، نه با جابه‌جا کردن ترتیب — چون فهرستی که ترتیبش با
 /// هر رویداد عوض شود، قابل اتکا نیست.
 class AlertsListPage extends ConsumerStatefulWidget {
-  const AlertsListPage({super.key});
+  const AlertsListPage({super.key, this.alertId});
+
+  final String? alertId;
 
   @override
   ConsumerState<AlertsListPage> createState() => _AlertsListPageState();

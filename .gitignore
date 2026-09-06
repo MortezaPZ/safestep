@@ -5,6 +5,11 @@ node_modules/
 .env
 .env.local
 .env.*.local
+backend/.env
+
+# حساب سرویس Firebase / FCM
+**/*service-account*.json
+**/firebase-adminsdk*.json
 
 # دیتابیس محلی PGlite
 .pglite/
