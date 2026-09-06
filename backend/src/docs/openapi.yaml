@@ -1543,6 +1543,75 @@ paths:
             application/json:
               schema: { type: object }
 
+  /simulator/fall:
+    post:
+      tags: [شبیه‌ساز]
+      summary: شبیه‌سازی سقوط برای حالت نمایش
+      responses:
+        '201':
+          description: نتیجهٔ تشخیص
+
+  /falls/detect:
+    post:
+      tags: [سقوط]
+      summary: ارسال بردار ۱۴تایی برای رده‌بندی
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [features, clientEventId]
+              properties:
+                features:
+                  type: array
+                  items: { type: number }
+                  minItems: 14
+                  maxItems: 14
+                clientEventId: { type: string, format: uuid }
+                detectedAt: { type: string, format: date-time }
+                lat: { type: number }
+                lng: { type: number }
+      responses:
+        '201':
+          description: نتیجه؛ در مثبت هنوز هشدار ساخته نمی‌شود
+
+  /falls/report-missed:
+    post:
+      tags: [سقوط]
+      summary: گزارش سقوطی که مدل ندید
+      responses:
+        '201': { description: ثبت شد }
+
+  /falls:
+    get:
+      tags: [سقوط]
+      summary: فهرست رویدادهای سقوط (خود یا مراقب با emergency)
+      responses:
+        '200': { description: فهرست }
+
+  /falls/{id}/feedback:
+    post:
+      tags: [سقوط]
+      summary: بازخورد شمارش معکوس
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feedback]
+              properties:
+                feedback: { type: string, enum: [confirmed, false_alarm, no_response] }
+                respondedWithinSec: { type: integer }
+      responses:
+        '200': { description: ذخیره شد }
+
 components:
   securitySchemes:
     bearerAuth:

@@ -36,6 +36,7 @@ export async function list(subjectIds, viewerId, { types, unreadOnly = false, li
     `SELECT a.*,
             u.full_name    AS subject_name,
             u.avatar_color AS subject_avatar_color,
+            u.phone        AS subject_phone,
             z.name         AS zone_name,
             (r.alert_id IS NOT NULL) AS is_read
      FROM alerts a

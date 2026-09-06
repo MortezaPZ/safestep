@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +13,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/utils/fa.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
-import '../../tracking/presentation/tracking_controller.dart';
+import '../../fall/data/fall_repository.dart';
 
 /// تنظیمات.
 ///
@@ -145,6 +146,31 @@ class SettingsPage extends ConsumerWidget {
                   subtitle: 'رویدادهای ثبت‌شده و وضعیت خواندنشان',
                   onTap: () => context.push(AppRoutes.alerts),
                 ),
+                const Divider(height: 1),
+                _SettingsTile(
+                  icon: Icons.personal_injury_outlined,
+                  title: 'تشخیص سقوط',
+                  subtitle: 'گزارش سقوط ازدست‌رفته و شبیه‌سازی در حالت اشکال‌زدایی',
+                  onTap: () async {
+                    await ref.read(fallRepositoryProvider).reportMissed();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('گزارش سقوط ازدست‌رفته ثبت شد')),
+                      );
+                    }
+                  },
+                ),
+                if (kDebugMode) ...<Widget>[
+                  const Divider(height: 1),
+                  _SettingsTile(
+                    icon: Icons.bug_report_outlined,
+                    title: 'شبیه‌سازی سقوط',
+                    subtitle: 'فقط در نسخه‌ی اشکال‌زدایی',
+                    onTap: () => context.go(
+                      '${AppRoutes.fallCheck}?id=debug&sec=5',
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

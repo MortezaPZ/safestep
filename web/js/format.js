@@ -176,7 +176,7 @@ export const ALERT_LABELS = {
   zone_enter: { label: 'بازگشت به محدوده', icon: '🏠' },
   long_stop: { label: 'توقف طولانی', icon: '⏸️' },
   gps_lost: { label: 'قطع ارتباط موقعیت', icon: '📡' },
-  low_battery: { label: 'باتری کم', icon: '🔋' },
+  fall_detected: { label: 'تشخیص سقوط', icon: '🤕' },
 };
 
 export const PERMISSION_LABELS = {

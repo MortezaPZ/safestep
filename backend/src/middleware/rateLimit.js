@@ -71,6 +71,15 @@ export const inviteLimiter = rateLimit({
  * محدودکننده‌ی عمومی برای بقیه‌ی مسیرها.
  * سقف بالا انتخاب شده چون پینگ موقعیت می‌تواند پرتکرار باشد.
  */
+export const fallLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKey,
+  handler: buildHandler('fall', 'تعداد تشخیص سقوط بیش از حد مجاز است.'),
+});
+
 export const generalLimiter = rateLimit({
   windowMs: 60_000,
   max: 300,

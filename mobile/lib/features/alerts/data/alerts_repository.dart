@@ -17,9 +17,11 @@ class AlertItem {
     required this.createdAt,
     this.subjectName,
     this.subjectId,
+    this.subjectPhone,
     this.zoneName,
     this.isRead = false,
     this.resolvedAt,
+    this.confidence,
   });
 
   final String id;
@@ -30,9 +32,11 @@ class AlertItem {
   final DateTime createdAt;
   final String? subjectName;
   final String? subjectId;
+  final String? subjectPhone;
   final String? zoneName;
   final bool isRead;
   final DateTime? resolvedAt;
+  final double? confidence;
 
   bool get isCritical => severity == 'critical';
   bool get isResolved => resolvedAt != null;
@@ -75,9 +79,11 @@ class AlertItem {
       createdAt: Json.date(json, 'createdAt') ?? DateTime.now(),
       subjectName: subject == null ? null : Json.strOrNull(subject, 'fullName'),
       subjectId: subject == null ? null : Json.strOrNull(subject, 'id'),
+      subjectPhone: subject == null ? null : Json.strOrNull(subject, 'phone'),
       zoneName: Json.strOrNull(json, 'zoneName'),
       isRead: Json.boolOf(json, 'isRead'),
       resolvedAt: Json.date(json, 'resolvedAt'),
+      confidence: Json.dblOrNull(Json.mapOrNull(json['metadata']) ?? json, 'confidence'),
     );
   }
 }

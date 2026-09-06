@@ -46,6 +46,8 @@ export function mapSettings(row) {
     locationRetentionDays: row.location_retention_days,
     adaptivePingEnabled: row.adaptive_ping_enabled !== false,
     pingIntervalStationarySec: row.ping_interval_stationary_sec ?? 120,
+    fallDetectionEnabled: row.fall_detection_enabled !== false,
+    fallCountdownSec: row.fall_countdown_sec ?? 30,
     updatedAt: d(row.updated_at),
   };
 }
@@ -208,6 +210,7 @@ export function mapAlert(row) {
             id: row.user_id,
             fullName: row.subject_name,
             avatarColor: row.subject_avatar_color,
+            phone: row.subject_phone ?? null,
           },
         }
       : {}),

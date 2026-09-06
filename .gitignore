@@ -29,6 +29,7 @@ mobile/ios/Pods/
 # سیستم‌عامل و ویرایشگر
 .DS_Store
 Thumbs.db
-*.log
+backend/data/falls/dataset.csv
+backend/data/falls/raw/
 .vscode/
 .idea/

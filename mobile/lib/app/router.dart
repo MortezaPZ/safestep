@@ -8,7 +8,7 @@ import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/register_page.dart';
 import '../features/home/presentation/guardian_home_page.dart';
 import '../features/home/presentation/primary_home_page.dart';
-import '../features/alerts/presentation/alerts_page.dart';
+import '../features/fall/presentation/fall_check_page.dart';
 import '../features/onboarding/presentation/role_select_page.dart';
 import '../features/pairing/presentation/guardians_page.dart';
 import '../features/pairing/presentation/invite_page.dart';
@@ -41,7 +41,7 @@ class AppRoutes {
   static const String invite = '/pair/invite';
   static const String redeem = '/pair/redeem';
 
-  static const String alerts = '/alerts';
+  static const String fallCheck = '/fall-check';
 
   /// نقشه‌ی زنده‌ی یک فرد تحت پایش
   static String mapFor(String userId) => '/watch/$userId';
@@ -171,6 +171,13 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.alerts,
         builder: (BuildContext context, GoRouterState state) =>
             AlertsListPage(alertId: state.uri.queryParameters['alertId']),
+      ),
+      GoRoute(
+        path: AppRoutes.fallCheck,
+        builder: (BuildContext context, GoRouterState state) => FallCheckPage(
+          fallEventId: state.uri.queryParameters['id'] ?? '',
+          countdownSec: int.tryParse(state.uri.queryParameters['sec'] ?? '') ?? 30,
+        ),
       ),
       GoRoute(
         path: '/watch/:userId',
