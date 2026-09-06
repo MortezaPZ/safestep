@@ -25,6 +25,7 @@ import * as admin from '../controllers/adminController.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validate.js';
 import { authLimiter, sosLimiter, inviteLimiter, generalLimiter, fallLimiter } from '../middleware/rateLimit.js';
+import env from '../config/env.js';
 import {
   ALL_ALERT_TYPES,
   ALL_ROLES,
@@ -48,9 +49,8 @@ router.post(
       phone: schemas.phone,
       password: schemas.password,
       fullName: schemas.fullName,
-      // نقش ادمین عمداً در این فهرست نیست: هیچ‌کس نمی‌تواند خودش را مدیر
-      // سامانه ثبت کند. ادمین فقط با اسکریپت سرور یا توسط ادمین موجود ساخته می‌شود.
       role: z.enum(SELF_SIGNUP_ROLES).default('primary'),
+      verificationToken: z.string().min(10).optional(),
     }),
   }),
   authController.register,
@@ -82,6 +82,37 @@ router.post(
 
 router.post('/auth/logout-all', requireAuth, authController.logoutAll);
 router.get('/auth/me', requireAuth, authController.me);
+
+router.post(
+  '/auth/otp/request',
+  validate({
+    body: z.object({
+      phone: schemas.phone,
+      purpose: z.enum(['register', 'login', 'change_phone']),
+    }),
+  }),
+  authController.requestOtp,
+);
+
+router.post(
+  '/auth/otp/verify',
+  validate({
+    body: z.object({
+      phone: schemas.phone,
+      code: z.string().min(4).max(8),
+      purpose: z.enum(['register', 'login', 'change_phone']),
+    }),
+  }),
+  authController.verifyOtp,
+);
+
+router.get('/config/public', (_req, res) => {
+  res.json({
+    phoneVerificationRequired: env.auth.phoneVerificationRequired,
+    smsDriver: env.sms.driver,
+    demoMode: env.demo.enabled,
+  });
+});
 
 /* ═══════════════════════ سرپرستی و کد دعوت ═══════════════════════ */
 

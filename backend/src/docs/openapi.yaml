@@ -79,6 +79,52 @@ security:
 paths:
   # ═══════════════════════════ احراز هویت ═══════════════════════════
 
+  /auth/otp/request:
+    post:
+      tags: [احراز هویت]
+      summary: درخواست کد پیامک
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, purpose]
+              properties:
+                phone: { type: string }
+                purpose: { type: string, enum: [register, login, change_phone] }
+      responses:
+        '200': { description: کد ارسال شد }
+        '429': { description: سقف درخواست }
+
+  /auth/otp/verify:
+    post:
+      tags: [احراز هویت]
+      summary: تأیید کد پیامک
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code, purpose]
+              properties:
+                phone: { type: string }
+                code: { type: string }
+                purpose: { type: string }
+      responses:
+        '200': { description: توکن تأیید کوتاه‌عمر }
+
+  /config/public:
+    get:
+      tags: [تنظیمات و دستگاه]
+      summary: پیکربندی عمومی بدون ورود
+      security: []
+      responses:
+        '200': { description: پرچم OTP و درایور پیامک }
+
   /auth/register:
     post:
       tags: [احراز هویت]

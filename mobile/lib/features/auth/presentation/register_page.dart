@@ -12,6 +12,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../data/auth_repository.dart';
 import '../domain/auth_models.dart';
 import 'auth_controller.dart';
 
@@ -46,6 +47,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   String? _phoneError;
   String? _passwordError;
   bool _obscure = true;
+  final TextEditingController _otp = TextEditingController();
+  bool _otpRequired = false;
+  String? _otpHint;
 
   late final String _role =
       widget.initialRole == 'guardian' ? 'guardian' : 'primary';
@@ -54,12 +58,27 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       _role == 'guardian' ? 'مراقب' : 'کاربر اصلی';
 
   @override
+  void initState() {
+    super.initState();
+    ref.read(authRepositoryProvider).publicConfig().then((Map<String, dynamic> cfg) {
+      if (!mounted) return;
+      setState(() {
+        _otpRequired = cfg['phoneVerificationRequired'] == true;
+        if (cfg['smsDriver'] == 'console') {
+          _otpHint = 'کد در لاگ سرور چاپ شد (حالت توسعه)';
+        }
+      });
+    }).catchError((_) {});
+  }
+
+  @override
   void dispose() {
     _name.dispose();
     _phone.dispose();
     _password.dispose();
     _phoneFocus.dispose();
     _passwordFocus.dispose();
+    _otp.dispose();
     super.dispose();
   }
 
@@ -85,11 +104,30 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     FocusManager.instance.primaryFocus?.unfocus();
 
+    String? token;
+    if (_otpRequired) {
+      final AuthRepository repo = ref.read(authRepositoryProvider);
+      if (_otp.text.trim().isEmpty) {
+        final String? hint = await repo.requestOtp(_phone.text, 'register');
+        if (!mounted) return;
+        AppSnackBar.show(context, hint ?? 'کد ارسال شد. آن را وارد کنید و دوباره بزنید.');
+        return;
+      }
+      try {
+        token = await repo.verifyOtp(_phone.text, _otp.text.trim(), 'register');
+      } on AppException catch (error) {
+        if (!mounted) return;
+        AppSnackBar.show(context, error.message, kind: AppSnackKind.error);
+        return;
+      }
+    }
+
     final bool ok = await ref.read(authControllerProvider.notifier).register(
           phone: _phone.text,
           password: _password.text,
           fullName: _name.text,
           role: _role == 'guardian' ? UserRole.guardian : UserRole.primary,
+          verificationToken: token,
         );
 
     if (!mounted) return;
@@ -214,6 +252,18 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               ),
             ),
           ),
+
+          if (_otpRequired) ...<Widget>[
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              controller: _otp,
+              label: 'کد تأیید پیامک',
+              helperText: _otpHint,
+              keyboardType: TextInputType.number,
+              latinDigits: true,
+              prefixIcon: Icons.sms_outlined,
+            ),
+          ],
 
           const SizedBox(height: AppSpacing.xl),
 

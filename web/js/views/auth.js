@@ -62,7 +62,30 @@ export function mountAuth(container, { onSuccess }) {
     roleSelect,
   );
 
-  const submitBtn = el('button.btn.btn--block', { type: 'submit', text: 'ورود' });
+  const otpInput = el('input.input', {
+    type: 'text',
+    id: 'auth-otp',
+    inputmode: 'numeric',
+    placeholder: 'کد ۶ رقمی',
+    dir: 'ltr',
+  });
+  const otpHint = el('p.text-xs.text-muted', { text: '' });
+  const otpField = el(
+    'div.field.hidden',
+    {},
+    el('label.field__label', { for: 'auth-otp', text: 'کد تأیید پیامک' }),
+    otpInput,
+    otpHint,
+  );
+
+  let publicCfg = { phoneVerificationRequired: false, smsDriver: 'console' };
+  api.publicConfig().then((cfg) => {
+    publicCfg = cfg ?? publicCfg;
+    otpField.classList.toggle('hidden', !(publicCfg.phoneVerificationRequired && mode === 'register'));
+    otpHint.textContent = publicCfg.smsDriver === 'console'
+      ? 'کد در لاگ سرور چاپ شد (حالت توسعه)'
+      : '';
+  }).catch(() => {});
 
   const loginTab = el('button.auth-tab', {
     type: 'button',
@@ -88,6 +111,7 @@ export function mountAuth(container, { onSuccess }) {
     registerTab.setAttribute('aria-selected', String(!isLogin));
     nameField.classList.toggle('hidden', isLogin);
     roleField.classList.toggle('hidden', isLogin);
+    otpField.classList.toggle('hidden', isLogin || !publicCfg.phoneVerificationRequired);
     submitBtn.textContent = isLogin ? 'ورود' : 'ساخت حساب';
     passwordInput.setAttribute('autocomplete', isLogin ? 'current-password' : 'new-password');
     errorBox.textContent = '';
@@ -109,6 +133,20 @@ export function mountAuth(container, { onSuccess }) {
     submitBtn.textContent = mode === 'login' ? 'در حال ورود…' : 'در حال ساخت حساب…';
 
     try {
+      let verificationToken;
+      if (mode === 'register' && publicCfg.phoneVerificationRequired) {
+        const code = toEnDigits(otpInput.value).replace(/\D/g, '');
+        if (!code) {
+          const sent = await api.requestOtp(phone, 'register');
+          errorBox.textContent = sent.hint || 'کد ارسال شد. پس از وارد کردن کد دوباره ثبت‌نام کنید.';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'ساخت حساب';
+          return;
+        }
+        const verified = await api.verifyOtp(phone, code, 'register');
+        verificationToken = verified.verificationToken;
+      }
+
       const session =
         mode === 'login'
           ? await api.login(phone, password)
@@ -117,6 +155,7 @@ export function mountAuth(container, { onSuccess }) {
               password,
               fullName: nameInput.value.trim(),
               role: roleSelect.value,
+              verificationToken,
             });
 
       toast('خوش آمدید', session.user.fullName);
@@ -147,6 +186,7 @@ export function mountAuth(container, { onSuccess }) {
       passwordInput,
     ),
     roleField,
+    otpField,
     errorBox,
     submitBtn,
   );

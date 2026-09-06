@@ -3,6 +3,7 @@
  * کنترلرها فقط ورودی را به سرویس می‌دهند و خروجی را به HTTP تبدیل می‌کنند.
  */
 import authService from '../services/authService.js';
+import otpService from '../services/otpService.js';
 import { asyncHandler } from '../middleware/error.js';
 
 export const register = asyncHandler(async (req, res) => {
@@ -41,4 +42,13 @@ export const logoutAll = asyncHandler(async (req, res) => {
 export const me = asyncHandler(async (req, res) => {
   const result = await authService.me(req.user.id);
   res.json(result);
+});
+
+export const requestOtp = asyncHandler(async (req, res) => {
+  const result = await otpService.requestOtp(req.body, { ip: req.ip });
+  res.json(result);
+});
+
+export const verifyOtp = asyncHandler(async (req, res) => {
+  res.json(await otpService.verifyOtp(req.body));
 });

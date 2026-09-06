@@ -15,6 +15,8 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken, ttlToMs } from '
 import adminRepository from '../repositories/adminRepository.js';
 import auditService from './auditService.js';
 import { AUDIT_ACTIONS, USER_STATUS } from '../config/constants.js';
+import { normalizePhone } from '../utils/phone.js';
+import { readVerificationToken } from './otpService.js';
 import { conflict, unauthorized, notFound, forbidden } from '../utils/errors.js';
 import logger from '../utils/logger.js';
 
@@ -28,23 +30,7 @@ const pickAvatarColor = (phone) => {
   return AVATAR_COLORS[sum % AVATAR_COLORS.length];
 };
 
-/**
- * نرمال‌سازی شماره‌ی موبایل به قالب ۱۱ رقمی ایرانی.
- * ورودی‌های ‎+98912...‎ و ‎0098912...‎ و ‎912...‎ همگی به ‎0912...‎ تبدیل می‌شوند
- * تا یک نفر نتواند با سه نگارش مختلف، سه حساب بسازد.
- */
-export function normalizePhone(input) {
-  // تبدیل ارقام فارسی و عربی به لاتین
-  const digits = String(input)
-    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
-    .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
-    .replace(/\D/g, '');
-
-  if (digits.startsWith('0098')) return `0${digits.slice(4)}`;
-  if (digits.startsWith('98') && digits.length === 12) return `0${digits.slice(2)}`;
-  if (digits.startsWith('9') && digits.length === 10) return `0${digits}`;
-  return digits;
-}
+export { normalizePhone } from '../utils/phone.js';
 
 /** صدور جفت توکن و ثبت نشست. */
 async function issueTokens(user, userAgent) {
@@ -68,12 +54,23 @@ async function issueTokens(user, userAgent) {
 
 /* ─────────────────────────── ثبت‌نام ─────────────────────────── */
 
-export async function register({ phone, password, fullName, role }, { userAgent, req } = {}) {
+export async function register({ phone, password, fullName, role, verificationToken }, { userAgent, req } = {}) {
   const normalized = normalizePhone(phone);
+
+  if (env.auth.phoneVerificationRequired) {
+    const payload = readVerificationToken(verificationToken, { phone: normalized, purpose: 'register' });
+    if (!payload) {
+      throw unauthorized('تأیید شماره موبایل لازم است. ابتدا کد پیامک را وارد کنید.');
+    }
+  }
 
   if (await userRepository.existsByPhone(normalized)) {
     throw conflict('این شماره قبلاً ثبت شده است. وارد شوید یا شماره‌ی دیگری بزنید.');
   }
+
+  const verified = Boolean(
+    readVerificationToken(verificationToken, { phone: normalized, purpose: 'register' }),
+  );
 
   const user = await userRepository.create({
     phone: normalized,
@@ -81,6 +78,7 @@ export async function register({ phone, password, fullName, role }, { userAgent,
     fullName: fullName.trim(),
     role: role ?? ROLES.PRIMARY,
     avatarColor: pickAvatarColor(normalized),
+    phoneVerifiedAt: verified ? new Date() : null,
   });
 
   const tokens = await issueTokens(user, userAgent);

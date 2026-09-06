@@ -17,6 +17,7 @@ import { createDocsRouter } from './docs/index.js';
 import telemetryService from './services/telemetryService.js';
 import db from './db/index.js';
 import notificationAdapter from './services/notificationAdapter.js';
+import smsAdapter from './services/smsAdapter.js';
 import hub from './realtime/hub.js';
 import logger from './utils/logger.js';
 
@@ -99,6 +100,7 @@ export function createApp() {
         uptimeSec: Math.floor(process.uptime()),
         database,
         notifications: notificationAdapter.status(),
+        sms: smsAdapter.status(),
         telemetry: telemetryService.status(),
         realtime: { connectedUsers: hub.connectedUserCount() },
         docs: '/api/docs',
