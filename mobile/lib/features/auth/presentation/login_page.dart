@@ -12,6 +12,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
+import 'package:safestep/l10n/app_localizations.dart';
 import 'auth_controller.dart';
 
 /// صفحه‌ی ورود.
@@ -103,9 +104,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final AppLocalizations l10n = AppLocalizations.of(context)!;
 
     return AppScaffold(
-      title: 'ورود',
+      title: l10n.login,
       scrollable: true,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -114,13 +116,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
           AnimatedEntrance(
             index: 0,
-            child: Text('خوش برگشتید', style: theme.textTheme.headlineSmall),
+            child: Text(l10n.welcomeBack, style: theme.textTheme.headlineSmall),
           ),
           const SizedBox(height: AppSpacing.xs),
           AnimatedEntrance(
             index: 1,
             child: Text(
-              'با شماره‌ای که با آن ثبت‌نام کرده‌اید وارد شوید.',
+              l10n.loginHint,
               style: theme.textTheme.bodyMedium,
             ),
           ),
@@ -131,7 +133,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             index: 2,
             child: AppTextField(
               controller: _phone,
-              label: 'شماره موبایل',
+              label: l10n.phoneLabel,
               hint: '09123456789',
               latinDigits: true,
               keyboardType: TextInputType.phone,
@@ -151,7 +153,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             child: AppTextField(
               controller: _password,
               focusNode: _passwordFocus,
-              label: 'رمز عبور',
+              label: l10n.passwordLabel,
               obscureText: _obscure,
               textInputAction: TextInputAction.done,
               prefixIcon: Icons.lock_outline_rounded,
@@ -172,7 +174,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           AnimatedEntrance(
             index: 4,
             child: AppButton(
-              label: 'ورود',
+              label: l10n.login,
               loading: ref.watch(authControllerProvider).busy,
               onPressed: _submit,
             ),
@@ -183,7 +185,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           AnimatedEntrance(
             index: 5,
             child: AppButton(
-              label: 'حساب ندارم؛ ثبت‌نام می‌کنم',
+              label: l10n.noAccount,
               variant: AppButtonVariant.text,
               onPressed: () => context.push(AppRoutes.roleSelect),
             ),

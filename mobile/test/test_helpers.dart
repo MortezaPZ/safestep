@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:safestep/core/accessibility/accessibility_settings.dart';
 import 'package:safestep/core/theme/app_theme.dart';
+import 'package:safestep/l10n/app_localizations.dart';
 
 Future<Widget> wrapForTest(Widget child, {List<Override> overrides = const <Override>[]}) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -17,8 +18,9 @@ Future<Widget> wrapForTest(Widget child, {List<Override> overrides = const <Over
     child: MaterialApp(
       theme: AppTheme.light(),
       locale: const Locale('fa', 'IR'),
-      supportedLocales: const <Locale>[Locale('fa', 'IR')],
+      supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

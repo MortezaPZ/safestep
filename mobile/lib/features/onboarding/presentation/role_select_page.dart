@@ -11,6 +11,7 @@ import '../../../core/widgets/animated_entrance.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import 'package:safestep/l10n/app_localizations.dart';
 
 /// انتخاب نقش.
 ///
@@ -55,7 +56,7 @@ class RoleSelectPage extends ConsumerWidget {
           AnimatedEntrance(
             index: 1,
             child: Text(
-              'برای شروع، مشخص کنید از کدام سمت وارد می‌شوید.',
+              AppLocalizations.of(context)!.roleSelect,
               style: theme.textTheme.bodyLarge,
             ),
           ),

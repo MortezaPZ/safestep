@@ -15,6 +15,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/state_views.dart';
+import 'package:safestep/l10n/app_localizations.dart';
 import '../../realtime/realtime_controller.dart';
 import '../data/alerts_repository.dart';
 
@@ -201,7 +202,7 @@ class _AlertsListPageState extends ConsumerState<AlertsListPage> {
     });
 
     return AppScaffold(
-      title: 'هشدارها',
+      title: AppLocalizations.of(context)?.alerts ?? 'هشدارها',
       onRefresh: () => ref.read(alertsControllerProvider.notifier).load(),
       scrollable: true,
       actions: <Widget>[

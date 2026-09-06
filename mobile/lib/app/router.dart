@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/alerts/presentation/alerts_page.dart';
 import '../features/auth/domain/auth_models.dart';
 import '../features/auth/presentation/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
@@ -41,6 +42,7 @@ class AppRoutes {
   static const String invite = '/pair/invite';
   static const String redeem = '/pair/redeem';
 
+  static const String alerts = '/alerts';
   static const String fallCheck = '/fall-check';
 
   /// نقشه‌ی زنده‌ی یک فرد تحت پایش

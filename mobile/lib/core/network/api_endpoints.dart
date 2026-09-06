@@ -16,6 +16,7 @@ class ApiEndpoints {
   static const String refresh = '/auth/refresh';
   static const String logout = '/auth/logout';
   static const String logoutAll = '/auth/logout-all';
+  static const String me = '/auth/me';
   static const String otpRequest = '/auth/otp/request';
   static const String otpVerify = '/auth/otp/verify';
   static const String publicConfig = '/config/public';
@@ -62,6 +63,7 @@ class ApiEndpoints {
   static String fallFeedback(String id) => '/falls/$id/feedback';
   static const String falls = '/falls';
   static const String clientConfig = '/config/client';
+  static const String settings = '/settings';
   static const String devices = '/devices';
   static String device(String id) => '/devices/$id';
 }
