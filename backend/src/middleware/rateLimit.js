@@ -17,6 +17,8 @@ import logger from '../utils/logger.js';
 
 const log = logger.child({ module: 'rate-limit' });
 
+const skipLoadtest = () => process.env.LOADTEST === '1';
+
 /** پاسخ یکدست برای همه‌ی محدودکننده‌ها. */
 const buildHandler = (label, message) => (req, res) => {
   log.warn('سقف نرخ درخواست رد شد', {
@@ -34,6 +36,7 @@ const buildHandler = (label, message) => (req, res) => {
 const userKey = (req) => req.user?.id ?? req.ip;
 
 export const authLimiter = rateLimit({
+  skip: skipLoadtest,
   windowMs: env.rateLimit.authWindowMs,
   max: env.rateLimit.authMax,
   standardHeaders: true,
@@ -47,6 +50,7 @@ export const authLimiter = rateLimit({
 });
 
 export const sosLimiter = rateLimit({
+  skip: skipLoadtest,
   windowMs: env.rateLimit.sosWindowMs,
   max: env.rateLimit.sosMax,
   standardHeaders: true,
@@ -59,6 +63,7 @@ export const sosLimiter = rateLimit({
 });
 
 export const inviteLimiter = rateLimit({
+  skip: skipLoadtest,
   windowMs: env.rateLimit.inviteWindowMs,
   max: env.rateLimit.inviteMax,
   standardHeaders: true,
@@ -72,6 +77,7 @@ export const inviteLimiter = rateLimit({
  * سقف بالا انتخاب شده چون پینگ موقعیت می‌تواند پرتکرار باشد.
  */
 export const fallLimiter = rateLimit({
+  skip: skipLoadtest,
   windowMs: 60_000,
   max: 10,
   standardHeaders: true,
@@ -81,6 +87,7 @@ export const fallLimiter = rateLimit({
 });
 
 export const generalLimiter = rateLimit({
+  skip: skipLoadtest,
   windowMs: 60_000,
   max: 300,
   standardHeaders: true,
