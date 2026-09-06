@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_config.dart';
 import '../../../core/utils/app_exception.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../auth/domain/auth_models.dart';
 import '../data/location_queue.dart';
 import '../data/location_repository.dart';
 import '../data/permission_service.dart';
@@ -28,6 +29,7 @@ class TrackingState {
     this.online = true,
     this.batteryLevel,
     this.error,
+    this.powerSave = false,
   });
 
   final TrackingStatus status;
@@ -45,6 +47,7 @@ class TrackingState {
   final bool online;
   final int? batteryLevel;
   final AppException? error;
+  final bool powerSave;
 
   bool get isActive =>
       status == TrackingStatus.live || status == TrackingStatus.offline;
@@ -58,6 +61,7 @@ class TrackingState {
     bool? online,
     int? batteryLevel,
     AppException? error,
+    bool? powerSave,
     bool clearError = false,
   }) {
     return TrackingState(
@@ -69,6 +73,7 @@ class TrackingState {
       online: online ?? this.online,
       batteryLevel: batteryLevel ?? this.batteryLevel,
       error: clearError ? null : (error ?? this.error),
+      powerSave: powerSave ?? this.powerSave,
     );
   }
 }
@@ -112,9 +117,17 @@ class TrackingController extends StateNotifier<TrackingState> {
 
   /// فاصله‌ی ارسال، از پیکربندی سرور می‌آید تا تغییرش نیاز به انتشار
   /// نسخه‌ی جدید اپ نداشته باشد.
-  int get _intervalSec =>
-      _ref.read(authControllerProvider).settings?.pingIntervalSec ??
-      AppConfig.defaultPingIntervalSec;
+  int get _intervalSec {
+    final UserSettings? s = _ref.read(authControllerProvider).settings;
+    if (state.powerSave && (s?.adaptivePingEnabled ?? true)) {
+      return s?.pingIntervalStationarySec ?? 120;
+    }
+    return s?.pingIntervalSec ?? AppConfig.defaultPingIntervalSec;
+  }
+
+  DateTime? _stillSince;
+  double? _lastLat;
+  double? _lastLng;
 
   /* ═══════════════════════ چرخه‌ی عمر ═══════════════════════ */
 
@@ -293,7 +306,7 @@ class TrackingController extends StateNotifier<TrackingState> {
   LocationSettings _buildLocationSettings() {
     if (defaultTargetPlatform.isAndroidLike) {
       return AndroidSettings(
-        accuracy: LocationAccuracy.high,
+        accuracy: state.powerSave ? LocationAccuracy.medium : LocationAccuracy.high,
         distanceFilter: 10,
         intervalDuration: Duration(seconds: _intervalSec),
         // اعلان جداگانه‌ی geolocator خاموش است تا با اعلان سرویس
@@ -336,7 +349,41 @@ class TrackingController extends StateNotifier<TrackingState> {
       provider: defaultTargetPlatform.isAndroidLike ? 'fused' : 'gps',
     );
 
-    state = state.copyWith(lastSample: sample, batteryLevel: battery);
+    final UserSettings? settings = _ref.read(authControllerProvider).settings;
+    bool powerSave = state.powerSave;
+    if (settings?.adaptivePingEnabled ?? true) {
+      final double speed = position.speed >= 0 ? position.speed : 0;
+      double moved = 0;
+      if (_lastLat != null && _lastLng != null) {
+        moved = Geolocator.distanceBetween(
+          _lastLat!,
+          _lastLng!,
+          position.latitude,
+          position.longitude,
+        );
+      }
+      _lastLat = position.latitude;
+      _lastLng = position.longitude;
+      final bool still = speed < 0.5 && moved < 30;
+      if (still) {
+        _stillSince ??= DateTime.now();
+      } else {
+        _stillSince = null;
+      }
+      final bool shouldSave = still &&
+          _stillSince != null &&
+          DateTime.now().difference(_stillSince!).inSeconds >= 300;
+      if (shouldSave != powerSave) {
+        powerSave = shouldSave;
+        unawaited(_startPositionStream());
+      }
+    }
+
+    state = state.copyWith(
+      lastSample: sample,
+      batteryLevel: battery,
+      powerSave: powerSave,
+    );
 
     await _deliver(sample);
   }

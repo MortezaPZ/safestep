@@ -189,6 +189,8 @@ class UserSettings {
     this.hapticFeedbackEnabled = true,
     this.locationRetentionDays = 90,
     this.theme = 'system',
+    this.adaptivePingEnabled = true,
+    this.pingIntervalStationarySec = 120,
   });
 
   final bool locationSharingEnabled;
@@ -202,6 +204,8 @@ class UserSettings {
   final bool hapticFeedbackEnabled;
   final int locationRetentionDays;
   final String theme;
+  final bool adaptivePingEnabled;
+  final int pingIntervalStationarySec;
 
   factory UserSettings.fromJson(Map<String, dynamic> json) {
     return UserSettings(
@@ -216,6 +220,8 @@ class UserSettings {
       hapticFeedbackEnabled: Json.boolOf(json, 'hapticFeedbackEnabled', true),
       locationRetentionDays: Json.intOf(json, 'locationRetentionDays', 90),
       theme: Json.str(json, 'theme', 'system'),
+      adaptivePingEnabled: Json.boolOf(json, 'adaptivePingEnabled', true),
+      pingIntervalStationarySec: Json.intOf(json, 'pingIntervalStationarySec', 120),
     );
   }
 }

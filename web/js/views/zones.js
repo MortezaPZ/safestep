@@ -36,6 +36,20 @@ export function mountZones(container, ctx) {
     let radius = existing?.radiusM ?? 150;
     let color = existing?.color ?? ZONE_COLORS[zones.length % ZONE_COLORS.length];
     let icon = existing?.icon ?? 'home';
+    let shape = existing?.shape === 'polygon' ? 'polygon' : 'circle';
+    let vertices = Array.isArray(existing?.polygon)
+      ? existing.polygon.map((p) => (Array.isArray(p) ? { lat: p[0], lng: p[1] } : p))
+      : [];
+    let alertOnEnter = existing?.alertOnEnter !== false;
+    let alertOnExit = existing?.alertOnExit !== false;
+    const dwellInput = el('input.input', {
+      type: 'number',
+      min: '1',
+      max: '1440',
+      value: existing?.dwellAlertMinutes ? String(existing.dwellAlertMinutes) : '',
+      placeholder: 'خالی = بدون هشدار ماندگاری',
+      ariaLabel: 'دقیقه ماندگاری بیرون',
+    });
 
     const nameInput = el('input.input', {
       type: 'text',
@@ -138,6 +152,34 @@ export function mountZones(container, ctx) {
           el('label.field__label', { text: 'نام محدوده' }),
           nameInput,
         ),
+        el('div.chip-row.mb-3', {},
+          el('button.chip.chip--button', {
+            type: 'button',
+            text: 'دایره',
+            ariaPressed: String(shape === 'circle'),
+            onClick: (e) => {
+              shape = 'circle';
+              e.currentTarget.setAttribute('aria-pressed', 'true');
+              e.currentTarget.nextElementSibling?.setAttribute('aria-pressed', 'false');
+            },
+          }),
+          el('button.chip.chip--button', {
+            type: 'button',
+            text: 'چندضلعی',
+            ariaPressed: String(shape === 'polygon'),
+            onClick: (e) => {
+              shape = 'polygon';
+              e.currentTarget.setAttribute('aria-pressed', 'true');
+              e.currentTarget.previousElementSibling?.setAttribute('aria-pressed', 'false');
+              previewInfo.textContent = 'روی نقشه کلیک کنید تا رأس اضافه شود. دکمهٔ واگرد آخرین رأس را برمی‌دارد.';
+            },
+          }),
+          el('button.btn.btn--ghost.btn--sm', {
+            type: 'button',
+            text: 'واگرد رأس',
+            onClick: () => { vertices.pop(); },
+          }),
+        ),
         editorMapEl,
         el('div.field.mt-4', {},
           el('label.field__label', {},
@@ -146,6 +188,26 @@ export function mountZones(container, ctx) {
           radiusSlider,
         ),
         previewInfo,
+        el('label.row.gap-2.mt-3', {},
+          el('input', {
+            type: 'checkbox',
+            checked: alertOnEnter,
+            onChange: (e) => { alertOnEnter = e.target.checked; },
+          }),
+          el('span', { text: 'هشدار ورود' }),
+        ),
+        el('label.row.gap-2', {},
+          el('input', {
+            type: 'checkbox',
+            checked: alertOnExit,
+            onChange: (e) => { alertOnExit = e.target.checked; },
+          }),
+          el('span', { text: 'هشدار خروج' }),
+        ),
+        el('div.field.mt-3', {},
+          el('label.field__label', { text: 'ماندگاری بیرون (دقیقه)' }),
+          dwellInput,
+        ),
         el('div.field.mt-4', {},
           el('label.field__label', { text: 'آیکون' }),
           iconRow,
@@ -167,25 +229,32 @@ export function mountZones(container, ctx) {
             }
 
             try {
+              const dwell = dwellInput.value ? Number(dwellInput.value) : null;
+              const payload = {
+                name,
+                color,
+                icon,
+                shape,
+                alertOnEnter,
+                alertOnExit,
+                dwellAlertMinutes: dwell,
+              };
+              if (shape === 'polygon') {
+                if (vertices.length < 3) {
+                  toast('چندضلعی ناقص است', 'حداقل سه رأس لازم است.', { severity: 'warning' });
+                  return;
+                }
+                payload.polygon = vertices.map((v) => [v.lat, v.lng]);
+              } else {
+                payload.centerLat = center.lat;
+                payload.centerLng = center.lng;
+                payload.radiusM = radius;
+              }
               if (isEdit) {
-                await api.updateZone(existing.id, {
-                  name,
-                  centerLat: center.lat,
-                  centerLng: center.lng,
-                  radiusM: radius,
-                  color,
-                  icon,
-                });
+                await api.updateZone(existing.id, payload);
                 toast('ذخیره شد', 'محدوده به‌روزرسانی شد.');
               } else {
-                await api.createZone({
-                  name,
-                  centerLat: center.lat,
-                  centerLng: center.lng,
-                  radiusM: radius,
-                  color,
-                  icon,
-                });
+                await api.createZone(payload);
                 toast('ساخته شد', `محدوده‌ی «${name}» اضافه شد.`);
               }
 
@@ -209,6 +278,11 @@ export function mountZones(container, ctx) {
       }
 
       editorMap.onClick((point) => {
+        if (shape === 'polygon') {
+          vertices.push(point);
+          previewInfo.textContent = `${vertices.length} رأس. برای پایان ذخیره کنید.`;
+          return;
+        }
         center = point;
         editorMap.setPreviewCircle(center, radius);
         refreshPreview();
@@ -262,7 +336,9 @@ export function mountZones(container, ctx) {
       el('div.list-row__main', {},
         el('div.list-row__title', { text: zone.name }),
         el('div.list-row__sub', {
-          text: `شعاع ${faDistance(zone.radiusM)} · آستانه‌ی خروج ${faDistance(zone.thresholds.exitThresholdM)} · آستانه‌ی بازگشت ${faDistance(zone.thresholds.enterThresholdM)}`,
+          text: zone.shape === 'polygon'
+            ? `چندضلعی · ${zone.scheduleActive === false ? 'زمان‌بندی الان غیرفعال · ' : ''}آستانه‌ی هیسترزیس ${faDistance(zone.thresholds.hysteresisM)}`
+            : `شعاع ${faDistance(zone.radiusM)} · آستانه‌ی خروج ${faDistance(zone.thresholds.exitThresholdM)} · آستانه‌ی بازگشت ${faDistance(zone.thresholds.enterThresholdM)}`,
         }),
         el('div.chip-row', {},
           el('span', {
