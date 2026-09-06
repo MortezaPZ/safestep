@@ -963,6 +963,7 @@ paths:
                 type: object
                 properties:
                   alert:
+                    type: object
                     nullable: true
                     allOf: [{ $ref: '#/components/schemas/Alert' }]
 
@@ -1868,6 +1869,7 @@ components:
       type: object
       properties:
         location:
+          type: object
           nullable: true
           allOf: [{ $ref: '#/components/schemas/Ping' }]
         status:
@@ -1906,6 +1908,7 @@ components:
           type: string
           description: پیام محترمانه برای حالت `hidden`
         location:
+          type: object
           nullable: true
           allOf: [{ $ref: '#/components/schemas/Ping' }]
         status:
