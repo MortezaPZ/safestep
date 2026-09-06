@@ -80,6 +80,9 @@ export const ALERT_REQUIRED_PERMISSION = Object.freeze({
 /** وضعیت کاربر نسبت به یک محدوده‌ی امن. */
 export const ZONE_STATE = Object.freeze({ INSIDE: 'inside', OUTSIDE: 'outside', UNKNOWN: 'unknown' });
 
+export const ZONE_SHAPES = Object.freeze({ CIRCLE: 'circle', POLYGON: 'polygon' });
+export const ALL_ZONE_SHAPES = Object.freeze(Object.values(ZONE_SHAPES));
+
 /** رویدادهای WebSocket — نام‌ها بین بک‌اند، وب و موبایل مشترک است. */
 export const WS_EVENTS = Object.freeze({
   LOCATION_UPDATE: 'location:update',

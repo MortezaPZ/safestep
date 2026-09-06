@@ -34,6 +34,13 @@ function buildClientConfig(settingsRow) {
       debounceCount: env.geofence.debounceCount,
       cooldownSec: env.geofence.cooldownSec,
     },
+    adaptivePing: {
+      enabled: settingsRow?.adaptivePingEnabled !== false,
+      movingIntervalSec: settingsRow?.pingIntervalSec ?? 30,
+      stationaryIntervalSec: settingsRow?.pingIntervalStationarySec ?? 120,
+      stationarySpeedMps: 0.5,
+      stationaryAfterSec: 300,
+    },
     accessibility: {
       textScale: settingsRow?.textScale ?? 1,
       highContrastEnabled: settingsRow?.highContrastEnabled ?? false,

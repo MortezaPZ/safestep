@@ -21,12 +21,25 @@ export async function findById(id) {
   return mapSafeZone(rows[0]);
 }
 
-export async function create({ userId, name, centerLat, centerLng, radiusM, color, icon }) {
+export async function create({
+  userId, name, centerLat, centerLng, radiusM, color, icon,
+  shape = 'circle', polygon = null, schedule = null,
+  alertOnEnter = true, alertOnExit = true, dwellAlertMinutes = null,
+}) {
   const { rows } = await db.query(
-    `INSERT INTO safe_zones (user_id, name, center_lat, center_lng, radius_m, color, icon)
-     VALUES ($1, $2, $3, $4, $5, COALESCE($6, '#2F6FED'), COALESCE($7, 'home'))
+    `INSERT INTO safe_zones (
+       user_id, name, center_lat, center_lng, radius_m, color, icon,
+       shape, polygon, schedule, alert_on_enter, alert_on_exit, dwell_alert_minutes
+     )
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, '#2F6FED'), COALESCE($7, 'home'),
+             $8, $9::jsonb, $10::jsonb, $11, $12, $13)
      RETURNING *`,
-    [userId, name, centerLat, centerLng, radiusM, color ?? null, icon ?? null],
+    [
+      userId, name, centerLat, centerLng, radiusM, color ?? null, icon ?? null,
+      shape, polygon ? JSON.stringify(polygon) : null,
+      schedule ? JSON.stringify(schedule) : null,
+      alertOnEnter !== false, alertOnExit !== false, dwellAlertMinutes ?? null,
+    ],
   );
   return mapSafeZone(rows[0]);
 }
@@ -42,6 +55,12 @@ export async function update(id, userId, patch) {
        is_active  = COALESCE($7, is_active),
        color      = COALESCE($8, color),
        icon       = COALESCE($9, icon),
+       shape      = COALESCE($10, shape),
+       polygon    = COALESCE($11::jsonb, polygon),
+       schedule   = COALESCE($12::jsonb, schedule),
+       alert_on_enter = COALESCE($13, alert_on_enter),
+       alert_on_exit  = COALESCE($14, alert_on_exit),
+       dwell_alert_minutes = COALESCE($15, dwell_alert_minutes),
        updated_at = now()
      WHERE id = $1 AND user_id = $2
      RETURNING *`,
@@ -55,6 +74,14 @@ export async function update(id, userId, patch) {
       patch.isActive ?? null,
       patch.color ?? null,
       patch.icon ?? null,
+      patch.shape ?? null,
+      patch.polygon ? JSON.stringify(patch.polygon) : null,
+      patch.schedule !== undefined
+        ? (patch.schedule === null ? null : JSON.stringify(patch.schedule))
+        : null,
+      patch.alertOnEnter ?? null,
+      patch.alertOnExit ?? null,
+      patch.dwellAlertMinutes === undefined ? null : patch.dwellAlertMinutes,
     ],
   );
   return mapSafeZone(rows[0]);
@@ -90,8 +117,9 @@ export async function getZoneState(userId, zoneId) {
 export async function listStatesForUser(userId) {
   const { rows } = await db.query(
     `SELECT z.id AS zone_id, z.user_id, z.name AS zone_name, z.radius_m, z.is_active,
+            z.shape, z.polygon, z.schedule, z.alert_on_enter, z.alert_on_exit, z.dwell_alert_minutes,
             s.state, s.consecutive_count, s.pending_state, s.last_distance_m,
-            s.last_transition_at, s.last_alert_at, s.last_evaluated_at
+            s.last_transition_at, s.last_alert_at, s.last_evaluated_at, s.last_dwell_alert_at
      FROM safe_zones z
      LEFT JOIN zone_states s ON s.zone_id = z.id AND s.user_id = z.user_id
      WHERE z.user_id = $1 AND z.is_active = TRUE`,
@@ -110,15 +138,17 @@ export async function upsertZoneState({
   lastDistanceM,
   transitioned,
   alerted,
+  dwellAlerted = false,
 }) {
   const { rows } = await db.query(
     `INSERT INTO zone_states
        (user_id, zone_id, state, consecutive_count, pending_state, last_distance_m,
-        last_transition_at, last_alert_at, last_evaluated_at)
+        last_transition_at, last_alert_at, last_evaluated_at, last_dwell_alert_at)
      VALUES ($1, $2, $3, $4, $5, $6,
              CASE WHEN $7::boolean THEN now() ELSE NULL END,
              CASE WHEN $8::boolean THEN now() ELSE NULL END,
-             now())
+             now(),
+             CASE WHEN $9::boolean THEN now() ELSE NULL END)
      ON CONFLICT (user_id, zone_id) DO UPDATE SET
        state              = EXCLUDED.state,
        consecutive_count  = EXCLUDED.consecutive_count,
@@ -126,7 +156,8 @@ export async function upsertZoneState({
        last_distance_m    = EXCLUDED.last_distance_m,
        last_transition_at = CASE WHEN $7::boolean THEN now() ELSE zone_states.last_transition_at END,
        last_alert_at      = CASE WHEN $8::boolean THEN now() ELSE zone_states.last_alert_at END,
-       last_evaluated_at  = now()
+       last_evaluated_at  = now(),
+       last_dwell_alert_at = CASE WHEN $9::boolean THEN now() ELSE zone_states.last_dwell_alert_at END
      RETURNING *`,
     [
       userId,
@@ -137,6 +168,7 @@ export async function upsertZoneState({
       lastDistanceM ?? null,
       Boolean(transitioned),
       Boolean(alerted),
+      Boolean(dwellAlerted),
     ],
   );
   return mapZoneState(rows[0]);

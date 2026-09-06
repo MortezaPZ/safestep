@@ -99,6 +99,8 @@ export async function updateSettings(userId, patch) {
        high_contrast_enabled       = COALESCE($11, high_contrast_enabled),
        haptic_feedback_enabled     = COALESCE($12, haptic_feedback_enabled),
        location_retention_days     = COALESCE($13, location_retention_days),
+       adaptive_ping_enabled       = COALESCE($14, adaptive_ping_enabled),
+       ping_interval_stationary_sec = COALESCE($15, ping_interval_stationary_sec),
        updated_at               = now()
      WHERE user_id = $1
      RETURNING *`,
@@ -116,6 +118,8 @@ export async function updateSettings(userId, patch) {
       patch.highContrastEnabled ?? null,
       patch.hapticFeedbackEnabled ?? null,
       patch.locationRetentionDays ?? null,
+      patch.adaptivePingEnabled ?? null,
+      patch.pingIntervalStationarySec ?? null,
     ],
   );
   return mapSettings(rows[0]);

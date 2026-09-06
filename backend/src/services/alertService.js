@@ -45,6 +45,13 @@ export function composeAlertMessage(type, context = {}) {
       };
 
     case ALERT_TYPES.ZONE_EXIT:
+      if (context.dwell) {
+        const n = Math.round(context.dwellMinutes ?? context.durationMinutes ?? 0);
+        return {
+          title: 'ماندگاری بیرون از محدوده',
+          body: `${name} بیش از ${n} دقیقه خارج از «${zone}» است.`,
+        };
+      }
       return {
         title: 'خروج از محدوده‌ی امن',
         body: `${name} از «${zone}» خارج شد.`,

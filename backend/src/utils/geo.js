@@ -171,3 +171,116 @@ export function roundCoord(value, digits = 5) {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 }
+
+function toMetersLocal(lat0, lng0, lat, lng) {
+  const x = toRad(lng - lng0) * EARTH_RADIUS_M * Math.cos(toRad(lat0));
+  const y = toRad(lat - lat0) * EARTH_RADIUS_M;
+  return { x, y };
+}
+
+function ring(points) {
+  return points.map((p) => (Array.isArray(p) ? { lat: p[0], lng: p[1] } : p));
+}
+
+/**
+ * نقطه داخل چندضلعی — پرتوی افقی (ray casting).
+ * نقطه روی یال به‌صورت داخل شمارش می‌شود تا لرزش مرز هشدار جعلی نسازد.
+ */
+export function pointInPolygon(point, polygon) {
+  const verts = ring(polygon);
+  if (verts.length < 3) return false;
+  const { lat, lng } = point;
+  let inside = false;
+  for (let i = 0, j = verts.length - 1; i < verts.length; j = i, i += 1) {
+    const yi = verts[i].lat;
+    const xi = verts[i].lng;
+    const yj = verts[j].lat;
+    const xj = verts[j].lng;
+    const intersect =
+      (yi > lat) !== (yj > lat) &&
+      lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function distPointToSegmentM(p, a, b) {
+  const pa = toMetersLocal(p.lat, p.lng, a.lat, a.lng);
+  const pb = toMetersLocal(p.lat, p.lng, b.lat, b.lng);
+  const abx = pb.x - pa.x;
+  const aby = pb.y - pa.y;
+  const len2 = abx * abx + aby * aby;
+  let t = 0;
+  if (len2 > 0) {
+    t = Math.max(0, Math.min(1, (-pa.x * abx + -pa.y * aby) / len2));
+  }
+  const fx = pa.x + t * abx;
+  const fy = pa.y + t * aby;
+  return Math.sqrt(fx * fx + fy * fy);
+}
+
+/**
+ * کمینه فاصله تا یال‌های چندضلعی.
+ * پای عمود در تصویر equirectangular حول نقطه محاسبه می‌شود؛ برای محدوده‌های
+ * کوچک‌تر از حدود ۵ کیلومتر خطا چند متر است.
+ */
+export function distanceToPolygonEdgeM(point, polygon) {
+  const verts = ring(polygon);
+  if (verts.length < 2) return Infinity;
+  let min = Infinity;
+  for (let i = 0; i < verts.length; i += 1) {
+    const a = verts[i];
+    const b = verts[(i + 1) % verts.length];
+    const d = distPointToSegmentM(point, a, b);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
+export function polygonCentroid(polygon) {
+  const verts = ring(polygon);
+  return centroid(verts);
+}
+
+export function polygonPerimeterM(polygon) {
+  const verts = ring(polygon);
+  if (verts.length < 2) return 0;
+  let total = 0;
+  for (let i = 0; i < verts.length; i += 1) {
+    const a = verts[i];
+    const b = verts[(i + 1) % verts.length];
+    total += haversineDistance(a.lat, a.lng, b.lat, b.lng);
+  }
+  return total;
+}
+
+/** مساحت تقریبی با فرمول گاوس روی تصویر محلی (متر مربع). */
+export function polygonAreaM2(polygon) {
+  const verts = ring(polygon);
+  if (verts.length < 3) return 0;
+  const c = centroid(verts);
+  let sum = 0;
+  for (let i = 0; i < verts.length; i += 1) {
+    const a = toMetersLocal(c.lat, c.lng, verts[i].lat, verts[i].lng);
+    const b = toMetersLocal(c.lat, c.lng, verts[(i + 1) % verts.length].lat, verts[(i + 1) % verts.length].lng);
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(sum) / 2;
+}
+
+export function inscribedRadiusEstimateM(polygon) {
+  const verts = ring(polygon);
+  if (verts.length < 3) return 0;
+  const c = centroid(verts);
+  return distanceToPolygonEdgeM(c, verts);
+}
+
+/** فاصله علامت‌دار تا مرز: منفی داخل، مثبت بیرون. */
+export function signedDistanceToZoneM(point, zone) {
+  if (zone.shape === 'polygon' && zone.polygon) {
+    const edge = distanceToPolygonEdgeM(point, zone.polygon);
+    return pointInPolygon(point, zone.polygon) ? -edge : edge;
+  }
+  const d = haversineDistance(point.lat, point.lng, zone.centerLat, zone.centerLng);
+  return d - zone.radiusM;
+}
