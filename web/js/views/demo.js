@@ -129,6 +129,18 @@ export function mountDemo(container, ctx) {
         text: '▶ شروع شبیه‌سازی',
         onClick: start,
       }),
+      el('button.btn.btn--secondary.btn--block.mt-3', {
+        type: 'button',
+        text: 'شبیه‌سازی سقوط',
+        onClick: async () => {
+          try {
+            const result = await api.simulatorFall();
+            toast('سقوط شبیه‌سازی شد', result.isFall ? 'مدل سقوط تشخیص داد' : 'مدل منفی بود');
+          } catch (error) {
+            toast('شبیه‌سازی سقوط ناموفق بود', error.message, { severity: 'warning' });
+          }
+        },
+      }),
     );
   }
 

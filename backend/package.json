@@ -15,7 +15,8 @@
     "db:reset": "node src/db/reset.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "create:admin": "node src/db/createAdmin.js"
+    "create:admin": "node src/db/createAdmin.js",
+    "train:fall": "node scripts/falls/train.js"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.17",

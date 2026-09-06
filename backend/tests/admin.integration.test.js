@@ -481,7 +481,7 @@ describe('لایه‌ی سنجش: لاگ درخواست و تله‌متری م�
     expect(res.body.tracking.pingIntervalSec).toBe(30);
     expect(res.body.tracking.maxBatchSize).toBe(200);
     // فاز سوم هنوز فعال نیست و اپ باید بتواند این را بفهمد
-    expect(res.body.features.fallDetection).toBe(false);
+    expect(res.body.features.fallDetection).toBe(true);
     // نام رویدادهای WebSocket از سرور می‌آید تا اپ و بک‌اند هرگز از هم جدا نیفتند
     expect(res.body.realtime.events.LOCATION_UPDATE).toBe('location:update');
   });

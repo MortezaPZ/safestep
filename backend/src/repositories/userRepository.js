@@ -101,6 +101,8 @@ export async function updateSettings(userId, patch) {
        location_retention_days     = COALESCE($13, location_retention_days),
        adaptive_ping_enabled       = COALESCE($14, adaptive_ping_enabled),
        ping_interval_stationary_sec = COALESCE($15, ping_interval_stationary_sec),
+       fall_detection_enabled       = COALESCE($16, fall_detection_enabled),
+       fall_countdown_sec           = COALESCE($17, fall_countdown_sec),
        updated_at               = now()
      WHERE user_id = $1
      RETURNING *`,
@@ -120,6 +122,8 @@ export async function updateSettings(userId, patch) {
       patch.locationRetentionDays ?? null,
       patch.adaptivePingEnabled ?? null,
       patch.pingIntervalStationarySec ?? null,
+      patch.fallDetectionEnabled ?? null,
+      patch.fallCountdownSec ?? null,
     ],
   );
   return mapSettings(rows[0]);

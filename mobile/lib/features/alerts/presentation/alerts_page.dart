@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../../core/accessibility/a11y.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -336,6 +338,25 @@ class _AlertCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.xxs),
 
           Text(alert.body, style: theme.textTheme.bodyMedium),
+
+          if (alert.type == 'fall_detected' && alert.confidence != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.xs),
+            Chip(
+              label: Text(
+                'اطمینان ${Fa.digits(((alert.confidence! * 100).round()).toString())}٪',
+              ),
+            ),
+          ],
+
+          if (alert.type == 'fall_detected' &&
+              alert.subjectPhone != null &&
+              alert.subjectPhone!.isNotEmpty) ...<Widget>[
+            TextButton.icon(
+              onPressed: () => launchUrl(Uri.parse('tel:${alert.subjectPhone}')),
+              icon: const Icon(Icons.call),
+              label: const Text('تماس'),
+            ),
+          ],
 
           const SizedBox(height: AppSpacing.xs),
 

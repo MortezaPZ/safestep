@@ -45,10 +45,15 @@ export const ALERT_TYPES = Object.freeze({
   LONG_STOP: 'long_stop',
   GPS_LOST: 'gps_lost',
   LOW_BATTERY: 'low_battery',
-  /** فاز سوم — فعلاً هیچ منطقی آن را تولید نمی‌کند، اما شما و رابط کاربری پذیرایش هستند. */
   FALL_DETECTED: 'fall_detected',
 });
 export const ALL_ALERT_TYPES = Object.freeze(Object.values(ALERT_TYPES));
+
+export const FALL_FEEDBACK = Object.freeze({
+  CONFIRMED: 'confirmed',
+  FALSE_ALARM: 'false_alarm',
+  NO_RESPONSE: 'no_response',
+});
 
 export const SEVERITY = Object.freeze({ INFO: 'info', WARNING: 'warning', CRITICAL: 'critical' });
 
@@ -94,6 +99,8 @@ export const WS_EVENTS = Object.freeze({
   SIMULATOR_STATUS: 'simulator:status',
   /** وضعیت اتصال کاربر تحت پایش، برای نشانگر «آنلاین/آفلاین» در سمت مراقب. */
   DEVICE_STATE: 'device:state',
+  FALL_DETECTED: 'fall:detected',
+  FALL_RESOLVED: 'fall:resolved',
 });
 
 /** منبع تولید یک پینگ موقعیت. */
@@ -141,6 +148,8 @@ export const AUDIT_ACTIONS = Object.freeze({
   SHARING_TOGGLE: 'settings.sharing_toggle',
   HISTORY_DELETE: 'location.history_delete',
   SOS_TRIGGER: 'sos.trigger',
+  FALL_DETECTED: 'fall.detected',
+  FALL_FEEDBACK: 'fall.feedback',
 });
 
 export const PLATFORMS = Object.freeze(['android', 'ios', 'web']);

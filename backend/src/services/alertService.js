@@ -85,6 +85,14 @@ export function composeAlertMessage(type, context = {}) {
         body: `شارژ باتری دستگاه ${name} به ${context.batteryLevel ?? 0} درصد رسیده است.`,
       };
 
+    case ALERT_TYPES.FALL_DETECTED: {
+      const pct = Math.round((context.confidence ?? 0) * 100);
+      return {
+        title: 'احتمال سقوط',
+        body: `احتمال سقوط ${name} تشخیص داده شد (اطمینان ${pct}٪). لطفاً فوراً تماس بگیرید.`,
+      };
+    }
+
     default:
       return { title: 'هشدار', body: `رویدادی برای ${name} ثبت شد.` };
   }

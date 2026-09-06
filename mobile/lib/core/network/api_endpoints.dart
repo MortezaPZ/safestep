@@ -55,7 +55,10 @@ class ApiEndpoints {
 
   /* ─────────────────────── تنظیمات و دستگاه ─────────────────────── */
 
-  static const String settings = '/settings';
+  static const String fallsDetect = '/falls/detect';
+  static const String fallsReportMissed = '/falls/report-missed';
+  static String fallFeedback(String id) => '/falls/$id/feedback';
+  static const String falls = '/falls';
   static const String clientConfig = '/config/client';
   static const String devices = '/devices';
   static String device(String id) => '/devices/$id';

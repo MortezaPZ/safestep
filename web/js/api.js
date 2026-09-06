@@ -259,7 +259,7 @@ export const api = {
   simulatorRoutes: () => request('/simulator/routes'),
   startSimulator: (payload) => request('/simulator/start', { method: 'POST', body: payload }),
   stopSimulator: () => request('/simulator/stop', { method: 'POST' }),
-  simulatorStatus: () => request('/simulator/status'),
+  simulatorFall: () => request('/simulator/fall', { method: 'POST' }),
 
   /* ─── مدیریت سامانه ─── */
   adminOverview: () => request('/admin/overview'),
