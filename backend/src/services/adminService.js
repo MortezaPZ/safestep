@@ -23,6 +23,8 @@ import adminRepository from '../repositories/adminRepository.js';
 import logRepository from '../repositories/logRepository.js';
 import telemetryService from './telemetryService.js';
 import auditService from './auditService.js';
+import * as fallEventRepository from '../repositories/fallEventRepository.js';
+import { loadModel } from './fallDetection/classifier.js';
 import { invalidateAccountState } from '../middleware/auth.js';
 import { badRequest, notFound, conflict } from '../utils/errors.js';
 import logger from '../utils/logger.js';
@@ -277,13 +279,22 @@ export async function metrics(range = {}) {
 
   const window = { from: range.from ?? null, to: range.to ?? null };
 
-  const [requests, location, deliveries, slowest, series] = await Promise.all([
+  const [requests, location, deliveries, slowest, series, falls] = await Promise.all([
     logRepository.requestMetrics(window),
     logRepository.locationMetrics(window),
     logRepository.deliveryMetrics(window),
     logRepository.slowestRoutes({ ...window, limit: 10 }),
     logRepository.dailyRequestSeries({ days: 7 }),
+    fallEventRepository.metrics(),
   ]);
+
+  let model = { version: null, datasetKind: null };
+  try {
+    const loaded = loadModel();
+    model = { version: loaded.version, datasetKind: loaded.datasetKind };
+  } catch {
+    // مدل هنوز آموزش ندیده
+  }
 
   return {
     range: {
@@ -296,6 +307,11 @@ export async function metrics(range = {}) {
     slowestRoutes: slowest,
     dailySeries: series,
     buffer: telemetryService.status(),
+    fallDetection: {
+      ...falls,
+      modelVersion: model.version,
+      datasetKind: model.datasetKind,
+    },
   };
 }
 

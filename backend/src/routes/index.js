@@ -18,12 +18,13 @@ import {
   settings,
   device,
   simulator,
+  falls,
 } from '../controllers/index.js';
 
 import * as admin from '../controllers/adminController.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validate.js';
-import { authLimiter, sosLimiter, inviteLimiter, generalLimiter } from '../middleware/rateLimit.js';
+import { authLimiter, sosLimiter, inviteLimiter, generalLimiter, fallLimiter } from '../middleware/rateLimit.js';
 import {
   ALL_ALERT_TYPES,
   ALL_ROLES,
@@ -429,6 +430,8 @@ router.patch(
       locationRetentionDays: z.number().int().min(0).max(3650).optional(),
       adaptivePingEnabled: z.boolean().optional(),
       pingIntervalStationarySec: z.number().int().min(30).max(1800).optional(),
+      fallDetectionEnabled: z.boolean().optional(),
+      fallCountdownSec: z.number().int().min(10).max(120).optional(),
     }),
   }),
   settings.update,
@@ -491,6 +494,68 @@ router.post(
 
 router.post('/simulator/stop', requireAuth, simulator.stop);
 router.get('/simulator/status', requireAuth, simulator.status);
+
+router.post('/simulator/fall', requireAuth, simulator.fall);
+
+/* ═══════════════════════════ تشخیص سقوط ═══════════════════════════ */
+
+router.post(
+  '/falls/detect',
+  requireAuth,
+  fallLimiter,
+  validate({
+    body: z.object({
+      features: z.array(z.number()).length(14),
+      detectedAt: z.coerce.date().optional(),
+      lat: schemas.lat.optional(),
+      lng: schemas.lng.optional(),
+      accuracyM: z.number().min(0).max(10_000).optional(),
+      batteryLevel: z.number().int().min(0).max(100).optional(),
+      clientEventId: schemas.uuid,
+    }),
+  }),
+  falls.detect,
+);
+
+router.post(
+  '/falls/report-missed',
+  requireAuth,
+  validate({
+    body: z.object({
+      detectedAt: z.coerce.date().optional(),
+      lat: schemas.lat.optional(),
+      lng: schemas.lng.optional(),
+      features: z.array(z.number()).max(14).optional(),
+    }),
+  }),
+  falls.reportMissed,
+);
+
+router.post(
+  '/falls/:id/feedback',
+  requireAuth,
+  validate({
+    params: z.object({ id: schemas.uuid }),
+    body: z.object({
+      feedback: z.enum(['confirmed', 'false_alarm', 'no_response']),
+      respondedWithinSec: z.number().int().min(0).max(600).optional(),
+    }),
+  }),
+  falls.feedback,
+);
+
+router.get(
+  '/falls',
+  requireAuth,
+  validate({
+    query: z.object({
+      userId: schemas.uuid.optional(),
+      limit: schemas.numericQuery(1, 200, 50),
+      before: schemas.isoDate.optional(),
+    }),
+  }),
+  falls.list,
+);
 
 /* ═══════════════════════ پنل مدیریت (فقط ادمین) ═══════════════════════ */
 

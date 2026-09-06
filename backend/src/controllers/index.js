@@ -10,9 +10,13 @@ import safeZoneService from '../services/safeZoneService.js';
 import alertService from '../services/alertService.js';
 import sosService from '../services/sosService.js';
 import simulatorService from '../services/simulatorService.js';
+import fallService from '../services/fallService.js';
+import { cannedPositiveFeatures } from '../services/fallDetection/classifier.js';
+import { forbidden } from '../utils/errors.js';
 import * as userRepository from '../repositories/userRepository.js';
 import * as deviceRepository from '../repositories/deviceRepository.js';
 import { asyncHandler } from '../middleware/error.js';
+import { randomUUID } from 'node:crypto';
 import env from '../config/env.js';
 import { WS_EVENTS, ALL_ALERT_TYPES } from '../config/constants.js';
 
@@ -54,7 +58,9 @@ function buildClientConfig(settingsRow) {
       pushNotifications: Boolean(
         env.notification.fcmServiceAccountPath || env.notification.fcmServiceAccountJson,
       ),
-      fallDetection: false,
+      fallDetection: true,
+      fallCountdownSec: settingsRow?.fallCountdownSec ?? 30,
+      fallDetectionEnabled: settingsRow?.fallDetectionEnabled !== false,
     },
   };
 }
@@ -279,5 +285,34 @@ export const simulator = {
 
   status: asyncHandler(async (req, res) => {
     res.json(simulatorService.status(req.user.id));
+  }),
+
+  fall: asyncHandler(async (req, res) => {
+    if (!env.demo.enabled) throw forbidden('شبیه‌ساز فقط در حالت نمایش فعال است.');
+    const features = cannedPositiveFeatures();
+    const result = await fallService.detect(req.user, {
+      features,
+      detectedAt: new Date(),
+      lat: req.body.lat,
+      lng: req.body.lng,
+      clientEventId: req.body.clientEventId ?? randomUUID(),
+    }, { source: 'simulator' });
+    res.status(201).json(result);
+  }),
+};
+
+export const falls = {
+  detect: asyncHandler(async (req, res) => {
+    const result = await fallService.detect(req.user, req.body);
+    res.status(201).json(result);
+  }),
+  feedback: asyncHandler(async (req, res) => {
+    res.json(await fallService.submitFeedback(req.user, req.params.id, req.body));
+  }),
+  reportMissed: asyncHandler(async (req, res) => {
+    res.status(201).json(await fallService.reportMissed(req.user, req.body));
+  }),
+  list: asyncHandler(async (req, res) => {
+    res.json(await fallService.listFalls(req.user, req.query));
   }),
 };

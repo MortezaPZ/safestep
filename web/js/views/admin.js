@@ -144,6 +144,41 @@ export function mountAdmin(container) {
     );
   }
 
+  function fallMetricsCard(fd) {
+    const c = fd?.confusion ?? { tp: 0, fp: 0, tn: 0, fn: 0 };
+    return el('div.card.mb-4', {},
+      el('div.card__body', {},
+        el('div.row.row--between.mb-3', {},
+          el('h2.card__title', { text: 'ماتریس درهم‌ریختگی سقوط' }),
+          el('button.btn.btn--ghost.btn--sm', {
+            type: 'button',
+            text: 'خروجی CSV',
+            onClick: () => downloadCsv(
+              'fall-confusion.csv',
+              ['tp', 'fp', 'fn', 'tn', 'precision', 'recall', 'f1'],
+              [[c.tp, c.fp, c.fn, c.tn, fd?.precision, fd?.recall, fd?.f1]],
+            ),
+          }),
+        ),
+        el('p.muted.mb-3', {
+          text: `مدل ${fd?.modelVersion ?? '—'} · داده ${fd?.datasetKind ?? '—'}`,
+        }),
+        table(
+          ['', 'سقوط واقعی', 'غیرسقوط'],
+          [
+            ['پیش‌بینی سقوط', c.tp, c.fp],
+            ['پیش‌بینی غیرسقوط', c.fn, c.tn],
+          ],
+        ),
+        el('div.row.row--wrap.gap-3.mt-4', {},
+          metricCard('صحت', fd?.precision),
+          metricCard('بازخوانی', fd?.recall),
+          metricCard('F1', fd?.f1),
+        ),
+      ),
+    );
+  }
+
   async function loadUsers(query = {}) {
     const page = await api.adminUsers({ limit: 30, offset: 0, ...query });
     const users = page.users ?? [];
@@ -456,6 +491,7 @@ export function mountAdmin(container) {
         metricCard('تأخیر p99', req.p99Ms),
         metricCard('تأخیر سرتاسری میانگین', lat.avgE2eMs),
       ),
+      fallMetricsCard(data.fallDetection),
       el('div.card.mb-4', {},
         el('div.card__body', {},
           el('div.row.row--between.mb-3', {},

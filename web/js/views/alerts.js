@@ -13,7 +13,7 @@ import {
   ALERT_LABELS,
 } from '../format.js';
 
-const FILTER_ORDER = ['sos', 'zone_exit', 'zone_enter', 'long_stop', 'gps_lost', 'low_battery'];
+const FILTER_ORDER = ['sos', 'fall_detected', 'zone_exit', 'zone_enter', 'long_stop', 'gps_lost', 'low_battery'];
 
 export function mountAlerts(container, ctx) {
   let alerts = [];
@@ -106,8 +106,11 @@ export function mountAlerts(container, ctx) {
     if (alert.metadata?.batteryLevel !== undefined && alert.metadata?.batteryLevel !== null) {
       details.push(`باتری: ${faNumber(alert.metadata.batteryLevel)}٪`);
     }
-    if (alert.metadata?.locationSource === 'last_known') {
-      details.push('موقعیت: آخرین نقطه‌ی شناخته‌شده');
+    if (alert.metadata?.confidence !== undefined && alert.metadata?.confidence !== null) {
+      details.push(`اطمینان مدل: ${faNumber(Math.round(alert.metadata.confidence * 100))}٪`);
+    }
+    if (alert.metadata?.feedback) {
+      details.push(`بازخورد: ${alert.metadata.feedback}`);
     }
 
     return el(
