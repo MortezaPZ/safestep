@@ -14,6 +14,7 @@ import { runMigrations } from './db/migrate.js';
 import { attachSocket } from './realtime/socket.js';
 import simulatorService from './services/simulatorService.js';
 import notificationAdapter from './services/notificationAdapter.js';
+import notificationOutbox from './services/notificationOutbox.js';
 import telemetryService from './services/telemetryService.js';
 import logger from './utils/logger.js';
 
@@ -60,6 +61,7 @@ async function start() {
 
   log.info('سرور آماده است', { port: env.port, env: env.nodeEnv });
   printBanner();
+  notificationOutbox.start();
 
   /* ─────────────────────── خاموش شدن تمیز ─────────────────────── */
 
@@ -74,6 +76,7 @@ async function start() {
     // شبیه‌سازها اول متوقف می‌شوند تا وسط نوشتن در دیتابیس قطع نشوند
     simulatorService.stopAll();
     telemetryService.stop();
+    notificationOutbox.stop();
 
     server.close(async () => {
       // بافر تله‌متری پیش از بستن اتصال تخلیه می‌شود، وگرنه لاگ چند ثانیه‌ی

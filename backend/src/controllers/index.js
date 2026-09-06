@@ -44,7 +44,9 @@ function buildClientConfig(settingsRow) {
     features: {
       demoMode: env.demo.enabled,
       // فازهای بعد؛ اپ از همین پرچم‌ها می‌فهمد چه چیزی هنوز فعال نیست
-      pushNotifications: Boolean(env.notification.fcmServerKey),
+      pushNotifications: Boolean(
+        env.notification.fcmServiceAccountPath || env.notification.fcmServiceAccountJson,
+      ),
       fallDetection: false,
     },
   };

@@ -15,6 +15,7 @@ const TABS = [
   { id: 'requests', label: 'لاگ درخواست‌ها' },
   { id: 'audit', label: 'لاگ حسابرسی' },
   { id: 'metrics', label: 'سنجه‌های ارزیابی' },
+  { id: 'outbox', label: 'صف نوتیفیکیشن' },
 ];
 
 const ROLE_FA = { primary: 'کاربر اصلی', guardian: 'مراقب', admin: 'مدیر سامانه' };
@@ -101,7 +102,8 @@ export function mountAdmin(container) {
       else if (tab === 'devices') await loadDevices();
       else if (tab === 'requests') await loadRequests();
       else if (tab === 'audit') await loadAudit();
-      else await loadMetrics();
+      else if (tab === 'metrics') await loadMetrics();
+      else await loadOutbox();
     } catch (err) {
       showError(err, load);
     }
@@ -504,6 +506,57 @@ export function mountAdmin(container) {
     } catch (err) {
       toast('پاک‌سازی نشد', err.message, { severity: 'warning' });
     }
+  }
+
+  async function loadOutbox() {
+    const page = await api.adminOutbox({ limit: 50 });
+    const items = page.items ?? [];
+    paint(el('div.card', {},
+      el('div.card__body', {},
+        el('h2.card__title.mb-3', { text: 'صف نوتیفیکیشن' }),
+        el('p.muted.mb-3', {
+          text: 'ارسال FCM از این صف با بازتلاش انجام می‌شود. اپ باز همان لحظه از WebSocket مطلع می‌شود.',
+        }),
+        items.length === 0
+          ? emptyState({ title: 'صف خالی است', text: 'هنوز پیامی برای ارسال FCM در صف نیست.' })
+          : outboxTable(items),
+      ),
+    ));
+  }
+
+  function outboxTable(items) {
+    const wrap = el('div.table-wrap');
+    const tbl = el('table.table');
+    tbl.append(el('thead', {}, el('tr', {},
+      ...['شناسه', 'وضعیت', 'تلاش', 'خطا', 'کنش'].map((h) => el('th', { text: h })),
+    )));
+    const tbody = el('tbody');
+    for (const row of items) {
+      const retryBtn = el('button.btn.btn--ghost', {
+        type: 'button',
+        text: 'تلاش دوباره',
+        disabled: row.status === 'pending' || row.status === 'sent',
+        onClick: async () => {
+          try {
+            await api.adminRetryOutbox(row.id);
+            toast('دوباره در صف قرار گرفت');
+            await loadOutbox();
+          } catch (err) {
+            toast('تلاش دوباره نشد', err.message, { severity: 'warning' });
+          }
+        },
+      });
+      tbody.append(el('tr', {},
+        el('td', { text: String(row.id) }),
+        el('td', { text: row.status }),
+        el('td', { text: faNumber(row.attempts) }),
+        el('td', { text: row.lastError ?? '—' }),
+        el('td', {}, retryBtn),
+      ));
+    }
+    tbl.append(tbody);
+    wrap.append(tbl);
+    return wrap;
   }
 
   function table(headers, rows) {

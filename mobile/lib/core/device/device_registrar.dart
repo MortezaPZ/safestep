@@ -35,7 +35,7 @@ class DeviceRegistrar {
   ///
   /// شکستش هرگز جریان ورود را متوقف نمی‌کند: کاربری که وارد شده، نباید
   /// به‌خاطر خطای یک درخواست جانبی بیرون بماند.
-  Future<void> registerCurrentDevice() async {
+  Future<void> registerCurrentDevice({String? pushToken}) async {
     try {
       final String installId = await _tokenStore.installId(() => _uuid.v4());
       final _DeviceInfo info = await _collect();
@@ -50,7 +50,7 @@ class DeviceRegistrar {
           'model': info.model,
           'osVersion': info.osVersion,
           'appVersion': info.appVersion,
-          // توکن Push در فاز دوم اضافه می‌شود؛ ستونش از همین حالا آماده است
+          if (pushToken != null) 'pushToken': pushToken,
         },
       );
     } catch (_) {

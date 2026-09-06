@@ -620,4 +620,28 @@ router.get(
   admin.metrics,
 );
 
+router.get(
+  '/admin/notifications/outbox',
+  requireAuth,
+  requireAdmin,
+  validate({
+    query: z.object({
+      status: z.enum(['pending', 'sent', 'failed', 'abandoned']).optional(),
+      limit: z.coerce.number().int().min(1).max(200).optional(),
+      offset: z.coerce.number().int().min(0).optional(),
+    }),
+  }),
+  admin.listOutbox,
+);
+
+router.post(
+  '/admin/notifications/outbox/:id/retry',
+  requireAuth,
+  requireAdmin,
+  validate({
+    params: z.object({ id: z.coerce.number().int().positive() }),
+  }),
+  admin.retryOutbox,
+);
+
 export default router;

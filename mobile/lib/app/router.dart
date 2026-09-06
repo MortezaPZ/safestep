@@ -170,7 +170,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.alerts,
         builder: (BuildContext context, GoRouterState state) =>
-            const AlertsListPage(),
+            AlertsListPage(alertId: state.uri.queryParameters['alertId']),
       ),
       GoRoute(
         path: '/watch/:userId',

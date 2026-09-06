@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
 import '../../../core/constants/app_config.dart';
+import '../../../core/push/push_service.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
@@ -108,6 +109,14 @@ class SettingsPage extends ConsumerWidget {
             padding: EdgeInsets.zero,
             child: Column(
               children: <Widget>[
+                _SettingsTile(
+                  icon: Icons.notifications_active_outlined,
+                  title: 'اعلان لحظه‌ای',
+                  subtitle: ref.watch(pushStatusProvider).reason,
+                  enabled: false,
+                  onTap: null,
+                ),
+                const Divider(height: 1),
                 _SettingsTile(
                   icon: Icons.text_fields_rounded,
                   title: 'نمایش و دسترس‌پذیری',
