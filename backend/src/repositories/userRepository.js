@@ -34,13 +34,13 @@ export async function existsByPhone(phone) {
  * اگر ساخت تنظیمات شکست بخورد، کاربر هم ساخته نمی‌شود — وگرنه کاربری
  * بدون تنظیمات می‌ماند که تمام کوئری‌های بعدی را می‌شکند.
  */
-export async function create({ phone, passwordHash, fullName, role, avatarColor }) {
+export async function create({ phone, passwordHash, fullName, role, avatarColor, phoneVerifiedAt }) {
   return db.transaction(async (tx) => {
     const { rows } = await tx.query(
-      `INSERT INTO users (phone, password_hash, full_name, role, avatar_color)
-       VALUES ($1, $2, $3, $4, COALESCE($5, '#2F6FED'))
+      `INSERT INTO users (phone, password_hash, full_name, role, avatar_color, phone_verified_at)
+       VALUES ($1, $2, $3, $4, COALESCE($5, '#2F6FED'), $6)
        RETURNING *`,
-      [phone, passwordHash, fullName, role, avatarColor ?? null],
+      [phone, passwordHash, fullName, role, avatarColor ?? null, phoneVerifiedAt ?? null],
     );
     const user = mapUser(rows[0]);
 
