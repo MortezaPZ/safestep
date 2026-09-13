@@ -522,6 +522,25 @@ button, input, select, textarea {
 }
 
 /* در تم تیره، کاشی‌های روشن نقشه آزاردهنده‌اند — کمی تعدیل می‌شوند */
+.document-preview {
+  display: block;
+  width: min(100%, 720px);
+  max-height: 70vh;
+  object-fit: contain;
+  margin-inline: auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--gray-0);
+}
+
+.brand__mark {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: var(--gray-0);
+}
+
 :root[data-theme='dark'] .leaflet-tile-pane { filter: brightness(0.72) saturate(0.85); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .leaflet-tile-pane { filter: brightness(0.72) saturate(0.85); }

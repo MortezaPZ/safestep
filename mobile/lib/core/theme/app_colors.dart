@@ -17,9 +17,9 @@ class AppColors {
   /* ─────────────────────────── برند ─────────────────────────── */
 
   /// آبی اصلی — دکمه‌ها، لینک‌ها، وضعیت «همه‌چیز عادی است»
-  static const Color primary = Color(0xFF2F6FED);
-  static const Color primaryDark = Color(0xFF1E4FB8);
-  static const Color primaryLight = Color(0xFFE8F0FE);
+  static const Color primary = Color(0xFF00AFA3);
+  static const Color primaryDark = Color(0xFF008F87);
+  static const Color primaryLight = Color(0xFFE5F5F5);
 
   /* ─────────────────────── رنگ‌های معنایی ─────────────────────── */
 
@@ -48,7 +48,8 @@ class AppColors {
 
   /* ─────────────────────── روشن ─────────────────────── */
 
-  static const Color lightBackground = Color(0xFFF7F8FA);
+  // تم روشن باید کاملاً سفید باشد؛ خاکستری فقط برای سطوح فرعی استفاده می‌شود.
+  static const Color lightBackground = Color(0xFFFFFFFF);
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightSurfaceAlt = Color(0xFFEFF1F5);
   static const Color lightBorder = Color(0xFFDCE0E7);

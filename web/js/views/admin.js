@@ -5,11 +5,12 @@
  * نشان نمی‌دهد و هیچ درخواستی به مسیرهای موقعیت نمی‌زند.
  */
 import api from '../api.js';
-import { el, render, toast, skeleton, emptyState, errorState } from '../ui.js';
+import { el, render, toast, skeleton, emptyState, errorState, dialog } from '../ui.js';
 import { faNumber } from '../format.js';
 
 const TABS = [
   { id: 'overview', label: 'نمای کلی' },
+  { id: 'documents', label: 'مدارک ارسالی' },
   { id: 'users', label: 'کاربران' },
   { id: 'devices', label: 'دستگاه‌ها' },
   { id: 'requests', label: 'لاگ درخواست‌ها' },
@@ -98,6 +99,7 @@ export function mountAdmin(container) {
     showLoading();
     try {
       if (tab === 'overview') await loadOverview();
+      else if (tab === 'documents') await loadDocuments();
       else if (tab === 'users') await loadUsers();
       else if (tab === 'devices') await loadDevices();
       else if (tab === 'requests') await loadRequests();
@@ -133,6 +135,76 @@ export function mountAdmin(container) {
         ),
       ),
     ));
+  }
+
+  async function loadDocuments() {
+    const page = await api.adminDocuments({ status: 'pending', limit: 50 });
+    const documents = page.documents ?? page.items ?? [];
+    paint(el('div.card', {},
+      el('div.card__body', {},
+        el('h2.card__title.mb-2', { text: 'مدارک در انتظار بررسی' }),
+        el('p.muted.mb-4', { text: 'تصویر مدرک را پیش از تأیید یا رد مشاهده کنید.' }),
+        documents.length === 0
+          ? emptyState({ title: 'مدرکی برای بررسی نیست', text: 'مدرک ارسال‌شده‌ای در انتظار بررسی وجود ندارد.' })
+          : documentTable(documents),
+      ),
+    ));
+  }
+
+  function documentTable(documents) {
+    const wrap = el('div.table-wrap');
+    const tbl = el('table.table');
+    tbl.append(el('thead', {}, el('tr', {},
+      ...['کاربر', 'نوع مدرک', 'زمان ارسال', 'کنش'].map((h) => el('th', { text: h })),
+    )));
+    const tbody = el('tbody');
+    for (const item of documents) {
+      tbody.append(el('tr', {},
+        el('td', { text: item.userName ?? item.userPhone ?? '—' }),
+        el('td', { text: item.typeLabel ?? item.type ?? '—' }),
+        el('td', { text: item.createdAt ?? '—' }),
+        el('td', {}, el('div.row.row--wrap.gap-2', {},
+          el('button.btn.btn--ghost.btn--sm', {
+            type: 'button', text: 'مشاهده تصویر',
+            onClick: () => viewDocument(item),
+          }),
+          el('button.btn.btn--secondary.btn--sm', {
+            type: 'button', text: 'تأیید',
+            onClick: () => updateDocument(item, 'approve'),
+          }),
+          el('button.btn.btn--ghost.btn--sm', {
+            type: 'button', text: 'رد',
+            onClick: () => updateDocument(item, 'reject'),
+          }),
+        )),
+      ));
+    }
+    tbl.append(tbody); wrap.append(tbl); return wrap;
+  }
+
+  function viewDocument(item) {
+    const imageUrl = item.imageUrl ?? item.fileUrl;
+    dialog({
+      title: `تصویر مدرک — ${item.userName ?? 'کاربر'}`,
+      content: imageUrl
+        ? el('img.document-preview', { src: imageUrl, alt: 'تصویر مدرک ارسالی', loading: 'eager' })
+        : el('p.dialog__text', { text: 'تصویر این مدرک در دسترس نیست.' }),
+    });
+  }
+
+  async function updateDocument(item, action) {
+    try {
+      if (action === 'approve') await api.adminApproveDocument(item.id);
+      else {
+        const reason = window.prompt('دلیل رد مدرک را بنویسید:');
+        if (!reason) return;
+        await api.adminRejectDocument(item.id, reason);
+      }
+      toast(action === 'approve' ? 'مدرک تأیید شد' : 'مدرک رد شد');
+      await loadDocuments();
+    } catch (err) {
+      toast('عملیات انجام نشد', err.message, { severity: 'warning' });
+    }
   }
 
   function metricCard(label, value) {

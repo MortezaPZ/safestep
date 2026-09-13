@@ -31,6 +31,51 @@ const mapAdminUser = (row) => ({
   ...(row.last_ping_at !== undefined ? { lastPingAt: d(row.last_ping_at) } : {}),
 });
 
+const mapIdentityDocument = (row) => ({
+  id: row.id,
+  userId: row.user_id,
+  userName: row.user_name,
+  userPhone: row.user_phone,
+  type: row.document_type,
+  imageUrl: row.image_url,
+  status: row.status,
+  rejectionReason: row.rejection_reason ?? null,
+  createdAt: d(row.created_at),
+  reviewedAt: d(row.reviewed_at),
+});
+
+export async function listIdentityDocuments({ status = 'pending', limit = 50, offset = 0 } = {}) {
+  const { rows } = await db.query(
+    `SELECT d.*, u.full_name AS user_name, u.phone AS user_phone
+       FROM identity_documents d JOIN users u ON u.id = d.user_id
+      WHERE ($1::text IS NULL OR d.status = $1)
+      ORDER BY d.created_at DESC LIMIT $2 OFFSET $3`,
+    [status, limit, offset],
+  );
+  return rows.map(mapIdentityDocument);
+}
+
+export async function createIdentityDocument(userId, documentType, imageUrl) {
+  const { rows } = await db.query(
+    `INSERT INTO identity_documents (user_id, document_type, image_url)
+     VALUES ($1, $2, $3)
+     RETURNING *`,
+    [userId, documentType, imageUrl],
+  );
+  return mapIdentityDocument(rows[0]);
+}
+
+export async function reviewIdentityDocument(id, status, reviewerId, rejectionReason = null) {
+  const { rows } = await db.query(
+    `UPDATE identity_documents
+        SET status = $2, reviewed_by = $3, reviewed_at = now(), rejection_reason = $4
+      WHERE id = $1
+      RETURNING *`,
+    [id, status, reviewerId, rejectionReason],
+  );
+  return rows[0] ? mapIdentityDocument(rows[0]) : null;
+}
+
 /* ═══════════════════════════ کاربران ═══════════════════════════ */
 
 /**

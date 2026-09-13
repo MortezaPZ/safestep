@@ -55,7 +55,9 @@ class _SafeStepAppState extends ConsumerState<SafeStepApp> {
 
       theme: AppTheme.light(highContrast: a11y.highContrast),
       darkTheme: AppTheme.dark(highContrast: a11y.highContrast),
-      themeMode: a11y.themeMode,
+      // «تم سیستم» عمداً با «روشن» یکی است تا تنظیمات دستگاه ظاهر برنامه
+      // را تغییر ندهد.
+      themeMode: a11y.themeMode == ThemeMode.system ? ThemeMode.light : a11y.themeMode,
 
       locale: Locale(a11y.localeCode),
       supportedLocales: AppLocalizations.supportedLocales,

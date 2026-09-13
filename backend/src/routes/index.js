@@ -590,6 +590,19 @@ router.get(
 
 /* ═══════════════════════ پنل مدیریت (فقط ادمین) ═══════════════════════ */
 
+router.post(
+  '/documents',
+  requireAuth,
+  validate({
+    body: z.object({
+      documentType: z.string().trim().min(1).max(40),
+      // کلاینت می‌تواند URL امن فایل یا data URL تصویر را ارسال کند.
+      imageUrl: z.string().trim().min(1).max(8_000_000),
+    }),
+  }),
+  admin.submitIdentityDocument,
+);
+
 /**
  * تمام مسیرهای زیر دو گارد دارند: احراز هویت، و سپس نقش ادمین.
  *
@@ -605,6 +618,39 @@ const adminPaging = {
 };
 
 router.get('/admin/overview', requireAuth, requireAdmin, admin.overview);
+
+router.get(
+  '/admin/documents',
+  requireAuth,
+  requireAdmin,
+  validate({
+    query: z.object({
+      status: z.enum(['pending', 'approved', 'rejected']).default('pending'),
+      limit: schemas.numericQuery(1, 200, 50),
+      offset: schemas.numericQuery(0, 100000, 0),
+    }),
+  }),
+  admin.listIdentityDocuments,
+);
+
+router.post(
+  '/admin/documents/:id/approve',
+  requireAuth,
+  requireAdmin,
+  validate({ params: z.object({ id: schemas.uuid }) }),
+  admin.approveIdentityDocument,
+);
+
+router.post(
+  '/admin/documents/:id/reject',
+  requireAuth,
+  requireAdmin,
+  validate({
+    params: z.object({ id: schemas.uuid }),
+    body: z.object({ reason: z.string().trim().min(1).max(300) }),
+  }),
+  admin.rejectIdentityDocument,
+);
 
 router.get(
   '/admin/users',
