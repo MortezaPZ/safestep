@@ -123,10 +123,15 @@ class _SplashPageState extends ConsumerState<SplashPage>
                     color: AppColors.primaryLight,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusLg + 6),
                   ),
-                  child: const Icon(
-                    Icons.directions_walk_rounded,
-                    size: 56,
-                    color: AppColors.primary,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.all(
+                      Radius.circular(AppSpacing.radiusLg + 6),
+                    ),
+                    child: Image.asset(
+                      'assets/images/logo-hamghadam.jpg',
+                      fit: BoxFit.contain,
+                      semanticLabel: 'لوگوی هم‌قدم',
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),

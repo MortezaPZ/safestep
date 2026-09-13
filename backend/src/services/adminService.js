@@ -68,6 +68,20 @@ export async function getUser(userId) {
   return { user };
 }
 
+export async function listIdentityDocuments(filters = {}) {
+  return { documents: await adminRepository.listIdentityDocuments(filters) };
+}
+
+export async function submitIdentityDocument(userId, documentType, imageUrl) {
+  return { document: await adminRepository.createIdentityDocument(userId, documentType, imageUrl) };
+}
+
+export async function reviewIdentityDocument(id, status, actor, reason = null) {
+  const document = await adminRepository.reviewIdentityDocument(id, status, actor.id, reason);
+  if (!document) throw notFound('مدرک یافت نشد.');
+  return { document };
+}
+
 /**
  * تعلیق حساب.
  * حساب معلق می‌تواند وارد شود اما هیچ عملیاتی انجام نمی‌دهد — این عمدی است:

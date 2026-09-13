@@ -232,11 +232,10 @@ export function getTheme() {
 }
 
 export function applyTheme(theme) {
-  if (theme === 'system') {
-    document.documentElement.removeAttribute('data-theme');
-  } else {
-    document.documentElement.setAttribute('data-theme', theme);
-  }
+  // تم سیستم عمداً با تم روشن یکی است تا ظاهر برنامه به تنظیمات سیستم
+  // وابسته نباشد و حالت روشن همیشه سفید باقی بماند.
+  const effectiveTheme = theme === 'system' ? 'light' : theme;
+  document.documentElement.setAttribute('data-theme', effectiveTheme);
   localStorage.setItem(THEME_KEY, theme);
 }
 

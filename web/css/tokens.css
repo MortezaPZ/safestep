@@ -43,14 +43,14 @@
   --blue-50:  #EFF5FF;
   --blue-100: #DBE7FE;
   --blue-300: #93B4FA;
-  --blue-500: #2F6FED;
-  --blue-600: #1E56C8;
-  --blue-700: #1743A0;
+  --blue-500: #00AFA3;
+  --blue-600: #008F87;
+  --blue-700: #006E69;
 
   --green-50:  #E8F7F1;
   --green-100: #C9EDDF;
-  --green-500: #12805C;
-  --green-600: #0D6647;
+  --green-500: #22C55E;
+  --green-600: #169447;
 
   --amber-50:  #FDF3E5;
   --amber-100: #FAE3C2;
@@ -136,10 +136,10 @@
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --bg-canvas:   var(--gray-50);
+  --bg-canvas:   var(--gray-0);
   --bg-surface:  var(--gray-0);
   --bg-raised:   var(--gray-0);
-  --bg-sunken:   var(--gray-25);
+  --bg-sunken:   var(--gray-0);
   --bg-overlay:  rgba(20, 26, 33, 0.55);
   --bg-hover:    var(--gray-50);
   --bg-active:   var(--gray-100);
@@ -242,63 +242,6 @@
 
   --skeleton-base: rgba(255, 255, 255, 0.06);
   --skeleton-shine: rgba(255, 255, 255, 0.11);
-}
-
-/* پیروی از تنظیم سیستم وقتی کاربر انتخاب صریحی نکرده است */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-
-    --bg-canvas:   var(--gray-950);
-    --bg-surface:  var(--gray-900);
-    --bg-raised:   var(--gray-800);
-    --bg-sunken:   #0A0E13;
-    --bg-overlay:  rgba(0, 0, 0, 0.7);
-    --bg-hover:    rgba(255, 255, 255, 0.04);
-    --bg-active:   rgba(255, 255, 255, 0.08);
-
-    --border-subtle: rgba(255, 255, 255, 0.07);
-    --border-default: rgba(255, 255, 255, 0.12);
-    --border-strong: rgba(255, 255, 255, 0.2);
-
-    --text-primary:   #EEF2F6;
-    --text-secondary: #A8B4C0;
-    --text-muted:     #7A8794;
-    --text-inverse:   var(--gray-900);
-
-    --accent:        #6C9BFF;
-    --accent-hover:  #89AFFF;
-    --accent-soft:   rgba(108, 155, 255, 0.13);
-    --accent-border: rgba(108, 155, 255, 0.28);
-    --accent-text:   #A9C4FF;
-
-    --safe:        #3BC49A;
-    --safe-soft:   rgba(59, 196, 154, 0.13);
-    --safe-border: rgba(59, 196, 154, 0.28);
-    --safe-text:   #6DD9B8;
-
-    --warn:        #F0A73E;
-    --warn-soft:   rgba(240, 167, 62, 0.13);
-    --warn-border: rgba(240, 167, 62, 0.28);
-    --warn-text:   #F5C071;
-
-    --danger:        #F0555A;
-    --danger-hover:  #F5787C;
-    --danger-soft:   rgba(240, 85, 90, 0.14);
-    --danger-border: rgba(240, 85, 90, 0.3);
-    --danger-text:   #FF9195;
-
-    --unknown:      var(--gray-500);
-    --unknown-soft: rgba(255, 255, 255, 0.05);
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 3px 10px rgba(0, 0, 0, 0.45);
-    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
-    --shadow-sos: 0 6px 24px rgba(240, 85, 90, 0.4);
-
-    --skeleton-base: rgba(255, 255, 255, 0.06);
-    --skeleton-shine: rgba(255, 255, 255, 0.11);
-  }
 }
 
 /* احترام به تنظیم «کاهش حرکت» سیستم عامل.

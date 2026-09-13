@@ -80,8 +80,10 @@ export function createApp() {
     }),
   );
 
-  app.use(express.json({ limit: '256kb' }));
-  app.use(express.urlencoded({ extended: false, limit: '256kb' }));
+  // مدارک می‌توانند به‌صورت data URL تصویر ارسال شوند؛ سقف با اعتبارسنجی
+  // endpoint مدارک هم‌راستا است تا تصویر قبل از رسیدن به route قطع نشود.
+  app.use(express.json({ limit: '8mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '8mb' }));
 
   // پس از تجزیه‌ی بدنه و پیش از مسیریابی: شناسه‌ی درخواست ساخته می‌شود و
   // زمان‌سنجی آغاز می‌گردد. خودِ ثبت، پس از ارسال کامل پاسخ انجام می‌شود.

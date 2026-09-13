@@ -58,6 +58,9 @@ function visibleViews() {
   const isGuardian = state.links.primaries.length > 0;
 
   return Object.entries(VIEWS).filter(([, view]) => {
+    // مدیر سامانه فقط به پنل مدیریت دسترسی دارد؛ نماهای عمومی (از جمله
+    // تنظیمات/پشتیبانی) نباید در ناوبری مدیر نمایش داده شوند.
+    if (isAdmin) return view.forAdmin === true;
     if (view.forAdmin) return isAdmin;
     if (view.always) return true;
     if (view.forHistory) return isPrimary || isGuardian;
@@ -93,7 +96,10 @@ function renderHeader() {
     el(
       'div.brand',
       {},
-      el('span.brand__mark', { text: '🚶', ariaHidden: 'true' }),
+      el('img.brand__mark', {
+        src: 'assets/logo-hamghadam.jpg',
+        alt: 'لوگوی هم‌قدم',
+      }),
       el(
         'span',
         {},
