@@ -29,6 +29,23 @@ export const getUser = asyncHandler(async (req, res) => {
   res.json(await adminService.getUser(req.params.id));
 });
 
+export const listIdentityDocuments = asyncHandler(async (req, res) => {
+  res.json(await adminService.listIdentityDocuments({ status: req.query.status, limit: req.query.limit, offset: req.query.offset }));
+});
+
+export const submitIdentityDocument = asyncHandler(async (req, res) => {
+  const { documentType, imageUrl } = req.body;
+  res.status(201).json(await adminService.submitIdentityDocument(req.user.id, documentType, imageUrl));
+});
+
+export const approveIdentityDocument = asyncHandler(async (req, res) => {
+  res.json(await adminService.reviewIdentityDocument(req.params.id, 'approved', actorOf(req)));
+});
+
+export const rejectIdentityDocument = asyncHandler(async (req, res) => {
+  res.json(await adminService.reviewIdentityDocument(req.params.id, 'rejected', actorOf(req), req.body.reason));
+});
+
 export const suspendUser = asyncHandler(async (req, res) => {
   res.json(await adminService.suspendUser(req.params.id, req.body.reason, actorOf(req), req));
 });
@@ -91,6 +108,10 @@ export default {
   overview,
   listUsers,
   getUser,
+  listIdentityDocuments,
+  submitIdentityDocument,
+  approveIdentityDocument,
+  rejectIdentityDocument,
   suspendUser,
   activateUser,
   deleteUser,

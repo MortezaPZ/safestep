@@ -268,7 +268,12 @@ export const api = {
   simulatorFall: () => request('/simulator/fall', { method: 'POST' }),
 
   /* ─── مدیریت سامانه ─── */
+  submitDocument: (documentType, imageUrl) =>
+    request('/documents', { method: 'POST', body: { documentType, imageUrl } }),
   adminOverview: () => request('/admin/overview'),
+  adminDocuments: (query = {}) => request('/admin/documents', { query }),
+  adminApproveDocument: (id) => request(`/admin/documents/${id}/approve`, { method: 'POST' }),
+  adminRejectDocument: (id, reason) => request(`/admin/documents/${id}/reject`, { method: 'POST', body: { reason } }),
   adminUsers: (query = {}) => request('/admin/users', { query }),
   adminUser: (id) => request(`/admin/users/${id}`),
   adminSuspendUser: (id, reason) =>
