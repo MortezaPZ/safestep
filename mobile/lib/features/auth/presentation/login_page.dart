@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
 import '../../../core/accessibility/a11y.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/network/server_origin.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/app_exception.dart';
 import '../../../core/utils/fa.dart';
@@ -32,6 +34,7 @@ class LoginPage extends ConsumerStatefulWidget {
 class _LoginPageState extends ConsumerState<LoginPage> {
   final TextEditingController _phone = TextEditingController();
   final TextEditingController _password = TextEditingController();
+  final TextEditingController _server = TextEditingController(text: ServerOrigin.current);
   final FocusNode _passwordFocus = FocusNode();
 
   String? _phoneError;
@@ -39,9 +42,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _obscure = true;
 
   @override
+  void initState() {
+    super.initState();
+    ServerOrigin.loadSaved().then((_) {
+      if (!mounted) return;
+      _server.text = ServerOrigin.current;
+    });
+  }
+
+  @override
   void dispose() {
     _phone.dispose();
     _password.dispose();
+    _server.dispose();
     _passwordFocus.dispose();
     super.dispose();
   }
@@ -67,6 +80,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     // صفحه‌کلید بسته شود تا پیام خطا زیرش پنهان نماند
     FocusManager.instance.primaryFocus?.unfocus();
+
+    await ServerOrigin.save(_server.text);
+    ref.read(apiClientProvider).useOrigin(_server.text);
 
     final bool ok = await ref.read(authControllerProvider.notifier).login(
           phone: _phone.text,
@@ -127,7 +143,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             ),
           ),
 
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.md),
 
           AnimatedEntrance(
             index: 2,
@@ -169,10 +185,27 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             ),
           ),
 
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.md),
 
           AnimatedEntrance(
             index: 4,
+            child: AppTextField(
+              controller: _server,
+              label: 'آدرس سرور',
+              hint: 'http://192.168.1.10:4000',
+              latinDigits: true,
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+              prefixIcon: Icons.dns_outlined,
+              helperText: 'همان رایانه‌ای که npm start روی آن اجرا شده؛ گوشی و رایانه باید یک وای‌فای باشند.',
+              onSubmitted: (_) => _submit(),
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          AnimatedEntrance(
+            index: 5,
             child: AppButton(
               label: l10n.login,
               loading: ref.watch(authControllerProvider).busy,
@@ -183,7 +216,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           const SizedBox(height: AppSpacing.sm),
 
           AnimatedEntrance(
-            index: 5,
+            index: 6,
             child: AppButton(
               label: l10n.noAccount,
               variant: AppButtonVariant.text,
@@ -191,7 +224,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             ),
           ),
 
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.md),
         ],
       ),
     );

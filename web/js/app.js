@@ -45,7 +45,7 @@ const VIEWS = {
   family: { labelKey: 'navFamily', icon: '👨‍👩‍👧', mount: mountFamily, always: true },
   history: { labelKey: 'navHistory', icon: '🗺️', mount: mountHistory, forHistory: true },
   demo: { labelKey: 'navDemo', icon: '🎬', mount: mountDemo, forPrimary: true },
-  settings: { labelKey: 'navSettings', icon: '⚙️', mount: mountSettings, always: true },
+  settings: { labelKey: 'navSettings', icon: '⚙️', mount: mountSettings, forPrimary: true },
 };
 
 /**
@@ -58,8 +58,7 @@ function visibleViews() {
   const isGuardian = state.links.primaries.length > 0;
 
   return Object.entries(VIEWS).filter(([, view]) => {
-    // مدیر سامانه فقط به پنل مدیریت دسترسی دارد؛ نماهای عمومی (از جمله
-    // تنظیمات/پشتیبانی) نباید در ناوبری مدیر نمایش داده شوند.
+    // مدیر فقط پنل مدیریت را می‌بیند. ناظر تب تنظیمات ندارد.
     if (isAdmin) return view.forAdmin === true;
     if (view.forAdmin) return isAdmin;
     if (view.always) return true;
@@ -126,6 +125,15 @@ function renderHeader() {
       title: state.user.fullName,
       style: { background: state.user.avatarColor ?? 'var(--accent)' },
     }),
+    state.user?.role !== 'admin'
+      ? el('button.icon-btn', {
+          type: 'button',
+          text: 'خروج',
+          title: 'خروج از حساب',
+          ariaLabel: 'خروج از حساب',
+          onClick: () => doLogout(),
+        })
+      : null,
   );
 
   return { header, tabsContainer };
