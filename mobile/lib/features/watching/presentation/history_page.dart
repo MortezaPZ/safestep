@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/accessibility/a11y.dart';
 import '../../../core/theme/app_colors.dart';
@@ -11,6 +12,7 @@ import '../../../core/utils/app_exception.dart';
 import '../../../core/utils/fa.dart';
 import '../../../core/utils/jalali_format.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/osm_tile_layer.dart';
 import '../../../core/widgets/state_views.dart';
 import '../data/watching_repository.dart';
 import '../domain/watched_person.dart';
@@ -128,8 +130,7 @@ class HistoryPage extends ConsumerStatefulWidget {
 }
 
 class _HistoryPageState extends ConsumerState<HistoryPage> {
-  final Completer<GoogleMapController> _mapController =
-      Completer<GoogleMapController>();
+  final MapController _mapController = MapController();
 
   @override
   void initState() {
@@ -140,38 +141,18 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
   }
 
   /// جا دادن کل مسیر در کادر نقشه.
-  Future<void> _fitBounds(List<TrackPoint> points) async {
-    if (points.isEmpty || !_mapController.isCompleted) return;
+  void _fitBounds(List<TrackPoint> points) {
+    if (points.isEmpty) return;
 
-    double minLat = points.first.lat;
-    double maxLat = points.first.lat;
-    double minLng = points.first.lng;
-    double maxLng = points.first.lng;
+    final List<LatLng> coords = <LatLng>[
+      for (final TrackPoint point in points) LatLng(point.lat, point.lng),
+    ];
 
-    for (final TrackPoint point in points) {
-      if (point.lat < minLat) minLat = point.lat;
-      if (point.lat > maxLat) maxLat = point.lat;
-      if (point.lng < minLng) minLng = point.lng;
-      if (point.lng > maxLng) maxLng = point.lng;
-    }
-
-    final GoogleMapController controller = await _mapController.future;
-
-    // مسیرِ تک‌نقطه‌ای کادر بی‌بعد می‌سازد که نقشه را می‌شکند
-    if ((maxLat - minLat).abs() < 0.0001 && (maxLng - minLng).abs() < 0.0001) {
-      await controller.animateCamera(
-        CameraUpdate.newLatLngZoom(LatLng(minLat, minLng), 16),
-      );
-      return;
-    }
-
-    await controller.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(minLat, minLng),
-          northeast: LatLng(maxLat, maxLng),
-        ),
-        60,
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: coords,
+        padding: const EdgeInsets.all(48),
+        maxZoom: 16,
       ),
     );
   }
@@ -184,7 +165,9 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       historyControllerProvider(widget.userId).select((HistoryState s) => s.result),
       (HistoryResult? previous, HistoryResult? next) {
         if (next != null && next.points.isNotEmpty) {
-          unawaited(_fitBounds(next.points));
+          unawaited(Future<void>.delayed(const Duration(milliseconds: 80), () {
+            _fitBounds(next.points);
+          }));
         }
       },
     );
@@ -261,10 +244,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
 
     return _RouteMap(
       points: result.points,
-      onCreated: (GoogleMapController controller) {
-        if (!_mapController.isCompleted) _mapController.complete(controller);
-        unawaited(_fitBounds(result.points));
-      },
+      mapController: _mapController,
     );
   }
 }
@@ -331,68 +311,68 @@ class _DayPicker extends StatelessWidget {
 }
 
 class _RouteMap extends StatelessWidget {
-  const _RouteMap({required this.points, required this.onCreated});
+  const _RouteMap({required this.points, required this.mapController});
 
   final List<TrackPoint> points;
-  final void Function(GoogleMapController) onCreated;
+  final MapController mapController;
 
-  /// مسیر به چند قطعه شکسته می‌شود تا گرادیان رنگی ساخته شود.
-  ///
-  /// Google Maps برای هر خط فقط یک رنگ می‌پذیرد، پس تنها راهِ گرادیان،
-  /// چند خطِ پشت سر هم است. تعداد قطعه‌ها محدود است چون هر خط یک شیء روی
-  /// نقشه است و صدها شیء، گوشی‌های ضعیف را کند می‌کند.
   static const int _maxSegments = 24;
 
   @override
   Widget build(BuildContext context) {
-    final Set<Polyline> polylines = _buildPolylines();
-
     return Semantics(
       label: 'نقشه‌ی مسیر با ${Fa.digits(points.length.toString())} نقطه، '
           'از ${JalaliFormat.time(points.first.recordedAt)} '
           'تا ${JalaliFormat.time(points.last.recordedAt)}',
       child: ExcludeSemantics(
-        child: GoogleMap(
-          initialCameraPosition: CameraPosition(
-            target: LatLng(points.first.lat, points.first.lng),
-            zoom: 14,
+        child: FlutterMap(
+          mapController: mapController,
+          options: MapOptions(
+            initialCenter: LatLng(points.first.lat, points.first.lng),
+            initialZoom: 14,
           ),
-          onMapCreated: onCreated,
-          polylines: polylines,
-          markers: <Marker>{
-            Marker(
-              markerId: const MarkerId('start'),
-              position: LatLng(points.first.lat, points.first.lng),
-              infoWindow: InfoWindow(
-                title: 'شروع',
-                snippet: JalaliFormat.time(points.first.recordedAt),
-              ),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          children: <Widget>[
+            const OsmTileLayer(),
+            PolylineLayer(
+              polylines: _buildPolylines(),
             ),
-            Marker(
-              markerId: const MarkerId('end'),
-              position: LatLng(points.last.lat, points.last.lng),
-              infoWindow: InfoWindow(
-                title: 'پایان',
-                snippet: JalaliFormat.time(points.last.recordedAt),
-              ),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            MarkerLayer(
+              markers: <Marker>[
+                Marker(
+                  point: LatLng(points.first.lat, points.first.lng),
+                  width: 18,
+                  height: 18,
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.success,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Marker(
+                  point: LatLng(points.last.lat, points.last.lng),
+                  width: 18,
+                  height: 18,
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.danger,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          },
-          zoomControlsEnabled: false,
-          myLocationEnabled: false,
-          myLocationButtonEnabled: false,
-          mapToolbarEnabled: false,
+          ],
         ),
       ),
     );
   }
 
-  Set<Polyline> _buildPolylines() {
-    if (points.length < 2) return const <Polyline>{};
+  List<Polyline> _buildPolylines() {
+    if (points.length < 2) return const <Polyline>[];
 
     final int segmentSize = (points.length / _maxSegments).ceil().clamp(1, 1000);
-    final Set<Polyline> lines = <Polyline>{};
+    final List<Polyline> lines = <Polyline>[];
 
     int index = 0;
     int segment = 0;
@@ -408,18 +388,14 @@ class _RouteMap extends StatelessWidget {
 
       lines.add(
         Polyline(
-          polylineId: PolylineId('segment_$segment'),
           points: chunk,
-          width: 5,
-          // از آبی تیره (شروع) به آبی روشن (پایان)
+          strokeWidth: 5,
           color: Color.lerp(
                 AppColors.primaryDark,
                 AppColors.primary,
                 progress,
               ) ??
               AppColors.primary,
-          startCap: Cap.roundCap,
-          endCap: Cap.roundCap,
         ),
       );
 

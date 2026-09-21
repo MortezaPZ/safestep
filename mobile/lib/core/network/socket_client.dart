@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../constants/app_config.dart';
+import 'server_origin.dart';
 
 /// نام رویدادهای WebSocket.
 ///
@@ -87,7 +88,7 @@ class SocketClient {
     _emitStatus(SocketStatus.connecting);
 
     final io.Socket socket = io.io(
-      AppConfig.socketUrl,
+      ServerOrigin.socketUrl,
       io.OptionBuilder()
           // فقط WebSocket: بدون این، کتابخانه اول polling را امتحان می‌کند
           // که هم کندتر است و هم روی شبکه‌های موبایل بیشتر قطع می‌شود

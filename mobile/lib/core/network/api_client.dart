@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../constants/app_config.dart';
+import 'server_origin.dart';
 import '../storage/token_store.dart';
 import '../utils/app_exception.dart';
 import 'api_endpoints.dart';
@@ -54,9 +55,14 @@ class ApiClient {
 
   Dio get raw => _dio;
 
+  void useOrigin(String origin) {
+    ServerOrigin.set(origin);
+    _dio.options.baseUrl = ServerOrigin.apiUrl;
+  }
+
   void _configure() {
     _dio.options = BaseOptions(
-      baseUrl: AppConfig.apiUrl,
+      baseUrl: ServerOrigin.apiUrl,
       connectTimeout: AppConfig.connectTimeout,
       receiveTimeout: AppConfig.receiveTimeout,
       contentType: Headers.jsonContentType,
@@ -195,7 +201,7 @@ class ApiClient {
       // میان‌افزار نشود و حلقه‌ی بی‌پایان نسازد
       final Dio plain = Dio(
         BaseOptions(
-          baseUrl: AppConfig.apiUrl,
+          baseUrl: ServerOrigin.apiUrl,
           connectTimeout: AppConfig.connectTimeout,
           receiveTimeout: AppConfig.receiveTimeout,
           contentType: Headers.jsonContentType,

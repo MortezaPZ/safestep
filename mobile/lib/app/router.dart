@@ -130,6 +130,12 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
         return AppRoutes.home;
       }
 
+      // ناظر/مراقب به تنظیمات و پشتیبانی دسترسی ندارد
+      if (auth.user!.role == UserRole.guardian &&
+          location == AppRoutes.settings) {
+        return AppRoutes.guardian;
+      }
+
       return null;
     },
 

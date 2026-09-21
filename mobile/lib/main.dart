@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
 import 'core/accessibility/accessibility_settings.dart';
+import 'core/network/server_origin.dart';
 
 /// نقطه‌ی ورود اپ.
 ///
@@ -38,6 +39,7 @@ Future<void> main() async {
       ));
 
       final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await ServerOrigin.loadSaved();
 
       // خطاهای ویجت‌ها در حالت انتشار نباید صفحه‌ی قرمز نشان دهند
       FlutterError.onError = (FlutterErrorDetails details) {

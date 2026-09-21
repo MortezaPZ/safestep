@@ -15,6 +15,7 @@ import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../alerts/presentation/alerts_page.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../../pairing/domain/pairing_models.dart';
 import '../../realtime/realtime_controller.dart';
 import '../../watching/domain/watched_person.dart';
@@ -94,9 +95,11 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
         const _ConnectionDot(),
         _AlertsButton(unread: unread),
         IconButton(
-          onPressed: () => context.push(AppRoutes.settings),
-          icon: const Icon(Icons.settings_outlined),
-          tooltip: 'تنظیمات',
+          onPressed: () async {
+            await ref.read(authControllerProvider.notifier).logout();
+          },
+          icon: const Icon(Icons.logout_rounded),
+          tooltip: 'خروج',
         ),
       ],
       body: Builder(

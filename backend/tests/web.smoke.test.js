@@ -28,6 +28,19 @@ describe('وب‌اپ ایستا', () => {
     expect(res.headers['content-type']).toMatch(/html/);
   });
 
+  it('مختصات نامعتبر کاشی نقشه رد می‌شود', async () => {
+    const res = await request(app).get('/tiles/foo/1/1.png');
+    expect(res.status).toBe(400);
+  });
+
+  it('اسکریپت ناوبری ناظر گزینه پشتیبانی ندارد', async () => {
+    const appJs = await request(app).get('/js/app.js');
+    expect(appJs.status).toBe(200);
+    expect(appJs.text).not.toMatch(/labelKey:\s*'navSupport'/);
+    expect(appJs.text).not.toMatch(/پشتیبانی/);
+    expect(appJs.text).toContain('forPrimary: true');
+  });
+
   it('اسکریپت پنل ادمین را سرو می‌کند', async () => {
     const res = await request(app).get('/js/views/admin.js');
     expect(res.status).toBe(200);

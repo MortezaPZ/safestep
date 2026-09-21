@@ -1,9 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../app/router.dart';
 import '../../../core/accessibility/a11y.dart';
@@ -13,6 +14,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/fa.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/osm_tile_layer.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../realtime/realtime_controller.dart';
 import '../domain/watched_person.dart';
@@ -40,8 +42,7 @@ class LiveMapPage extends ConsumerStatefulWidget {
 }
 
 class _LiveMapPageState extends ConsumerState<LiveMapPage> {
-  final Completer<GoogleMapController> _mapController =
-      Completer<GoogleMapController>();
+  final MapController _mapController = MapController();
 
   /// دوربین، موقعیت را دنبال می‌کند
   bool _following = true;
@@ -60,20 +61,7 @@ class _LiveMapPageState extends ConsumerState<LiveMapPage> {
   }
 
   Future<void> _moveCamera(TrackPoint point, {bool animate = true}) async {
-    if (!_mapController.isCompleted) return;
-
-    final GoogleMapController controller = await _mapController.future;
-    final CameraUpdate update = CameraUpdate.newLatLngZoom(
-      LatLng(point.lat, point.lng),
-      _defaultZoom,
-    );
-
-    if (animate) {
-      await controller.animateCamera(update);
-    } else {
-      await controller.moveCamera(update);
-    }
-
+    _mapController.move(LatLng(point.lat, point.lng), _defaultZoom);
     _lastCameraMove = point.recordedAt;
   }
 
@@ -166,53 +154,52 @@ class _LiveMapPageState extends ConsumerState<LiveMapPage> {
     final Color markerColor = AppColors.parse(person.person.avatarColor);
 
     return Semantics(
-      // نقشه برای صفحه‌خوان معنا ندارد؛ توضیح متنی جایگزینش می‌شود
       label: 'نقشه‌ی موقعیت ${person.person.fullName}. '
           '${_zoneLabel(person)}. آخرین به‌روزرسانی ${Fa.timeAgo(point.recordedAt)}',
       child: ExcludeSemantics(
-        child: GoogleMap(
-          initialCameraPosition: CameraPosition(
-            target: LatLng(point.lat, point.lng),
-            zoom: _defaultZoom,
+        child: FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: LatLng(point.lat, point.lng),
+            initialZoom: _defaultZoom,
+            onPositionChanged: (MapCamera camera, bool hasGesture) {
+              if (hasGesture && _following) {
+                setState(() => _following = false);
+              }
+            },
           ),
-          onMapCreated: (GoogleMapController controller) {
-            if (!_mapController.isCompleted) {
-              _mapController.complete(controller);
-            }
-          },
-          // اولین حرکت دستی، دنبال‌کردن را خاموش می‌کند
-          onCameraMoveStarted: () {
-            if (_following) setState(() => _following = false);
-          },
-          markers: <Marker>{
-            Marker(
-              markerId: MarkerId(person.userId),
-              position: LatLng(point.lat, point.lng),
-              infoWindow: InfoWindow(
-                title: person.person.fullName,
-                snippet: Fa.timeAgo(point.recordedAt),
-              ),
-            ),
-          },
-          circles: <Circle>{
-            // دایره‌ی دقت: نقطه‌ی تنها این توهم را می‌سازد که موقعیت
-            // دقیقاً همان‌جاست. با دایره، مراقب می‌بیند که «جایی در این
-            // محدوده» درست‌تر است.
+          children: <Widget>[
+            const OsmTileLayer(),
             if (point.accuracyM != null && point.accuracyM! > 0)
-              Circle(
-                circleId: CircleId('${person.userId}_accuracy'),
-                center: LatLng(point.lat, point.lng),
-                radius: point.accuracyM!,
-                fillColor: markerColor.withOpacity(0.12),
-                strokeColor: markerColor.withOpacity(0.35),
-                strokeWidth: 1,
+              CircleLayer(
+                circles: <CircleMarker>[
+                  CircleMarker(
+                    point: LatLng(point.lat, point.lng),
+                    radius: point.accuracyM!,
+                    useRadiusInMeter: true,
+                    color: markerColor.withOpacity(0.12),
+                    borderColor: markerColor.withOpacity(0.35),
+                    borderStrokeWidth: 1,
+                  ),
+                ],
               ),
-          },
-          myLocationEnabled: false,
-          myLocationButtonEnabled: false,
-          zoomControlsEnabled: false,
-          compassEnabled: true,
-          mapToolbarEnabled: false,
+            MarkerLayer(
+              markers: <Marker>[
+                Marker(
+                  point: LatLng(point.lat, point.lng),
+                  width: 22,
+                  height: 22,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: markerColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

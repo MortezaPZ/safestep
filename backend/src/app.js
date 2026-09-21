@@ -20,6 +20,7 @@ import notificationAdapter from './services/notificationAdapter.js';
 import smsAdapter from './services/smsAdapter.js';
 import hub from './realtime/hub.js';
 import logger from './utils/logger.js';
+import { isValidTileCoord, fetchTilePng } from './services/tileProxy.js';
 
 const log = logger.child({ module: 'app' });
 
@@ -55,12 +56,7 @@ export function createApp() {
           styleSrc: ["'self'", "'unsafe-inline'"],
           // هر دو صورت لازم است: دامنه‌ی اصلی و زیردامنه‌ها.
           // الگوی ‎*.tile.openstreetmap.org خودِ ‎tile.openstreetmap.org را پوشش نمی‌دهد.
-          imgSrc: [
-            "'self'",
-            'data:',
-            'https://tile.openstreetmap.org',
-            'https://*.tile.openstreetmap.org',
-          ],
+          imgSrc: ["'self'", 'data:'],
           connectSrc: ["'self'", 'ws:', 'wss:'],
           fontSrc: ["'self'", 'data:'],
         },
@@ -114,6 +110,24 @@ export function createApp() {
         error: { code: 'DB_UNAVAILABLE', message: 'اتصال به دیتابیس برقرار نیست.' },
         detail: env.isProduction ? undefined : error.message,
       });
+    }
+  });
+
+  app.get('/tiles/:z/:x/:y.png', async (req, res, next) => {
+    const { z, x, y } = req.params;
+    if (!isValidTileCoord(z, x, y)) {
+      return res.status(400).type('text').send('invalid tile');
+    }
+    try {
+      const png = await fetchTilePng(z, x, y);
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(png);
+    } catch (error) {
+      if (error.status === 502 || error.message === 'tile upstream failed') {
+        return res.status(502).type('text').send('tile unavailable');
+      }
+      return next(error);
     }
   });
 

@@ -10,7 +10,7 @@
  * خودِ کتابخانه به‌صورت محلی سرو می‌شود.
  */
 
-const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_URL = '/tiles/{z}/{x}/{y}.png';
 const TILE_ATTRIBUTION = '© مشارکت‌کنندگان OpenStreetMap';
 
 const TEHRAN = [35.7219, 51.3347];
