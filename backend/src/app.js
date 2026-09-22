@@ -50,15 +50,17 @@ export function createApp() {
     helmet({
       // وب‌اپ از همین مبدأ سرو می‌شود و به نقشه‌ی OpenStreetMap نیاز دارد
       contentSecurityPolicy: {
+        useDefaults: true,
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
-          // هر دو صورت لازم است: دامنه‌ی اصلی و زیردامنه‌ها.
-          // الگوی ‎*.tile.openstreetmap.org خودِ ‎tile.openstreetmap.org را پوشش نمی‌دهد.
           imgSrc: ["'self'", 'data:'],
           connectSrc: ["'self'", 'ws:', 'wss:'],
           fontSrc: ["'self'", 'data:'],
+          // اگر فعال بماند، مرورگر اسکریپت را با https می‌خواهد و روی
+          // localhost صفحه خالی می‌ماند.
+          upgradeInsecureRequests: null,
         },
       },
       crossOriginEmbedderPolicy: false,
@@ -145,9 +147,11 @@ export function createApp() {
     }),
   );
 
-  // هر مسیر غیر API که فایل ایستا نبود، به وب‌اپ سپرده می‌شود (مسیریابی سمت کلاینت)
+  // فقط مسیرهای بدون پسوند فایل به index می‌روند؛ وگرنه /js/app.js به‌جای
+  // ماژول، HTML می‌گیرد و صفحه خالی می‌ماند.
   app.get(/^\/(?!api\/).*/, (req, res, next) => {
     if (req.method !== 'GET') return next();
+    if (path.extname(req.path)) return next();
     return res.sendFile(path.join(WEB_ROOT, 'index.html'), (error) => {
       if (error) next();
     });

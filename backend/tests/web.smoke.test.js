@@ -26,6 +26,17 @@ describe('وب‌اپ ایستا', () => {
     const res = await request(app).get('/');
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/html/);
+    expect(String(res.headers['content-security-policy'] ?? '')).not.toMatch(
+      /upgrade-insecure-requests/i,
+    );
+  });
+
+  it('ماژول اپ را به‌صورت جاوااسکریپت سرو می‌کند نه HTML', async () => {
+    const res = await request(app).get('/js/app.js');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/javascript|ecmascript|text/);
+    expect(res.text.trimStart().startsWith('<')).toBe(false);
+    expect(res.text).toContain('import api');
   });
 
   it('مختصات نامعتبر کاشی نقشه رد می‌شود', async () => {

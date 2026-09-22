@@ -8,6 +8,7 @@
 import api from '../api.js';
 import { el, render, toast, confirmDialog, skeleton, errorState, getTheme, applyTheme, THEME_LABELS } from '../ui.js';
 import { t, getLang, setLang } from '../i18n.js';
+import { faDuration, faDistance, faNumber, ALERT_LABELS } from '../format.js';
 
 const CONFIGURABLE_ALERTS = ['zone_exit', 'long_stop', 'gps_lost', 'low_battery'];
 
