@@ -186,6 +186,7 @@ function navigate(viewKey, params = {}) {
 
   // پس از تعویض نما، تمرکز به ابتدای محتوا می‌رود تا کاربر صفحه‌خوان گم نشود
   viewContainer.focus?.();
+  requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
 }
 
 /** بافتی که به همه‌ی نماها داده می‌شود. */

@@ -392,7 +392,7 @@ export function mountGuardian(container, ctx) {
     try {
       const [watchResult, alertResult] = await Promise.all([
         api.watchList(),
-        api.alerts({ limit: 20 }),
+        api.alerts({ limit: 20 }).catch((error) => ({ alerts: [], error })),
       ]);
 
       watching = watchResult.watching ?? [];
@@ -403,7 +403,14 @@ export function mountGuardian(container, ctx) {
         alerts.find((a) => a.type === 'sos' && !a.resolvedAt) ?? null;
 
       renderAll();
+      if (alertResult.error && !silent) {
+        toast('هشدارها بارگذاری نشد', alertResult.error.message, { severity: 'warning' });
+      }
     } catch (error) {
+      if (silent && watching.length > 0) {
+        toast('به‌روزرسانی ناموفق بود', error.message, { severity: 'warning' });
+        return;
+      }
       render(container, errorState({ text: error.message, onRetry: () => load() }));
     }
   }

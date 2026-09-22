@@ -446,6 +446,10 @@ export function mountFamily(container, ctx) {
 
       renderAll();
     } catch (error) {
+      if (silent && (guardians.length > 0 || primaries.length > 0)) {
+        toast('به‌روزرسانی ناموفق بود', error.message, { severity: 'warning' });
+        return;
+      }
       render(container, errorState({ text: error.message, onRetry: () => load() }));
     }
   }

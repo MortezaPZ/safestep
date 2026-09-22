@@ -200,7 +200,9 @@ export function mapAlert(row) {
     lat: n(row.lat),
     lng: n(row.lng),
     zoneId: row.zone_id,
-    metadata: row.metadata ?? {},
+    metadata: typeof row.metadata === 'string'
+      ? (() => { try { return JSON.parse(row.metadata); } catch { return {}; } })()
+      : (row.metadata ?? {}),
     createdAt: d(row.created_at),
     resolvedAt: d(row.resolved_at),
     resolvedBy: row.resolved_by,

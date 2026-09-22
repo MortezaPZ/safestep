@@ -433,6 +433,10 @@ export function mountDashboard(container, ctx) {
       status = await api.ownStatus();
       renderAll();
     } catch (error) {
+      if (silent && status) {
+        toast('به‌روزرسانی ناموفق بود', error.message, { severity: 'warning' });
+        return;
+      }
       render(
         container,
         errorState({
