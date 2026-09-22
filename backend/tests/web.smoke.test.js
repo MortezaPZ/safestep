@@ -52,6 +52,15 @@ describe('وب‌اپ ایستا', () => {
     expect(appJs.text).toContain('forPrimary: true');
   });
 
+  it('حساب دموی ناظر و مدیر سامانه در صفحه ورود هست', async () => {
+    const res = await request(app).get('/js/views/auth.js');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('09121110002');
+    expect(res.text).toContain('ناظر');
+    expect(res.text).toContain('09121110009');
+    expect(res.text).toContain('مدیر سامانه');
+  });
+
   it('اسکریپت پنل ادمین را سرو می‌کند', async () => {
     const res = await request(app).get('/js/views/admin.js');
     expect(res.status).toBe(200);

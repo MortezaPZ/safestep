@@ -378,11 +378,13 @@ export function mountFamily(container, ctx) {
           el('div.card__header', {},
             el('h2.card__title', { text: 'اعضایی که به من دسترسی دارند' }),
             el('div.header-spacer'),
-            el('button.btn.btn--sm', {
-              type: 'button',
-              text: '＋ ساخت کد دعوت',
-              onClick: openInviteDialog,
-            }),
+            ctx.user?.role === 'primary'
+              ? el('button.btn.btn--sm', {
+                  type: 'button',
+                  text: '＋ ساخت کد دعوت',
+                  onClick: openInviteDialog,
+                })
+              : null,
           ),
           el('div.card__body', {},
             guardians.length > 0
@@ -390,8 +392,12 @@ export function mountFamily(container, ctx) {
               : emptyState({
                   icon: '👨‍👩‍👧',
                   title: 'هنوز کسی به شما دسترسی ندارد',
-                  text: 'یک کد دعوت بسازید و به عضو خانواده بدهید تا بتواند موقعیت شما را ببیند.',
-                  action: { label: 'ساخت کد دعوت', onClick: openInviteDialog },
+                  text: ctx.user?.role === 'primary'
+                    ? 'یک کد دعوت بسازید و به ناظر بدهید تا بتواند موقعیت شما را ببیند.'
+                    : 'ناظر کد دعوت نمی‌سازد؛ این بخش برای کاربر اصلی است.',
+                  action: ctx.user?.role === 'primary'
+                    ? { label: 'ساخت کد دعوت', onClick: openInviteDialog }
+                    : undefined,
                 }),
           ),
         ),

@@ -50,6 +50,12 @@ const USERS = {
     role: 'guardian',
     avatarColor: '#7C4DFF',
   },
+  admin: {
+    phone: '09121110009',
+    fullName: 'مدیر سامانه',
+    role: 'admin',
+    avatarColor: '#455A64',
+  },
 };
 
 const SAFE_ZONES = [
@@ -469,8 +475,9 @@ if (isDirectRun) {
       '',
       '  ┌─ حساب‌های آماده ────────────────────────────────────────────┐',
       `  │  کاربر اصلی    ${USERS.primary.phone}   ${USERS.primary.fullName}`,
-      `  │  عضو خانواده   ${USERS.son.phone}   ${USERS.son.fullName} (دسترسی کامل + اضطراری)`,
-      `  │  عضو خانواده   ${USERS.daughter.phone}   ${USERS.daughter.fullName} (بدون دسترسی اضطراری)`,
+      `  │  ناظر           ${USERS.son.phone}   ${USERS.son.fullName} (دسترسی کامل + اضطراری)`,
+      `  │  ناظر           ${USERS.daughter.phone}   ${USERS.daughter.fullName} (بدون دسترسی اضطراری)`,
+      `  │  مدیر سامانه   ${USERS.admin.phone}   ${USERS.admin.fullName}`,
       '  │',
       `  │  رمز عبور همه: ${env.seedPassword}`,
       '  └────────────────────────────────────────────────────────────┘',

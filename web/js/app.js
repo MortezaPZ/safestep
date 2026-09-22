@@ -55,7 +55,7 @@ const VIEWS = {
 function visibleViews() {
   const isAdmin = state.user?.role === 'admin';
   const isPrimary = state.user?.role === 'primary';
-  const isGuardian = state.links.primaries.length > 0;
+  const isGuardian = state.user?.role === 'guardian' || state.links.primaries.length > 0;
 
   return Object.entries(VIEWS).filter(([, view]) => {
     // مدیر فقط پنل مدیریت را می‌بیند. ناظر تب تنظیمات ندارد.
