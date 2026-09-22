@@ -52,7 +52,10 @@ export class SafeMap {
 
   /** اندازه‌ی نقشه پس از تغییر چیدمان باید دوباره محاسبه شود. */
   invalidate() {
-    setTimeout(() => this.map.invalidateSize(), 60);
+    const run = () => this.map?.invalidateSize();
+    setTimeout(run, 50);
+    setTimeout(run, 250);
+    setTimeout(run, 800);
   }
 
   destroy() {

@@ -243,6 +243,10 @@ export function mountHistory(container, ctx, params = {}) {
 
       renderAll();
     } catch (error) {
+      if (points.length > 0 || days.length > 0) {
+        toast('بارگذاری مسیر ناموفق بود', error.message, { severity: 'warning' });
+        return;
+      }
       render(container, errorState({ text: error.message, onRetry: loadDay }));
     }
   }

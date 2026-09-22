@@ -95,11 +95,16 @@ async function doFetch(path, { method = 'GET', body, query, auth = true } = {}) 
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (auth && session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'ارتباط با سرور برقرار نشد. چند لحظه دیگر دوباره تلاش کنید.');
+  }
 
   const data = await parseResponse(response);
 
@@ -114,6 +119,15 @@ async function doFetch(path, { method = 'GET', body, query, auth = true } = {}) 
   }
 
   return data;
+}
+
+function isTransient(error) {
+  if (!error || typeof error.status !== 'number') return true;
+  return error.status === 0 || error.status === 429 || error.status >= 500;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** تازه‌سازی توکن — تنها یک درخواست همزمان مجاز است. */
@@ -142,7 +156,7 @@ async function refreshAccessToken() {
  * درخواست با تازه‌سازی خودکار.
  * فقط یک بار تلاش مجدد می‌کند؛ اگر باز هم ۴۰۱ شد، نشست واقعاً باطل است.
  */
-async function request(path, options = {}) {
+async function requestOnce(path, options = {}) {
   try {
     return await doFetch(path, options);
   } catch (error) {
@@ -159,6 +173,24 @@ async function request(path, options = {}) {
 
     return doFetch(path, options);
   }
+}
+
+async function request(path, options = {}) {
+  const method = String(options.method ?? 'GET').toUpperCase();
+  const attempts = method === 'GET' || method === 'HEAD' ? 3 : 1;
+  let lastError;
+
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await requestOnce(path, options);
+    } catch (error) {
+      lastError = error;
+      if (i === attempts - 1 || !isTransient(error)) throw error;
+      await sleep(280 * (i + 1));
+    }
+  }
+
+  throw lastError;
 }
 
 /* ═══════════════════════════ واسط API ═══════════════════════════ */

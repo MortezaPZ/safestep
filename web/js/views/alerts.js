@@ -66,7 +66,7 @@ export function mountAlerts(container, ctx) {
             },
           }),
           ...FILTER_ORDER.filter((type) => countsByType[type]).map((type) => {
-            const meta = ALERT_LABELS[type];
+            const meta = ALERT_LABELS[type] ?? { label: type, icon: '🔔' };
             return el('button', {
               class: 'chip chip--button',
               type: 'button',
@@ -246,7 +246,10 @@ export function mountAlerts(container, ctx) {
     render(container, renderFilters(), body);
   }
 
+  let loadSeq = 0;
+
   async function load() {
+    const seq = ++loadSeq;
     if (!destroyed && container.childElementCount === 0) {
       render(container, ...skeleton('row', 5));
     }
@@ -258,13 +261,29 @@ export function mountAlerts(container, ctx) {
         limit: 200,
       });
 
-      alerts = result.alerts ?? [];
+      if (destroyed || seq !== loadSeq) return;
+
+      alerts = (result.alerts ?? []).map((alert) => {
+        if (typeof alert.metadata === 'string') {
+          try {
+            alert.metadata = JSON.parse(alert.metadata);
+          } catch {
+            alert.metadata = {};
+          }
+        }
+        return alert;
+      });
       countsByType = result.countsByType ?? {};
       unreadCount = result.unreadCount ?? 0;
       ctx.setUnreadCount?.(unreadCount);
 
       renderAll();
     } catch (error) {
+      if (destroyed || seq !== loadSeq) return;
+      if (alerts.length > 0) {
+        toast('بارگذاری هشدارها ناموفق بود', error.message, { severity: 'warning' });
+        return;
+      }
       render(container, errorState({ text: error.message, onRetry: load }));
     }
   }
