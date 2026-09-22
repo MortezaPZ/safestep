@@ -342,28 +342,40 @@ async function startApp() {
 /* ─────────────────────── نقطه‌ی شروع ─────────────────────── */
 
 function boot() {
-  applyTheme(getTheme());
+  try {
+    applyTheme(getTheme());
 
-  const session = loadSession();
+    const session = loadSession();
 
-  if (session?.accessToken) {
-    state.user = session.user;
-    state.settings = session.settings;
+    if (session?.accessToken) {
+      state.user = session.user;
+      state.settings = session.settings;
 
-    // اعتبار نشست را می‌سنجیم؛ اگر باطل بود به صفحه‌ی ورود می‌رویم
-    api
-      .me()
-      .then((result) => {
-        state.user = result.user;
-        state.settings = result.settings;
-        startApp();
-      })
-      .catch(() => {
-        clearSession();
-        showAuth();
-      });
-  } else {
-    showAuth();
+      api
+        .me()
+        .then((result) => {
+          state.user = result.user;
+          state.settings = result.settings;
+          startApp();
+        })
+        .catch(() => {
+          clearSession();
+          showAuth();
+        });
+    } else {
+      showAuth();
+    }
+  } catch (error) {
+    console.error(error);
+    if (root) {
+      render(
+        root,
+        el('div.auth-screen', {}, el('div.auth-card', {},
+          el('h1', { text: 'داشبورد بارگذاری نشد' }),
+          el('p', { text: String(error.message || error) }),
+        )),
+      );
+    }
   }
 }
 
