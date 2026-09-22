@@ -11,8 +11,9 @@ import { toEnDigits } from '../format.js';
 
 const DEMO_ACCOUNTS = [
   { phone: '09121110001', name: 'مریم رضایی', role: 'کاربر اصلی', icon: '👤' },
-  { phone: '09121110002', name: 'علی رضایی', role: 'عضو خانواده — دسترسی کامل', icon: '👨' },
-  { phone: '09121110003', name: 'زهرا رضایی', role: 'عضو خانواده — بدون دسترسی اضطراری', icon: '👩' },
+  { phone: '09121110002', name: 'علی رضایی', role: 'ناظر', icon: '👨' },
+  { phone: '09121110003', name: 'زهرا رضایی', role: 'ناظر — بدون دسترسی اضطراری', icon: '👩' },
+  { phone: '09121110009', name: 'مدیر سامانه', role: 'پنل مدیریت', icon: '🛡️' },
 ];
 
 const DEMO_PASSWORD = 'Test@1234';
@@ -45,7 +46,7 @@ export function mountAuth(container, { onSuccess }) {
     'select.select',
     { id: 'auth-role' },
     el('option', { value: 'primary', text: 'کاربر اصلی — من می‌خواهم مستقل بیرون بروم' }),
-    el('option', { value: 'guardian', text: 'عضو خانواده — می‌خواهم مراقب کسی باشم' }),
+    el('option', { value: 'guardian', text: 'ناظر — می‌خواهم مراقب کسی باشم' }),
   );
 
   const nameField = el(
@@ -101,6 +102,11 @@ export function mountAuth(container, { onSuccess }) {
     ariaSelected: 'false',
     text: 'ثبت‌نام',
     onClick: () => setMode('register'),
+  });
+
+  const submitBtn = el('button.btn.btn--block', {
+    type: 'submit',
+    text: 'ورود',
   });
 
   function setMode(next) {

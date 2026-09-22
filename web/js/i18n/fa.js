@@ -8,7 +8,7 @@ export default {
   alerts: 'هشدارها',
   navAdmin: 'مدیریت سامانه',
   navDashboard: 'داشبورد',
-  navGuardian: 'تحت مراقبت',
+  navGuardian: 'ناظر',
   navZones: 'محدوده‌های امن',
   navFamily: 'اعضای خانواده',
   navHistory: 'تاریخچه‌ی مسیر',
