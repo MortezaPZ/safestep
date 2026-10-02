@@ -30,16 +30,61 @@ export const getUser = asyncHandler(async (req, res) => {
 });
 
 export const listIdentityDocuments = asyncHandler(async (req, res) => {
-  res.json(await adminService.listIdentityDocuments({ status: req.query.status, limit: req.query.limit, offset: req.query.offset }));
+  const status = req.query.status === 'all' ? null : req.query.status;
+  res.json(await adminService.listIdentityDocuments({ status, limit: req.query.limit, offset: req.query.offset }));
+});
+
+export const myIdentityDocuments = asyncHandler(async (req, res) => {
+  res.json(await adminService.myIdentityDocuments(req.user.id));
 });
 
 export const submitIdentityDocument = asyncHandler(async (req, res) => {
-  const { documentType, imageUrl } = req.body;
-  res.status(201).json(await adminService.submitIdentityDocument(req.user.id, documentType, imageUrl));
+  const { documentType, imageUrl, healthCondition, subjectUserId } = req.body;
+  if (subjectUserId) {
+    res.status(201).json(await adminService.submitIdentityDocumentForPrimary(
+      actorOf(req), subjectUserId, documentType, imageUrl, healthCondition,
+    ));
+    return;
+  }
+  res.status(201).json(await adminService.submitIdentityDocument(
+    req.user.id, documentType, imageUrl, healthCondition,
+  ));
 });
 
 export const approveIdentityDocument = asyncHandler(async (req, res) => {
-  res.json(await adminService.reviewIdentityDocument(req.params.id, 'approved', actorOf(req)));
+  res.json(await adminService.reviewIdentityDocument(
+    req.params.id,
+    'approved',
+    { ...actorOf(req), healthCondition: req.body?.healthCondition },
+  ));
+});
+
+export const mySupport = asyncHandler(async (req, res) => {
+  res.json(await adminService.listMySupport(req.user.id));
+});
+
+export const postSupport = asyncHandler(async (req, res) => {
+  res.status(201).json(await adminService.postSupportMessage(req.user.id, req.body.body));
+});
+
+export const supportInbox = asyncHandler(async (req, res) => {
+  res.json(await adminService.listSupportInbox());
+});
+
+export const supportReply = asyncHandler(async (req, res) => {
+  res.status(201).json(await adminService.replySupport(req.params.userId, req.body.body));
+});
+
+export const adminFalls = asyncHandler(async (_req, res) => {
+  res.json(await adminService.listAdminFalls());
+});
+
+export const families = asyncHandler(async (_req, res) => {
+  res.json(await adminService.listFamilies());
+});
+
+export const adminAlerts = asyncHandler(async (_req, res) => {
+  res.json(await adminService.listAdminAlerts());
 });
 
 export const rejectIdentityDocument = asyncHandler(async (req, res) => {
@@ -109,8 +154,16 @@ export default {
   listUsers,
   getUser,
   listIdentityDocuments,
+  myIdentityDocuments,
   submitIdentityDocument,
   approveIdentityDocument,
+  mySupport,
+  postSupport,
+  supportInbox,
+  supportReply,
+  families,
+  adminAlerts,
+  adminFalls,
   rejectIdentityDocument,
   suspendUser,
   activateUser,

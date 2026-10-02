@@ -84,6 +84,27 @@ export async function listForUsers(userIds, { limit = 50, before } = {}) {
   return rows.map(mapFallEvent);
 }
 
+export async function listRecentForAdmin(limit = 50) {
+  const { rows } = await db.query(
+    `SELECT f.id, f.detected_at, f.confidence, f.classified_as_fall, f.detection_source,
+            f.user_feedback, u.full_name
+       FROM fall_events f JOIN users u ON u.id = f.user_id
+      ORDER BY f.detected_at DESC
+      LIMIT $1`,
+    [limit],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    detectedAt: row.detected_at,
+    confidence: row.confidence,
+    classifiedAsFall: row.classified_as_fall,
+    source: row.detection_source,
+    feedback: row.user_feedback,
+    subjectName: row.full_name,
+    title: row.classified_as_fall ? 'فراخوان اضطراری' : 'گزارش سقوط',
+  }));
+}
+
 export async function applyFeedback(id, { feedback, respondedWithinSec }) {
   const { rows } = await db.query(
     `UPDATE fall_events SET

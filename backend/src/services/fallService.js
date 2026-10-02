@@ -57,10 +57,18 @@ export async function detect(user, body, { source = 'device' } = {}) {
   });
 
   if (isFall) {
+    await raiseAlert({
+      userId: user.id,
+      type: ALERT_TYPES.FALL_DETECTED,
+      location: { lat: body.lat, lng: body.lng },
+      context: { confidence: prediction.confidence, auto: true },
+      metadata: { fallEventId: row.id, auto: true, label: 'فراخوان اضطراری' },
+    });
     hub.emitToUser(user.id, WS_EVENTS.FALL_DETECTED, {
       fallEventId: row.id,
       countdownSec: settings?.fallCountdownSec ?? 30,
       confidence: prediction.confidence,
+      autoSent: true,
     });
   }
 

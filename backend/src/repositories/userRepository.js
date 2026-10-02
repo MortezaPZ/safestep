@@ -80,7 +80,11 @@ export async function updatePassword(id, passwordHash) {
 }
 
 export async function getSettings(userId) {
-  const { rows } = await db.query('SELECT * FROM user_settings WHERE user_id = $1', [userId]);
+  let { rows } = await db.query('SELECT * FROM user_settings WHERE user_id = $1', [userId]);
+  if (!rows[0]) {
+    await db.query('INSERT INTO user_settings (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [userId]);
+    ({ rows } = await db.query('SELECT * FROM user_settings WHERE user_id = $1', [userId]));
+  }
   return mapSettings(rows[0]);
 }
 

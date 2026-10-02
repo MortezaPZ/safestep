@@ -3,7 +3,7 @@
 /// مقادیر با `--dart-define` قابل بازنویسی‌اند:
 ///
 /// ```bash
-/// flutter run --dart-define=API_BASE_URL=http://192.168.1.20:4000
+/// flutter run --dart-define=API_BASE_URL=http://192.168.1.20:4080
 /// ```
 ///
 /// ── چرا مقدار پیش‌فرض ‎10.0.2.2‎ است ─────────────────────────────────────
@@ -21,7 +21,7 @@ class AppConfig {
 
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:4000',
+    defaultValue: 'http://10.0.2.2:4080',
   );
 
   static const String apiPrefix = '/api/v1';

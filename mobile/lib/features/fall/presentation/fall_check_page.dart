@@ -90,26 +90,32 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
               Text(
                 'آیا حال شما خوب است؟',
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
                     ),
               ),
               const SizedBox(height: 24),
-              Semantics(
-                liveRegion: true,
-                label: 'مانده ${Fa.digits(_left.toString())} ثانیه',
-                child: Text(
-                  Fa.digits(_left.toString()),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 96,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+              Expanded(
+                child: Semantics(
+                  liveRegion: true,
+                  label: 'مانده ${Fa.digits(_left.toString())} ثانیه',
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      Fa.digits(_left.toString()),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 96,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ),
-              const Spacer(),
               SizedBox(
                 height: 72,
                 child: FilledButton(
@@ -117,6 +123,8 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
                   onPressed: () => _send('false_alarm'),
                   child: Text(
                     'حالم خوب است',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: AppColors.danger, fontSize: 22),
                   ),
                 ),

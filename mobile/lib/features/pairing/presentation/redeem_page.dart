@@ -9,6 +9,7 @@ import '../../../core/widgets/animated_entrance.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/main_nav.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../domain/pairing_models.dart';
@@ -98,6 +99,8 @@ class _RedeemPageState extends ConsumerState<RedeemPage> {
 
     return AppScaffold(
       title: 'اتصال به فرد تحت پایش',
+      showBackButton: false,
+      bottomBar: const MainNav(current: 'family'),
       scrollable: true,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

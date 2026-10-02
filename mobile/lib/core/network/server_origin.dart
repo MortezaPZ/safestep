@@ -12,13 +12,16 @@ class ServerOrigin {
 
   static String normalize(String raw) {
     String value = raw.trim();
-    if (value.endsWith('/')) {
-      value = value.substring(0, value.length - 1);
-    }
+    if (value.isEmpty) return AppConfig.apiBaseUrl;
     if (!value.startsWith('http://') && !value.startsWith('https://')) {
       value = 'http://$value';
     }
-    return value;
+    final Uri? uri = Uri.tryParse(value);
+    if (uri == null || uri.host.isEmpty) {
+      return value.replaceAll(RegExp(r'/+$'), '');
+    }
+    final String port = uri.hasPort ? ':${uri.port}' : '';
+    return '${uri.scheme}://${uri.host}$port';
   }
 
   static void set(String raw) {

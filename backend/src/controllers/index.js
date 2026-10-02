@@ -12,7 +12,10 @@ import sosService from '../services/sosService.js';
 import simulatorService from '../services/simulatorService.js';
 import fallService from '../services/fallService.js';
 import { cannedPositiveFeatures } from '../services/fallDetection/classifier.js';
-import { forbidden } from '../utils/errors.js';
+import { forbidden, badRequest } from '../utils/errors.js';
+import * as guardianshipRepository from '../repositories/guardianshipRepository.js';
+import logRepository from '../repositories/logRepository.js';
+import telemetryService from '../services/telemetryService.js';
 import * as userRepository from '../repositories/userRepository.js';
 import * as deviceRepository from '../repositories/deviceRepository.js';
 import { asyncHandler } from '../middleware/error.js';
@@ -156,11 +159,29 @@ export const location = {
 
 export const safeZone = {
   list: asyncHandler(async (req, res) => {
+    const subjectId = req.query.subjectUserId;
+    if (subjectId && subjectId !== req.user.id) {
+      const allowed = await guardianshipRepository.hasPermission(
+        subjectId, req.user.id, 'view_location',
+      );
+      if (!allowed) throw forbidden('شما به محدوده‌های این کاربر دسترسی ندارید.');
+      res.json({ zones: await safeZoneService.list(subjectId) });
+      return;
+    }
     res.json({ zones: await safeZoneService.list(req.user.id) });
   }),
 
   create: asyncHandler(async (req, res) => {
-    res.status(201).json(await safeZoneService.create(req.user.id, req.body));
+    const subjectId = req.body.subjectUserId;
+    if (req.user.role === 'primary') {
+      throw forbidden('تعریف محدوده امن فقط برای ناظر اصلی است.');
+    }
+    if (!subjectId) {
+      throw badRequest('کاربر اصلی این محدوده را مشخص کنید.');
+    }
+    const allowed = await guardianshipRepository.isMainSupervisor(req.user.id, subjectId);
+    if (!allowed) throw forbidden('فقط ناظر اصلی می‌تواند محدوده امن تعریف کند.');
+    res.status(201).json(await safeZoneService.create(subjectId, req.body));
   }),
 
   update: asyncHandler(async (req, res) => {
@@ -314,5 +335,55 @@ export const falls = {
   }),
   list: asyncHandler(async (req, res) => {
     res.json(await fallService.listFalls(req.user, req.query));
+  }),
+};
+
+const SUS_ITEMS = [
+  'فکر می‌کنم دوست دارم اغلب از این سامانه استفاده کنم.',
+  'این سامانه را بی‌جهت پیچیده یافتم.',
+  'فکر می‌کنم استفاده از این سامانه آسان است.',
+  'فکر می‌کنم برای استفاده از این سامانه به کمک یک فرد فنی نیاز دارم.',
+  'کارکردهای مختلف این سامانه را به‌خوبی یکپارچه یافتم.',
+  'در این سامانه ناسازگاری زیادی دیدم.',
+  'تصور می‌کنم بیشتر افراد خیلی سریع کار با این سامانه را یاد می‌گیرند.',
+  'استفاده از این سامانه را دست‌وپاگیر یافتم.',
+  'با استفاده از این سامانه احساس اطمینان داشتم.',
+  'قبل از اینکه بتوانم با این سامانه کار کنم باید چیزهای زیادی یاد می‌گرفتم.',
+];
+
+export const evaluation = {
+  reference: asyncHandler(async (req, res) => {
+    const saved = await logRepository.upsertLocationReference(req.user.id, req.body);
+    res.status(201).json(saved);
+  }),
+  currentReference: asyncHandler(async (req, res) => {
+    res.json({ reference: await logRepository.getLocationReference(req.user.id) });
+  }),
+  susForm: asyncHandler(async (_req, res) => {
+    res.json({
+      scale: 'SUS',
+      items: SUS_ITEMS,
+      choices: [1, 2, 3, 4, 5],
+      hint: '۱ کاملاً مخالف تا ۵ کاملاً موافق',
+    });
+  }),
+  submitSus: asyncHandler(async (req, res) => {
+    let score;
+    try {
+      score = logRepository.scoreSus(req.body.answers);
+    } catch {
+      throw badRequest('ده پاسخ بین ۱ تا ۵ لازم است.');
+    }
+    const saved = await logRepository.insertSusResponse(req.user.id, req.user.role, req.body.answers, score);
+    res.status(201).json(saved);
+  }),
+  summary: asyncHandler(async (req, res) => {
+    await telemetryService.flush();
+    const [location, deliveries, sus] = await Promise.all([
+      logRepository.locationMetrics(),
+      logRepository.deliveryMetrics(),
+      logRepository.susMetrics(),
+    ]);
+    res.json({ location, deliveries, sus });
   }),
 };

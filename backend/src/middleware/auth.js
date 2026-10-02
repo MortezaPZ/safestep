@@ -6,6 +6,7 @@ import { unauthorized, forbidden } from '../utils/errors.js';
 import * as guardianshipRepository from '../repositories/guardianshipRepository.js';
 import adminRepository from '../repositories/adminRepository.js';
 import { ROLES, USER_STATUS } from '../config/constants.js';
+import env from '../config/env.js';
 
 /**
  * حافظه‌ی نهانِ کوتاه‌مدتِ وضعیت حساب.
@@ -72,7 +73,11 @@ export async function requireAuth(req, _res, next) {
       throw unauthorized('این حساب دیگر فعال نیست.');
     }
 
-    req.user = { id: state.id, role: state.role };
+    req.user = {
+      id: state.id,
+      role: state.role,
+      verificationStatus: state.verification_status ?? 'unverified',
+    };
     next();
   } catch (error) {
     next(error);
@@ -158,3 +163,14 @@ export function requireRole(...roles) {
  * وجود یا نبودِ پنل مدیریت، اطلاعاتی است که کاربر عادی لازم نیست بداند.
  */
 export const requireAdmin = requireRole(ROLES.ADMIN);
+
+const GATED_SKIP = new Set(['test']);
+
+/** تا مدارک تأیید نشده، قابلیت‌های مراقبتی قفل است. */
+export function requireVerified(req, _res, next) {
+  if (GATED_SKIP.has(env.nodeEnv)) return next();
+  if (!req.user) return next(unauthorized());
+  if (req.user.role === ROLES.ADMIN) return next();
+  if (req.user.verificationStatus === 'verified') return next();
+  return next(forbidden('پس از تأیید مدارک توسط مدیر سامانه می‌توانید از این قابلیت استفاده کنید.'));
+}

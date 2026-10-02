@@ -37,9 +37,9 @@ class AppSpacing {
   /// ارتفاع دکمه‌ی اصلی
   static const double buttonHeight = 56;
 
-  /// قطر دکمه‌ی اضطراری. بزرگ‌ترین عنصر لمسی اپ، به‌عمد:
-  /// باید بدون نگاه کردن هم پیدا شود.
-  static const double sosButtonSize = 200;
+  /// قطر دکمه‌ی اضطراری. بزرگ است تا با انگشت پیدا شود،
+  /// ولی نباید کارت‌های بالای صفحه را بپوشاند.
+  static const double sosButtonSize = 112;
 
   /// ارتفاع نوار ناوبری پایین
   static const double navBarHeight = 72;

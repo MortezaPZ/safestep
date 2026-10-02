@@ -11,6 +11,7 @@ import '../../../core/widgets/animated_entrance.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/main_nav.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/state_views.dart';
 import '../domain/pairing_models.dart';
@@ -174,6 +175,8 @@ class _GuardiansPageState extends ConsumerState<GuardiansPage> {
 
     return AppScaffold(
       title: 'مراقبان و دسترسی‌ها',
+      showBackButton: false,
+      bottomBar: const MainNav(current: 'family'),
       onRefresh: () => ref.read(pairingControllerProvider.notifier).load(),
       scrollable: true,
       body: Builder(

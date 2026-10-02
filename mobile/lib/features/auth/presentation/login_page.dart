@@ -192,7 +192,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             child: AppTextField(
               controller: _server,
               label: 'آدرس سرور',
-              hint: 'http://192.168.1.10:4000',
+              hint: 'http://192.168.1.10:4080',
               latinDigits: true,
               keyboardType: TextInputType.url,
               textInputAction: TextInputAction.done,

@@ -11,6 +11,7 @@
  * مثل یک نقص یا مقاومت نشان دهد.
  */
 import api from '../api.js';
+import { carePanel } from './care-panel.js';
 import realtime, { WS_EVENTS } from '../realtime.js';
 import SafeMap from '../map.js';
 import { el, render, toast, skeleton, emptyState, errorState } from '../ui.js';
@@ -89,6 +90,26 @@ export function mountGuardian(container, ctx) {
 
   /* ─────────────────────── کارت هر کاربر ─────────────────────── */
 
+  function zoneSentence(entry, state, insideNames) {
+    if (state === 'inside' && insideNames.length > 0) {
+      return `داخل محدوده «${insideNames[0]}» است`;
+    }
+    if (state === 'outside') {
+      const outs = (entry.zones ?? []).filter((zone) => zone.state === 'outside');
+      const name = outs[0]?.zoneName ?? 'محدوده امن';
+      const since = outs
+        .map((zone) => zone.lastTransitionAt)
+        .filter(Boolean)
+        .map((value) => new Date(value).getTime())
+        .filter((value) => !Number.isNaN(value))
+        .sort((a, b) => a - b)[0];
+      if (!since) return `خارج از «${name}» است`;
+      const minutes = Math.max(1, Math.round((Date.now() - since) / 60000));
+      return `خارج از «${name}» است، حدود ${minutes} دقیقه`;
+    }
+    return STATUS_LABELS[state] ?? 'وضعیت محدوده نامشخص است';
+  }
+
   function renderWatchCard(entry) {
     const user = entry.user ?? {};
 
@@ -149,9 +170,7 @@ export function mountGuardian(container, ctx) {
               el('span', { text: user.fullName }),
             ),
             el('div.status-card__meta', {
-              text: state === 'inside' && insideNames.length > 0
-                ? `${STATUS_LABELS.inside} — ${insideNames.join('، ')}`
-                : STATUS_LABELS[state] ?? STATUS_LABELS.unknown,
+              text: zoneSentence(entry, state, insideNames),
             }),
           ),
         ),
@@ -371,6 +390,7 @@ export function mountGuardian(container, ctx) {
         el('div.stack', {}, ...watching.map(renderWatchCard)),
         el('div.stack', {}, renderMapCard(), renderAlertTimeline()),
       ),
+      carePanel({ subjectUserId: mainSubjectId || undefined }),
     );
   }
 
@@ -386,6 +406,8 @@ export function mountGuardian(container, ctx) {
 
   /* ─────────────────────── داده ─────────────────────── */
 
+  let mainSubjectId = null;
+
   async function load({ silent = false } = {}) {
     if (!silent) renderLoading();
 
@@ -396,6 +418,9 @@ export function mountGuardian(container, ctx) {
       ]);
 
       watching = watchResult.watching ?? [];
+      const links = await api.guardianships().catch(() => ({ primaries: [] }));
+      const main = (links.primaries ?? []).find((item) => item.isMainSupervisor);
+      mainSubjectId = main?.primaryUserId ?? null;
       alerts = alertResult.alerts ?? [];
 
       // هشدار اضطراری بازِ هر یک از کاربران تحت مراقبت

@@ -12,6 +12,7 @@ import '../../../core/widgets/animated_entrance.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/main_nav.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../alerts/presentation/alerts_page.dart';
@@ -91,6 +92,7 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
         await ref.read(watchingControllerProvider.notifier).load();
         await ref.read(alertsControllerProvider.notifier).load();
       },
+      bottomBar: const MainNav(current: 'home'),
       actions: <Widget>[
         const _ConnectionDot(),
         _AlertsButton(unread: unread),
@@ -334,39 +336,48 @@ class _PersonStatusCard extends StatelessWidget {
 
           if (point != null && !person.hidden) ...<Widget>[
             const Divider(height: AppSpacing.lg),
-            Row(
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xxs,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: <Widget>[
-                A11y.decorative(const Icon(Icons.schedule_rounded, size: 16)),
-                const SizedBox(width: AppSpacing.xxs),
-                Text(
-                  Fa.timeAgo(point.recordedAt),
-                  style: theme.textTheme.bodySmall,
-                ),
-                const Spacer(),
-                if (point.batteryLevel != null) ...<Widget>[
-                  A11y.decorative(
-                    Icon(
-                      point.batteryLevel! <= 15
-                          ? Icons.battery_alert_rounded
-                          : Icons.battery_full_rounded,
-                      size: 16,
-                      color: point.batteryLevel! <= 15 ? AppColors.warning : null,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    A11y.decorative(const Icon(Icons.schedule_rounded, size: 16)),
+                    const SizedBox(width: AppSpacing.xxs),
+                    Text(
+                      Fa.timeAgo(point.recordedAt),
+                      style: theme.textTheme.bodySmall,
                     ),
+                  ],
+                ),
+                if (point.batteryLevel != null)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      A11y.decorative(
+                        Icon(
+                          point.batteryLevel! <= 15
+                              ? Icons.battery_alert_rounded
+                              : Icons.battery_full_rounded,
+                          size: 16,
+                          color: point.batteryLevel! <= 15 ? AppColors.warning : null,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xxs),
+                      Text(
+                        Fa.percent(point.batteryLevel!),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: AppSpacing.xxs),
-                  Text(
-                    Fa.percent(point.batteryLevel!),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-                if (point.isSimulated) ...<Widget>[
-                  const SizedBox(width: AppSpacing.sm),
+                if (point.isSimulated)
                   Text(
                     'حالت نمایش',
                     style: theme.textTheme.labelSmall
                         ?.copyWith(color: AppColors.simulated),
                   ),
-                ],
               ],
             ),
           ],
@@ -388,9 +399,15 @@ class _PersonStatusCard extends StatelessWidget {
     if (!person.hasLocation) return 'هنوز موقعیتی ثبت نشده';
     if (person.gpsStale) return 'موقعیت قدیمی است';
     if (person.zoneStatus == 'inside' && person.zoneNames.isNotEmpty) {
-      return 'در «${person.zoneNames.first}»';
+      return 'داخل محدوده «${person.zoneNames.first}» است';
     }
-    if (person.zoneStatus == 'outside') return 'خارج از محدوده‌های امن';
+    if (person.zoneStatus == 'outside') {
+      final String name = person.outsideZoneName ?? 'محدوده امن';
+      final DateTime? since = person.outsideSince;
+      if (since == null) return 'خارج از «$name» است';
+      final int minutes = DateTime.now().difference(since).inMinutes.clamp(1, 100000);
+      return 'خارج از «$name» است، حدود $minutes دقیقه';
+    }
     return 'در حال پایش';
   }
 

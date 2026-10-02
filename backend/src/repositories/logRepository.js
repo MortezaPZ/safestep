@@ -67,11 +67,11 @@ export async function insertRequestLogs(entries) {
 export async function insertLocationTelemetry(entries) {
   if (!Array.isArray(entries) || entries.length === 0) return 0;
 
-  const columns = 11;
+  const columns = 14;
   const values = [];
   const placeholders = entries.map((_, i) => {
     const b = i * columns;
-    return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},$${b + 10},$${b + 11})`;
+    return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},$${b + 10},$${b + 11},$${b + 12},$${b + 13},$${b + 14})`;
   });
 
   for (const e of entries) {
@@ -87,13 +87,17 @@ export async function insertLocationTelemetry(entries) {
       e.batchSize ?? 1,
       Boolean(e.isQueuedReplay),
       e.gapSec ?? null,
+      e.referenceLat ?? null,
+      e.referenceLng ?? null,
+      e.errorM ?? null,
     );
   }
 
   const { rowCount } = await db.query(
     `INSERT INTO location_telemetry
        (user_id, ping_id, recorded_at, e2e_latency_ms, process_ms, accuracy_m,
-        provider, source, batch_size, is_queued_replay, gap_sec)
+        provider, source, batch_size, is_queued_replay, gap_sec,
+        reference_lat, reference_lng, error_m)
      VALUES ${placeholders.join(',')}`,
     values,
   );
@@ -361,6 +365,9 @@ export async function locationMetrics({ from = null, to = null } = {}) {
        COUNT(*) FILTER (WHERE is_queued_replay)::int     AS queued_replays,
        COUNT(*) FILTER (WHERE source = 'simulator')::int AS simulated,
        AVG(accuracy_m)                                   AS avg_accuracy_m,
+       COUNT(*) FILTER (WHERE error_m IS NOT NULL AND NOT is_queued_replay AND (accuracy_m IS NULL OR accuracy_m <= 30))::int AS error_samples,
+       AVG(error_m) FILTER (WHERE error_m IS NOT NULL AND NOT is_queued_replay AND (accuracy_m IS NULL OR accuracy_m <= 30)) AS avg_error_m,
+       percentile_cont(0.50) WITHIN GROUP (ORDER BY error_m) FILTER (WHERE error_m IS NOT NULL AND NOT is_queued_replay AND (accuracy_m IS NULL OR accuracy_m <= 30)) AS p50_error_m,
        percentile_cont(0.50) WITHIN GROUP (ORDER BY accuracy_m) AS p50_accuracy_m,
        percentile_cont(0.95) WITHIN GROUP (ORDER BY accuracy_m) AS p95_accuracy_m,
        AVG(e2e_latency_ms)     FILTER (WHERE NOT is_queued_replay) AS avg_e2e_ms,
@@ -395,6 +402,15 @@ export async function locationMetrics({ from = null, to = null } = {}) {
       avgM: num(r.avg_accuracy_m),
       p50M: num(r.p50_accuracy_m),
       p95M: num(r.p95_accuracy_m),
+      note: 'دقت اعلامی خود GPS؛ معیار پروپوزال نیست',
+    },
+    positionError: {
+      samples: r.error_samples ?? 0,
+      avgM: num(r.avg_error_m),
+      p50M: num(r.p50_error_m),
+      unit: 'meter',
+      definition: 'فاصله نقطه مرجع واقعی تا مختصات ثبت‌شده',
+      rule: 'نمونه معتبر: نقطه مرجع دارد، بازپخش آفلاین نیست، و دقت اعلامی GPS حداکثر ۳۰ متر است',
     },
     latency: {
       avgE2eMs: num(r.avg_e2e_ms),
@@ -470,9 +486,79 @@ export async function purgeOlderThan(days) {
   return { requestLogs: req.rowCount, locationTelemetry: tel.rowCount };
 }
 
+export async function getLocationReference(userId) {
+  const { rows } = await db.query(
+    `SELECT lat, lng, label, updated_at FROM location_references WHERE user_id = $1`,
+    [userId],
+  );
+  if (!rows[0]) return null;
+  return {
+    lat: rows[0].lat,
+    lng: rows[0].lng,
+    label: rows[0].label,
+    updatedAt: rows[0].updated_at,
+  };
+}
+
+export async function upsertLocationReference(userId, { lat, lng, label }) {
+  const { rows } = await db.query(
+    `INSERT INTO location_references (user_id, lat, lng, label)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (user_id) DO UPDATE
+       SET lat = EXCLUDED.lat, lng = EXCLUDED.lng, label = EXCLUDED.label, updated_at = now()
+     RETURNING lat, lng, label, updated_at`,
+    [userId, lat, lng, label ?? null],
+  );
+  return {
+    lat: rows[0].lat,
+    lng: rows[0].lng,
+    label: rows[0].label,
+    updatedAt: rows[0].updated_at,
+  };
+}
+
+/** نمرهٔ SUS از ده پاسخ ۱ تا ۵. گویه‌های فرد: امتیاز−۱، زوج: ۵−امتیاز، جمع × ۲٫۵ */
+export function scoreSus(answers) {
+  if (!Array.isArray(answers) || answers.length !== 10) {
+    throw new Error('SUS_ANSWERS');
+  }
+  let sum = 0;
+  answers.forEach((raw, index) => {
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 1 || value > 5) throw new Error('SUS_ANSWERS');
+    sum += index % 2 === 0 ? value - 1 : 5 - value;
+  });
+  return sum * 2.5;
+}
+
+export async function insertSusResponse(userId, role, answers, score) {
+  const { rows } = await db.query(
+    `INSERT INTO sus_responses (user_id, role, answers, score)
+     VALUES ($1, $2, $3::jsonb, $4)
+     RETURNING id, score, created_at`,
+    [userId, role, JSON.stringify(answers), score],
+  );
+  return { id: rows[0].id, score: rows[0].score, createdAt: rows[0].created_at };
+}
+
+export async function susMetrics() {
+  const { rows } = await db.query(
+    `SELECT COUNT(*)::int AS total, AVG(score) AS avg_score,
+            percentile_cont(0.50) WITHIN GROUP (ORDER BY score) AS p50_score
+       FROM sus_responses`,
+  );
+  const r = rows[0] ?? {};
+  return { total: r.total ?? 0, avgScore: num(r.avg_score), p50Score: num(r.p50_score) };
+}
+
 export default {
   insertRequestLogs,
   insertLocationTelemetry,
+  getLocationReference,
+  upsertLocationReference,
+  scoreSus,
+  insertSusResponse,
+  susMetrics,
   insertAuditLog,
   insertAlertDeliveries,
   acknowledgeDelivery,

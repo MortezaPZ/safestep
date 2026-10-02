@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/admin/presentation/admin_home_page.dart';
 import '../features/alerts/presentation/alerts_page.dart';
 import '../features/auth/domain/auth_models.dart';
 import '../features/auth/presentation/auth_controller.dart';
@@ -17,6 +18,7 @@ import '../features/pairing/presentation/redeem_page.dart';
 import '../features/settings/presentation/accessibility_settings_page.dart';
 import '../features/settings/presentation/settings_page.dart';
 import '../features/splash/presentation/splash_page.dart';
+import '../features/tracking/presentation/my_map_page.dart';
 import '../features/watching/presentation/history_page.dart';
 import '../features/watching/presentation/live_map_page.dart';
 
@@ -31,6 +33,7 @@ class AppRoutes {
 
   /// خانه‌ی کاربر اصلی (فرد تحت پایش)
   static const String home = '/home';
+  static const String myMap = '/my-map';
 
   /// خانه‌ی مراقب
   static const String guardian = '/guardian';
@@ -64,8 +67,13 @@ class AppRoutes {
   };
 
   /// خانه‌ی درست هر نقش.
-  static String homeFor(UserRole role) =>
-      role == UserRole.guardian ? guardian : home;
+  static const String admin = '/admin';
+
+  static String homeFor(UserRole role) {
+    if (role == UserRole.admin) return admin;
+    if (role == UserRole.guardian) return guardian;
+    return home;
+  }
 }
 
 /// روتر اپ.
@@ -126,14 +134,14 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
       if (location == AppRoutes.home && auth.user!.role == UserRole.guardian) {
         return AppRoutes.guardian;
       }
-      if (location == AppRoutes.guardian && auth.user!.role != UserRole.guardian) {
-        return AppRoutes.home;
+      if (location == AppRoutes.home && auth.user!.role == UserRole.admin) {
+        return AppRoutes.admin;
       }
-
-      // ناظر/مراقب به تنظیمات و پشتیبانی دسترسی ندارد
-      if (auth.user!.role == UserRole.guardian &&
-          location == AppRoutes.settings) {
-        return AppRoutes.guardian;
+      if (location == AppRoutes.guardian && auth.user!.role != UserRole.guardian) {
+        return AppRoutes.homeFor(auth.user!.role);
+      }
+      if (location == AppRoutes.admin && auth.user!.role != UserRole.admin) {
+        return AppRoutes.homeFor(auth.user!.role);
       }
 
       return null;
@@ -162,6 +170,14 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.home,
         builder: (BuildContext context, GoRouterState state) => const PrimaryHomePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.admin,
+        builder: (BuildContext context, GoRouterState state) => const AdminHomePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.myMap,
+        builder: (BuildContext context, GoRouterState state) => const MyMapPage(),
       ),
       GoRoute(
         path: AppRoutes.guardian,

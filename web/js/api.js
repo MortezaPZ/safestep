@@ -259,7 +259,7 @@ export const api = {
     request('/locations/sharing', { method: 'PUT', body: { enabled } }),
 
   /* ─── محدوده‌های امن ─── */
-  safeZones: () => request('/safe-zones'),
+  safeZones: (subjectUserId) => request('/safe-zones', { query: subjectUserId ? { subjectUserId } : undefined }),
   createZone: (payload) => request('/safe-zones', { method: 'POST', body: payload }),
   updateZone: (id, patch) => request(`/safe-zones/${id}`, { method: 'PATCH', body: patch }),
   deleteZone: (id) => request(`/safe-zones/${id}`, { method: 'DELETE' }),
@@ -295,6 +295,7 @@ export const api = {
 
   /* ─── شبیه‌ساز (حالت نمایش) ─── */
   simulatorRoutes: () => request('/simulator/routes'),
+  simulatorStatus: () => request('/simulator/status'),
   startSimulator: (payload) => request('/simulator/start', { method: 'POST', body: payload }),
   stopSimulator: () => request('/simulator/stop', { method: 'POST' }),
   simulatorFall: () => request('/simulator/fall', { method: 'POST' }),
@@ -304,6 +305,15 @@ export const api = {
     request('/documents', { method: 'POST', body: { documentType, imageUrl } }),
   adminOverview: () => request('/admin/overview'),
   adminDocuments: (query = {}) => request('/admin/documents', { query }),
+  adminFamilies: () => request('/admin/families'),
+  adminAlerts: () => request('/admin/alerts'),
+  adminFalls: () => request('/admin/falls'),
+  adminSupport: () => request('/admin/support'),
+  adminSupportReply: (userId, body) => request(`/admin/support/${userId}/reply`, { method: 'POST', body: { body } }),
+  mySupport: () => request('/support/messages'),
+  sendSupport: (body) => request('/support/messages', { method: 'POST', body: { body } }),
+  sendDocument: (body) => request('/documents', { method: 'POST', body }),
+  myDocuments: () => request('/documents/mine'),
   adminApproveDocument: (id) => request(`/admin/documents/${id}/approve`, { method: 'POST' }),
   adminRejectDocument: (id, reason) => request(`/admin/documents/${id}/reject`, { method: 'POST', body: { reason } }),
   adminUsers: (query = {}) => request('/admin/users', { query }),

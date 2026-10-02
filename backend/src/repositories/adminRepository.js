@@ -24,6 +24,8 @@ const mapAdminUser = (row) => ({
   createdAt: d(row.created_at),
   lastLoginAt: d(row.last_login_at),
   deletedAt: d(row.deleted_at),
+  healthCondition: row.health_condition ?? null,
+  verificationStatus: row.verification_status ?? null,
   // شمارنده‌ها فقط وقتی هستند که کوئری فهرست، آن‌ها را حساب کرده باشد
   ...(row.device_count !== undefined ? { deviceCount: Number(row.device_count) } : {}),
   ...(row.guardian_count !== undefined ? { guardianCount: Number(row.guardian_count) } : {}),
@@ -39,14 +41,30 @@ const mapIdentityDocument = (row) => ({
   type: row.document_type,
   imageUrl: row.image_url,
   status: row.status,
+  healthCondition: row.health_condition ?? null,
   rejectionReason: row.rejection_reason ?? null,
   createdAt: d(row.created_at),
   reviewedAt: d(row.reviewed_at),
 });
 
+export async function listIdentityDocumentsForUser(userId) {
+  const { rows } = await db.query(
+    `SELECT d.*, u.full_name AS user_name, u.phone AS user_phone, u.health_condition
+       FROM identity_documents d JOIN users u ON u.id = d.user_id
+      WHERE d.user_id = $1
+         OR d.user_id IN (
+           SELECT primary_user_id FROM guardianships
+            WHERE guardian_user_id = $1 AND status = 'active' AND is_main_supervisor = true
+         )
+      ORDER BY d.created_at DESC`,
+    [userId],
+  );
+  return rows.map(mapIdentityDocument);
+}
+
 export async function listIdentityDocuments({ status = 'pending', limit = 50, offset = 0 } = {}) {
   const { rows } = await db.query(
-    `SELECT d.*, u.full_name AS user_name, u.phone AS user_phone
+    `SELECT d.*, u.full_name AS user_name, u.phone AS user_phone, u.health_condition
        FROM identity_documents d JOIN users u ON u.id = d.user_id
       WHERE ($1::text IS NULL OR d.status = $1)
       ORDER BY d.created_at DESC LIMIT $2 OFFSET $3`,
@@ -185,8 +203,15 @@ export async function countActiveAdmins(excludeId = null) {
  * وضعیت حساب برای گاردِ احراز هویت.
  * سبک نگه داشته شده چون ممکن است روی هر درخواست اجرا شود.
  */
+export async function setVerificationStatus(userId, status) {
+  await db.query('UPDATE users SET verification_status = $2 WHERE id = $1', [userId, status]);
+}
+
 export async function accountState(id) {
-  const { rows } = await db.query('SELECT id, role, status FROM users WHERE id = $1', [id]);
+  const { rows } = await db.query(
+    'SELECT id, role, status, verification_status FROM users WHERE id = $1',
+    [id],
+  );
   return rows[0] ?? null;
 }
 
@@ -330,6 +355,118 @@ export async function recentAlerts(limit = 20) {
   }));
 }
 
+export async function listFamilies() {
+  const { rows } = await db.query(
+    `SELECT p.id AS primary_id, p.full_name AS primary_name, p.phone AS primary_phone,
+            p.health_condition, p.verification_status,
+            g.full_name AS guardian_name, g.phone AS guardian_phone,
+            gs.is_main_supervisor, gs.permissions
+       FROM users p
+       LEFT JOIN guardianships gs ON gs.primary_user_id = p.id AND gs.status = 'active'
+       LEFT JOIN users g ON g.id = gs.guardian_user_id
+      WHERE p.role = 'primary' AND p.deleted_at IS NULL
+      ORDER BY p.full_name, g.full_name`,
+  );
+  const families = new Map();
+  for (const row of rows) {
+    if (!families.has(row.primary_id)) {
+      families.set(row.primary_id, {
+        primaryId: row.primary_id,
+        primaryName: row.primary_name,
+        primaryPhone: row.primary_phone,
+        healthCondition: row.verification_status === 'verified' ? row.health_condition : null,
+        verificationStatus: row.verification_status,
+        guardians: [],
+      });
+    }
+    if (row.guardian_name) {
+      families.get(row.primary_id).guardians.push({
+        fullName: row.guardian_name,
+        phone: row.guardian_phone,
+        isMainSupervisor: row.is_main_supervisor === true,
+        permissions: row.permissions ?? [],
+      });
+    }
+  }
+  return [...families.values()];
+}
+
+export async function listAlertsWithoutLocation(limit = 80) {
+  const { rows } = await db.query(
+    `SELECT a.id, a.type, a.title, a.body, a.severity, a.created_at, u.full_name, u.id AS subject_id
+       FROM alerts a JOIN users u ON u.id = a.user_id
+      ORDER BY a.created_at DESC LIMIT $1`,
+    [limit],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    body: row.body,
+    severity: row.severity,
+    createdAt: d(row.created_at),
+    subjectId: row.subject_id,
+    subjectName: row.full_name,
+  }));
+}
+
+export async function setHealthCondition(userId, condition) {
+  await db.query('UPDATE users SET health_condition = $2 WHERE id = $1', [userId, condition]);
+}
+
+export async function listSupportMessages(userId) {
+  const { rows } = await db.query(
+    `SELECT id, user_id, sender_role, body, created_at
+       FROM support_messages WHERE user_id = $1 ORDER BY created_at`,
+    [userId],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    senderRole: row.sender_role,
+    body: row.body,
+    createdAt: d(row.created_at),
+  }));
+}
+
+export async function addSupportMessage(userId, senderRole, body) {
+  const { rows } = await db.query(
+    `INSERT INTO support_messages (user_id, sender_role, body)
+     VALUES ($1, $2, $3) RETURNING id, created_at`,
+    [userId, senderRole, body],
+  );
+  return { id: rows[0].id, createdAt: d(rows[0].created_at) };
+}
+
+export async function listSupportThreads() {
+  const { rows } = await db.query(
+    `SELECT m.user_id, u.full_name, u.phone, u.role,
+            count(*)::int AS message_count,
+            max(m.created_at) AS last_at
+       FROM support_messages m JOIN users u ON u.id = m.user_id
+      GROUP BY m.user_id, u.full_name, u.phone, u.role
+      ORDER BY max(m.created_at) DESC`,
+  );
+  return rows.map((row) => ({
+    userId: row.user_id,
+    fullName: row.full_name,
+    phone: row.phone,
+    role: row.role,
+    messageCount: row.message_count,
+    lastAt: d(row.last_at),
+  }));
+}
+
+export async function isMainSupervisor(guardianId, primaryId) {
+  const { rows } = await db.query(
+    `SELECT 1 FROM guardianships
+      WHERE guardian_user_id = $1 AND primary_user_id = $2
+        AND status = 'active' AND is_main_supervisor = true`,
+    [guardianId, primaryId],
+  );
+  return rows.length > 0;
+}
+
 export default {
   listUsers,
   countUsers,
@@ -339,9 +476,21 @@ export default {
   touchLastLogin,
   countActiveAdmins,
   accountState,
+  setVerificationStatus,
   listDevices,
   countDevices,
   revokeDevice,
   overview,
   recentAlerts,
+  listIdentityDocuments,
+  listIdentityDocumentsForUser,
+  createIdentityDocument,
+  reviewIdentityDocument,
+  setHealthCondition,
+  listSupportMessages,
+  addSupportMessage,
+  listSupportThreads,
+  isMainSupervisor,
+  listFamilies,
+  listAlertsWithoutLocation,
 };

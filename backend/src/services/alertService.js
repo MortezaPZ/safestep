@@ -23,6 +23,7 @@ import notificationAdapter from './notificationAdapter.js';
 import notificationOutbox from './notificationOutbox.js';
 import logger from '../utils/logger.js';
 import { forbidden, notFound } from '../utils/errors.js';
+import db from '../db/index.js';
 
 const log = logger.child({ module: 'alert' });
 
@@ -87,6 +88,12 @@ export function composeAlertMessage(type, context = {}) {
 
     case ALERT_TYPES.FALL_DETECTED: {
       const pct = Math.round((context.confidence ?? 0) * 100);
+      if (context.auto) {
+        return {
+          title: 'فراخوان اضطراری',
+          body: `سقوط ${name} تشخیص داده شد و فراخوان اضطراری به‌صورت خودکار ارسال شد (اطمینان ${pct}٪).`,
+        };
+      }
       return {
         title: 'احتمال سقوط',
         body: `احتمال سقوط ${name} تشخیص داده شد (اطمینان ${pct}٪). لطفاً فوراً تماس بگیرید.`,
@@ -137,6 +144,14 @@ export async function raiseAlert({ userId, type, location, zoneId, context = {},
     requiredPermission,
   );
   const recipientIds = recipients.map((r) => r.id);
+  if (type === ALERT_TYPES.FALL_DETECTED) {
+    const { rows: admins } = await db.query(
+      `SELECT id FROM users WHERE role = 'admin' AND status = 'active'`,
+    );
+    for (const row of admins) {
+      if (!recipientIds.includes(row.id)) recipientIds.push(row.id);
+    }
+  }
 
   const enriched = {
     ...alert,
@@ -198,6 +213,8 @@ export async function raiseAlert({ userId, type, location, zoneId, context = {},
         errorCode: delivery.fellBack ? 'FELL_BACK_TO_LOCAL' : null,
       });
     }
+    // تخلیهٔ فوری تا ردیف alert_deliveries منتظر تایمر ۵ثانیه‌ای نماند
+    await telemetryService.flush();
   }
 
   log.info('هشدار ثبت و توزیع شد', {
@@ -244,7 +261,27 @@ export async function listAlerts(viewerId, { types, unreadOnly, limit, before, s
     alertRepository.countUnread(subjectIds, viewerId),
   ]);
 
-  return { alerts, countsByType: counts, unreadCount };
+  const named = await Promise.all(alerts.map(async (item) => {
+    if (item.userId !== viewerId && item.user_id !== viewerId) return item;
+    const subjectId = item.userId ?? item.user_id;
+    const { rows } = await db.query(
+      `SELECT u.full_name FROM guardianships g
+         JOIN users u ON u.id = g.guardian_user_id
+        WHERE g.primary_user_id = $1 AND g.status = 'active'`,
+      [subjectId],
+    );
+    const names = rows.map((row) => row.full_name).join('، ') || 'ناظر';
+    const type = item.type;
+    let body = `این رویداد به ${names} ارسال شد.`;
+    if (type === 'gps_lost') body = `قطع موقعیت شما به ${names} ارسال شد.`;
+    if (type === 'low_battery') body = `شارژ باتری دستگاه شما کم شده و به ${names} ارسال شد.`;
+    if (type === 'zone_exit') body = `خروج شما از محدودهٔ امن به ${names} ارسال شد.`;
+    if (type === 'zone_enter') body = `شما در محدودهٔ امن هستید. این خبر به ${names} ارسال شد.`;
+    if (type === 'fall_detected') body = `فراخوان اضطراری به ${names} و مدیریت ارسال شد.`;
+    return { ...item, body, canResolve: false };
+  }));
+
+  return { alerts: named, countsByType: counts, unreadCount };
 }
 
 export async function markRead(alertId, viewerId) {
@@ -284,6 +321,9 @@ export async function resolveAlert(alertId, viewerId) {
   const allowed = await visibleSubjectIds(viewerId);
   if (!allowed.includes(alert.userId)) {
     throw forbidden('شما به این هشدار دسترسی ندارید.');
+  }
+  if (viewerId === alert.userId) {
+    throw forbidden('رسیدگی هشدار فقط برای ناظر است. شما فقط وضعیت ارسال را می‌بینید.');
   }
 
   const resolved = await alertRepository.resolve(alertId, viewerId);

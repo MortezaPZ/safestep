@@ -12,6 +12,7 @@
  * خودش باشد، نه گزارشی که دیگران از او می‌گیرند.
  */
 import api from '../api.js';
+import { carePanel } from './care-panel.js';
 import realtime, { WS_EVENTS } from '../realtime.js';
 import SafeMap from '../map.js';
 import { el, render, toast, dialog, confirmDialog, haptic, skeleton, errorState } from '../ui.js';
@@ -101,6 +102,19 @@ export function mountDashboard(container, ctx) {
 
   /* ─────────────────────── کارت وضعیت ─────────────────────── */
 
+  function outsideSentence(current) {
+    const outs = (current.zoneStates ?? []).filter((zone) => zone.state === 'outside');
+    const name = outs[0]?.zoneName ?? outs[0]?.name ?? 'محدوده امن';
+    const since = outs
+      .map((zone) => zone.lastTransitionAt)
+      .filter(Boolean)
+      .map((value) => new Date(value).getTime())
+      .sort((a, b) => a - b)[0];
+    if (!since) return `شما از «${name}» خارج شده‌اید`;
+    const minutes = Math.max(1, Math.round((Date.now() - since) / 60000));
+    return `شما از محدوده امن «${name}» به مدت ${minutes} دقیقه خارج شده‌اید`;
+  }
+
   function renderStatusCard() {
     const state = status.status ?? 'unknown';
     const insideNames = status.insideZones.map((z) => z.zoneName).filter(Boolean);
@@ -108,9 +122,9 @@ export function mountDashboard(container, ctx) {
 
     const detail =
       state === 'inside' && insideNames.length > 0
-        ? insideNames.join('، ')
+        ? `شما در محدوده امن «${insideNames[0]}» هستید`
         : state === 'outside'
-          ? 'بیرون از همه‌ی محدوده‌های امن'
+          ? outsideSentence(status)
           : status.zones.length === 0
             ? 'هنوز محدوده‌ی امنی تعریف نشده است'
             : 'در انتظار دریافت موقعیت';
@@ -343,11 +357,7 @@ export function mountDashboard(container, ctx) {
             el('p.state-block__text', {
               text: 'با تعریف محدوده‌ی امن، وقتی از آن خارج شوید خانواده مطلع می‌شود.',
             }),
-            el('button.btn', {
-              type: 'button',
-              text: 'ساخت محدوده‌ی امن',
-              onClick: () => ctx.navigate('zones'),
-            }),
+            el('p.muted', { text: 'تعریف محدوده امن با ناظر اصلی است.' }),
           ),
         ),
       );
@@ -359,11 +369,7 @@ export function mountDashboard(container, ctx) {
       el('div.card__header', {},
         el('h2.card__title', { text: 'محدوده‌های امن' }),
         el('div.header-spacer'),
-        el('button.btn.btn--ghost.btn--sm', {
-          type: 'button',
-          text: 'مدیریت',
-          onClick: () => ctx.navigate('zones'),
-        }),
+        el('span.muted', { text: 'تعریف با ناظر اصلی' }),
       ),
       el('div.card__body', {},
         ...status.zoneStates.map((zoneState) => {
@@ -405,6 +411,7 @@ export function mountDashboard(container, ctx) {
           renderStatusCard(),
           el('div.card', {}, el('div.card__body', {}, renderSosZone())),
           renderZonesCard(),
+          carePanel({}),
         ),
         renderMapCard(),
       ),

@@ -46,10 +46,10 @@ const env = {
   nodeEnv,
   isProduction,
   isTest: nodeEnv === 'test',
-  port: num('PORT', 4000),
+  port: num('PORT', 4080),
   // پوشه‌ی وب‌اپ. پیش‌فرض کنار backend است؛ در کانتینر با WEB_ROOT بازنویسی می‌شود.
   webRoot: path.resolve(BACKEND_ROOT, str('WEB_ROOT', '../web')),
-  corsOrigins: str('CORS_ORIGINS', 'http://localhost:4000')
+  corsOrigins: str('CORS_ORIGINS', 'http://localhost:4080')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),

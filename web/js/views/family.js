@@ -263,7 +263,7 @@ export function mountFamily(container, ctx) {
           person.fullName ?? '—',
           link.nickname ? ` (${link.nickname})` : '',
         ),
-        el('div.list-row__sub', { text: person.phone ?? '' }),
+        el('div.list-row__sub.phone-ltr', { text: person.phone ?? '' }),
         el('div.chip-row', {},
           el('span', {
             class: `chip ${link.isOnline ? 'chip--safe' : ''}`,
@@ -302,7 +302,7 @@ export function mountFamily(container, ctx) {
       }),
       el('div.list-row__main', {},
         el('div.list-row__title', { text: person.fullName ?? '—' }),
-        el('div.list-row__sub', { text: person.phone ?? '' }),
+        el('div.list-row__sub.phone-ltr', { text: person.phone ?? '' }),
         el('div.chip-row', {},
           el('span', {
             class: `chip ${link.isOnline ? 'chip--safe' : ''}`,

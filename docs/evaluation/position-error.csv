@@ -1,0 +1,8 @@
+offset_m,reported_accuracy_m,error_m,valid_sample,source
+3,12,3,1,demo-home-reference-geometry
+8,12,8,1,demo-home-reference-geometry
+12,12,12,1,demo-home-reference-geometry
+18,12,18,1,demo-home-reference-geometry
+25,12,25,1,demo-home-reference-geometry
+35,36,35,0,demo-home-reference-geometry
+48,36,48,0,demo-home-reference-geometry

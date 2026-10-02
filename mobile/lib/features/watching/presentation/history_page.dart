@@ -421,24 +421,29 @@ class _SummaryBar extends StatelessWidget {
             'مسافت ${Fa.distance(result.distanceM)}، '
             '${Fa.digits(result.pingCount.toString())} نقطه',
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: <Widget>[
-            _Metric(
-              label: 'مسافت',
-              value: Fa.distance(result.distanceM),
-              icon: Icons.route_rounded,
+            Expanded(
+              child: _Metric(
+                label: 'مسافت',
+                value: Fa.distance(result.distanceM),
+                icon: Icons.route_rounded,
+              ),
             ),
-            _Metric(
-              label: 'نقاط',
-              value: Fa.digits(result.pingCount.toString()),
-              icon: Icons.scatter_plot_rounded,
+            Expanded(
+              child: _Metric(
+                label: 'نقاط',
+                value: Fa.digits(result.pingCount.toString()),
+                icon: Icons.scatter_plot_rounded,
+              ),
             ),
             if (result.firstAt != null && result.lastAt != null)
-              _Metric(
-                label: 'بازه',
-                value: '${JalaliFormat.time(result.firstAt!)}'
-                    ' تا ${JalaliFormat.time(result.lastAt!)}',
-                icon: Icons.schedule_rounded,
+              Expanded(
+                child: _Metric(
+                  label: 'بازه',
+                  value: '${JalaliFormat.time(result.firstAt!)}'
+                      ' تا ${JalaliFormat.time(result.lastAt!)}',
+                  icon: Icons.schedule_rounded,
+                ),
               ),
           ],
         ),
@@ -463,7 +468,13 @@ class _Metric extends StatelessWidget {
       children: <Widget>[
         A11y.decorative(Icon(icon, size: 20)),
         const SizedBox(height: AppSpacing.xxs),
-        Text(value, style: theme.textTheme.titleSmall),
+        Text(
+          value,
+          style: theme.textTheme.titleSmall,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         Text(label, style: theme.textTheme.labelSmall),
       ],
     );

@@ -13,9 +13,12 @@ import '../../../core/utils/jalali_format.dart';
 import '../../../core/widgets/animated_entrance.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/main_nav.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/state_views.dart';
 import 'package:safestep/l10n/app_localizations.dart';
+import '../../auth/domain/auth_models.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../../realtime/realtime_controller.dart';
 import '../data/alerts_repository.dart';
 
@@ -205,6 +208,7 @@ class _AlertsListPageState extends ConsumerState<AlertsListPage> {
       title: AppLocalizations.of(context)?.alerts ?? 'هشدارها',
       onRefresh: () => ref.read(alertsControllerProvider.notifier).load(),
       scrollable: true,
+      bottomBar: const MainNav(current: 'alerts'),
       actions: <Widget>[
         if (state.page.unreadCount > 0)
           TextButton(
@@ -270,7 +274,8 @@ class _AlertsListPageState extends ConsumerState<AlertsListPage> {
                     onTap: () => ref
                         .read(alertsControllerProvider.notifier)
                         .markRead(state.page.alerts[i].id),
-                    onResolve: state.page.alerts[i].isResolved
+                    onResolve: state.page.alerts[i].isResolved ||
+                            ref.watch(currentUserProvider)?.role == UserRole.primary
                         ? null
                         : () => ref
                             .read(alertsControllerProvider.notifier)
@@ -367,11 +372,14 @@ class _AlertCard extends StatelessWidget {
                 const Icon(Icons.schedule_rounded, size: 14),
               ),
               const SizedBox(width: AppSpacing.xxs),
-              Text(
-                JalaliFormat.smart(alert.createdAt),
-                style: theme.textTheme.labelSmall,
+              Expanded(
+                child: Text(
+                  JalaliFormat.smart(alert.createdAt),
+                  style: theme.textTheme.labelSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const Spacer(),
               if (alert.isResolved)
                 Text(
                   'رسیدگی شد',

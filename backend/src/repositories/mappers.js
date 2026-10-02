@@ -25,6 +25,7 @@ export function mapUser(row) {
     createdAt: d(row.created_at),
     lastLoginAt: d(row.last_login_at),
     phoneVerifiedAt: d(row.phone_verified_at),
+    verificationStatus: row.verification_status ?? 'unverified',
   };
 }
 
@@ -81,6 +82,7 @@ export function mapGuardianship(row) {
     primaryUserId: row.primary_user_id,
     guardianUserId: row.guardian_user_id,
     permissions: row.permissions ?? [],
+    isMainSupervisor: row.is_main_supervisor === true,
     status: row.status,
     nickname: row.nickname,
     createdAt: d(row.created_at),

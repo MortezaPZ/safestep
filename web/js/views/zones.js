@@ -20,6 +20,8 @@ export function mountZones(container, ctx) {
   let zones = [];
   let currentLocation = null;
   let map = null;
+  let subjectUserId = null;
+  let canEdit = ctx.user?.role !== 'guardian';
   let destroyed = false;
 
   /* ─────────────────────── ساخت / ویرایش ─────────────────────── */
@@ -250,6 +252,7 @@ export function mountZones(container, ctx) {
                 payload.centerLng = center.lng;
                 payload.radiusM = radius;
               }
+              if (subjectUserId) payload.subjectUserId = subjectUserId;
               if (isEdit) {
                 await api.updateZone(existing.id, payload);
                 toast('ذخیره شد', 'محدوده به‌روزرسانی شد.');
@@ -350,7 +353,7 @@ export function mountZones(container, ctx) {
             : null,
         ),
       ),
-      el('div.list-row__actions', {},
+      canEdit ? el('div.list-row__actions', {},
         el('button.btn.btn--secondary.btn--sm', {
           type: 'button',
           text: 'ویرایش',
@@ -366,7 +369,7 @@ export function mountZones(container, ctx) {
           text: 'حذف',
           onClick: () => removeZone(zone),
         }),
-      ),
+      ) : null,
     );
   }
 
@@ -407,11 +410,13 @@ export function mountZones(container, ctx) {
           el('div.card__header', {},
             el('h2.card__title', { text: 'محدوده‌های امن' }),
             el('div.header-spacer'),
-            el('button.btn.btn--sm', {
-              type: 'button',
-              text: '＋ محدوده‌ی جدید',
-              onClick: () => openZoneEditor(),
-            }),
+            canEdit
+              ? el('button.btn.btn--sm', {
+                  type: 'button',
+                  text: '＋ محدوده‌ی جدید',
+                  onClick: () => openZoneEditor(),
+                })
+              : el('span.muted', { text: 'فقط مشاهده' }),
           ),
           el('div', { style: { padding: 'var(--space-3)' } }, renderMapCard()),
           el('div.card__body', {},
@@ -420,8 +425,10 @@ export function mountZones(container, ctx) {
               : emptyState({
                   icon: '📍',
                   title: 'هنوز محدوده‌ای ندارید',
-                  text: 'محدوده‌ی امن جایی است که رفت‌وآمد در آن عادی است. خروج از آن به خانواده اطلاع داده می‌شود.',
-                  action: { label: 'ساخت اولین محدوده', onClick: () => openZoneEditor() },
+                  text: canEdit
+                    ? 'محدوده‌ی امن جایی است که رفت‌وآمد در آن عادی است. خروج از آن به خانواده اطلاع داده می‌شود.'
+                    : 'ناظر اصلی هنوز محدوده‌ای تعریف نکرده است.',
+                  action: canEdit ? { label: 'ساخت اولین محدوده', onClick: () => openZoneEditor() } : null,
                 }),
           ),
         ),
@@ -435,8 +442,15 @@ export function mountZones(container, ctx) {
     }
 
     try {
+      if (ctx.user?.role === 'guardian') {
+        const links = await api.guardianships();
+        const primaries = links.primaries ?? links.watching ?? [];
+        const first = primaries[0];
+        subjectUserId = first?.primaryUserId ?? first?.primaryUser?.id ?? null;
+        canEdit = Boolean(first?.isMainSupervisor);
+      }
       const [zoneResult, status] = await Promise.all([
-        api.safeZones(),
+        api.safeZones(subjectUserId),
         api.ownStatus().catch(() => null),
       ]);
 
