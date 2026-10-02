@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../theme/app_motion.dart';
@@ -39,16 +37,13 @@ class _AnimatedEntranceState extends State<AnimatedEntrance>
   late final AnimationController _controller;
   bool _started = false;
 
-  /// حداکثر تأخیر انباشته. بدون این سقف، کارتِ دهم یک فهرست، نیم ثانیه
-  /// دیر ظاهر می‌شود و کاربر فکر می‌کند اپ کند است.
-  static const int _maxStaggerSteps = 6;
-
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
       duration: AppMotion.normal,
+      value: 1,
     );
   }
 
@@ -57,17 +52,9 @@ class _AnimatedEntranceState extends State<AnimatedEntrance>
     super.didChangeDependencies();
     if (_started) return;
     _started = true;
-
-    if (AppMotion.reduced(context)) {
-      // با «کاهش حرکت»، عنصر بدون انیمیشن و بی‌درنگ در جای خودش ظاهر می‌شود
-      _controller.value = 1;
-      return;
-    }
-
-    final int steps = widget.index.clamp(0, _maxStaggerSteps);
-    unawaited(Future<void>.delayed(AppMotion.stagger * steps, () {
-      if (mounted) _controller.forward();
-    }));
+    // انیمیشن ورود دیگر محتوا را پنهان نمی‌کند. روی گوشی، تیکرِ گذار صفحه
+    // گاهی تمام نمی‌شد و کارت‌ها روی شفافیت صفر می‌ماندند.
+    _controller.value = 1;
   }
 
   @override

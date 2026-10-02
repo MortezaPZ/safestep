@@ -41,11 +41,11 @@ const VIEWS = {
   dashboard: { labelKey: 'navDashboard', icon: '🏠', mount: mountDashboard, forPrimary: true },
   guardian: { labelKey: 'navGuardian', icon: '👀', mount: mountGuardian, forGuardian: true },
   alerts: { labelKey: 'alerts', icon: '🔔', mount: mountAlerts, always: true, badge: true },
-  zones: { labelKey: 'navZones', icon: '📍', mount: mountZones, forPrimary: true },
+  zones: { labelKey: 'navZones', icon: '📍', mount: mountZones, forGuardian: true },
   family: { labelKey: 'navFamily', icon: '👨‍👩‍👧', mount: mountFamily, always: true },
   history: { labelKey: 'navHistory', icon: '🗺️', mount: mountHistory, forHistory: true },
   demo: { labelKey: 'navDemo', icon: '🎬', mount: mountDemo, forPrimary: true },
-  settings: { labelKey: 'navSettings', icon: '⚙️', mount: mountSettings, forPrimary: true },
+  settings: { labelKey: 'navSettings', icon: '⚙️', mount: mountSettings, forPrimary: true, forGuardian: true },
 };
 
 /**
@@ -58,7 +58,7 @@ function visibleViews() {
   const isGuardian = state.user?.role === 'guardian' || state.links.primaries.length > 0;
 
   return Object.entries(VIEWS).filter(([, view]) => {
-    // مدیر فقط پنل مدیریت را می‌بیند. ناظر تب تنظیمات ندارد.
+    // مدیر فقط پنل مدیریت را می‌بیند. ناظر تنظیمات و محدودهٔ خودش را دارد.
     if (isAdmin) return view.forAdmin === true;
     if (view.forAdmin) return isAdmin;
     if (view.always) return true;
@@ -125,15 +125,13 @@ function renderHeader() {
       title: state.user.fullName,
       style: { background: state.user.avatarColor ?? 'var(--accent)' },
     }),
-    state.user?.role !== 'admin'
-      ? el('button.icon-btn', {
-          type: 'button',
-          text: 'خروج',
-          title: 'خروج از حساب',
-          ariaLabel: 'خروج از حساب',
-          onClick: () => doLogout(),
-        })
-      : null,
+    el('button.icon-btn', {
+      type: 'button',
+      text: 'خروج',
+      title: 'خروج از حساب',
+      ariaLabel: 'خروج از حساب',
+      onClick: () => doLogout(),
+    }),
   );
 
   return { header, tabsContainer };
@@ -170,6 +168,12 @@ let viewContainer = null;
 function navigate(viewKey, params = {}) {
   const view = VIEWS[viewKey];
   if (!view) return;
+  if (state.user && !visibleViews().some(([key]) => key === viewKey)) {
+    viewKey = defaultView();
+  }
+
+  const nextView = VIEWS[viewKey];
+  if (!nextView) return;
 
   // پاک‌سازی نمای قبلی — بدون این، شنونده‌های WebSocket و نقشه‌ها نشت می‌کنند
   state.cleanup?.();
@@ -182,11 +186,14 @@ function navigate(viewKey, params = {}) {
   window.location.hash = viewKey;
 
   viewContainer.replaceChildren();
-  state.cleanup = view.mount(viewContainer, buildContext(), params);
+  state.cleanup = nextView.mount(viewContainer, buildContext(), params);
 
   // پس از تعویض نما، تمرکز به ابتدای محتوا می‌رود تا کاربر صفحه‌خوان گم نشود
   viewContainer.focus?.();
-  requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  requestAnimationFrame(() => {
+    window.dispatchEvent(new Event('resize'));
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 150);
+  });
 }
 
 /** بافتی که به همه‌ی نماها داده می‌شود. */
@@ -287,16 +294,17 @@ async function doLogout() {
   }
 
   state.user = null;
+  if (window.location.hash) window.location.hash = '';
   showAuth();
 }
 
 function showAuth() {
   render(root, el('div'));
   mountAuth(root, {
-    onSuccess: (session) => {
+    onSuccess: async (session) => {
       state.user = session.user;
       state.settings = session.settings;
-      startApp();
+      await startApp();
     },
   });
 }
@@ -310,6 +318,15 @@ async function startApp() {
 
   viewContainer = el('div', { id: 'view', tabindex: '-1' });
 
+  const verifyBanner =
+    state.user?.role !== 'admin' &&
+    state.user?.verificationStatus &&
+    state.user.verificationStatus !== 'verified'
+      ? el('div.verify-banner', {
+          text: 'مدارک هنوز تأیید نشده. تا تأیید مدیر، ارسال موقعیت، محدوده امن، حالت نمایش و دکمه اضطراری قفل است.',
+        })
+      : null;
+
   render(
     root,
     el(
@@ -320,6 +337,7 @@ async function startApp() {
       el(
         'main#main.app-main',
         {},
+        verifyBanner,
         el('div.mb-4', {}, tabsContainer),
         viewContainer,
       ),
@@ -334,10 +352,13 @@ async function startApp() {
     .catch(() => {});
 
   const fromHash = window.location.hash.replace('#', '');
-  const initial = VIEWS[fromHash] ? fromHash : defaultView();
+  const allowed = new Set(visibleViews().map(([key]) => key));
+  const initial = fromHash && allowed.has(fromHash) ? fromHash : defaultView();
 
   renderTabs();
-  navigate(initial);
+  requestAnimationFrame(() => {
+    navigate(initial);
+  });
 }
 
 /* ─────────────────────── نقطه‌ی شروع ─────────────────────── */

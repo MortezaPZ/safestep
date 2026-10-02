@@ -73,6 +73,16 @@ export async function hasPermission(primaryUserId, guardianUserId, permission) {
   return rows.length > 0;
 }
 
+export async function isMainSupervisor(guardianUserId, primaryUserId) {
+  const { rows } = await db.query(
+    `SELECT 1 FROM guardianships
+      WHERE guardian_user_id = $1 AND primary_user_id = $2
+        AND status = 'active' AND is_main_supervisor = true`,
+    [guardianUserId, primaryUserId],
+  );
+  return rows.length > 0;
+}
+
 /**
  * فهرست اعضای خانواده‌ای که باید یک نوع هشدار را دریافت کنند.
  * توزیع هشدار دقیقاً از همین کوئری تغذیه می‌شود، پس فیلترِ دسترسی

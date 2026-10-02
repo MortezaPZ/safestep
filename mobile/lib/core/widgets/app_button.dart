@@ -80,14 +80,11 @@ class AppButton extends ConsumerWidget {
                   A11y.decorative(Icon(icon, size: 22)),
                   const SizedBox(width: AppSpacing.xs),
                 ],
-                Flexible(
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    // متن دکمه با بزرگ‌نمایی زیاد نباید بشکند و ناخوانا شود
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

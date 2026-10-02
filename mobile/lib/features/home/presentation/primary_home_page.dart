@@ -8,7 +8,6 @@ import '../../../core/network/socket_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/fa.dart';
-import '../../../core/widgets/animated_entrance.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
@@ -20,6 +19,8 @@ import '../../pairing/domain/pairing_models.dart';
 import '../../pairing/presentation/pairing_controller.dart';
 import '../../realtime/realtime_controller.dart';
 import '../../sos/presentation/sos_button.dart';
+import '../../../core/widgets/main_nav.dart';
+import '../../tracking/presentation/my_map_page.dart';
 import '../../tracking/presentation/tracking_card.dart';
 
 /// خانه‌ی کاربر اصلی (فرد تحت پایش).
@@ -82,8 +83,8 @@ class _PrimaryHomePageState extends ConsumerState<PrimaryHomePage> {
     return AppScaffold(
       title: AppLocalizations.of(context)?.home ?? 'وضعیت من',
       showBackButton: false,
-      scrollable: true,
-      onRefresh: () => ref.read(pairingControllerProvider.notifier).load(),
+      scrollable: false,
+      bottomBar: const MainNav(current: 'home'),
       actions: <Widget>[
         const _ConnectionDot(),
         IconButton(
@@ -93,44 +94,38 @@ class _PrimaryHomePageState extends ConsumerState<PrimaryHomePage> {
         ),
       ],
       body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const SizedBox(height: AppSpacing.md),
-
-          if (user != null)
-            AnimatedEntrance(
-              index: 0,
-              child: Text(
-                'سلام ${user.fullName.split(' ').first}',
-                style: theme.textTheme.headlineSmall,
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => ref.read(pairingControllerProvider.notifier).load(),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.md),
+                children: <Widget>[
+                  if (user != null)
+                    Text(
+                      'سلام ${user.fullName.split(' ').first}',
+                      style: theme.textTheme.headlineSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  const SizedBox(height: AppSpacing.md),
+                  const Text('موقعیت روی نقشه'),
+                  const SizedBox(height: AppSpacing.sm),
+                  const MyMapPage(embedded: true),
+                  const SizedBox(height: AppSpacing.md),
+                  const TrackingCard(),
+                  const SizedBox(height: AppSpacing.md),
+                  _WatchersCard(guardians: guardians),
+                ],
               ),
             ),
-
-          const SizedBox(height: AppSpacing.md),
-
-          /* ─────────────── ۱) ردیابی ─────────────── */
-
-          const AnimatedEntrance(index: 1, child: TrackingCard()),
-
-          const SizedBox(height: AppSpacing.md),
-
-          /* ─────────────── ۲) چه کسی مرا می‌بیند ─────────────── */
-
-          AnimatedEntrance(
-            index: 2,
-            child: _WatchersCard(guardians: guardians),
           ),
-
-          const SizedBox(height: AppSpacing.xxl),
-
-          /* ─────────────── ۳) دکمه‌ی اضطراری ─────────────── */
-
-          AnimatedEntrance(
-            index: 3,
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, AppSpacing.sm, 0, AppSpacing.sm),
             child: Center(child: SosButton(enabled: hasEmergencyContact)),
           ),
-
-          const SizedBox(height: AppSpacing.xl),
         ],
       ),
     );
@@ -253,7 +248,11 @@ class _WatchersCard extends StatelessWidget {
                       style: theme.textTheme.labelSmall,
                     ),
                   ),
-                  label: Text(link.guardianUser?.fullName ?? 'ناشناس'),
+                  label: Text(
+                    link.guardianUser?.fullName ?? 'ناشناس',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
             ],

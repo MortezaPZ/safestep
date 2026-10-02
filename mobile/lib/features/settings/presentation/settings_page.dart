@@ -1,21 +1,28 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:safestep/l10n/app_localizations.dart';
 
 import '../../../app/router.dart';
 import '../../../core/constants/app_config.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/push/push_service.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/main_nav.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/accessibility/accessibility_settings.dart';
 import '../../../core/utils/fa.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../fall/data/fall_repository.dart';
+import '../../tracking/data/location_repository.dart';
 import '../../tracking/presentation/tracking_controller.dart';
 
 /// تنظیمات.
@@ -71,7 +78,9 @@ class SettingsPage extends ConsumerWidget {
 
     return AppScaffold(
       title: 'تنظیمات',
+      showBackButton: false,
       scrollable: true,
+      bottomBar: const MainNav(current: 'settings'),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -96,9 +105,12 @@ class SettingsPage extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(user.fullName, style: theme.textTheme.titleMedium),
-                        Text(
-                          '${user.role.label} · ${Fa.digits(Fa.formatPhone(user.phone))}',
-                          style: theme.textTheme.bodySmall,
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Text(
+                            '${user.role.label} · ${user.phone}',
+                            style: theme.textTheme.bodySmall,
+                          ),
                         ),
                       ],
                     ),
@@ -148,8 +160,13 @@ class SettingsPage extends ConsumerWidget {
                   icon: Icons.notifications_active_outlined,
                   title: 'اعلان لحظه‌ای',
                   subtitle: ref.watch(pushStatusProvider).reason,
-                  enabled: false,
-                  onTap: null,
+                  onTap: () async {
+                    await ref.read(pushServiceProvider).initialize();
+                    ref.read(pushStatusProvider.notifier).state = PushStatus(
+                      available: ref.read(pushServiceProvider).available,
+                      reason: ref.read(pushServiceProvider).reason,
+                    );
+                  },
                 ),
                 const Divider(height: 1),
                 _SettingsTile(
@@ -162,9 +179,22 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsTile(
                   icon: Icons.privacy_tip_outlined,
                   title: 'حریم خصوصی و اشتراک موقعیت',
-                  subtitle: 'در گام ۵ فعال می‌شود',
-                  enabled: false,
-                  onTap: null,
+                  subtitle: 'روشن یا خاموش کردن دیدن موقعیت توسط ناظر',
+                  onTap: () async {
+                    final bool? enable = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext context) => AlertDialog(
+                        title: const Text('اشتراک موقعیت'),
+                        content: const Text('ناظر اصلی حتی پس از خاموش کردن هم می‌تواند موقعیت را ببیند.'),
+                        actions: <Widget>[
+                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('خاموش')),
+                          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('روشن')),
+                        ],
+                      ),
+                    );
+                    if (enable == null) return;
+                    await ref.read(locationRepositoryProvider).setSharing(enable);
+                  },
                 ),
                 const Divider(height: 1),
                 _SettingsTile(
@@ -209,6 +239,10 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
 
+          const SizedBox(height: AppSpacing.lg),
+          const _DocumentsCard(),
+          const SizedBox(height: AppSpacing.md),
+          const _SupportCard(),
           const SizedBox(height: AppSpacing.lg),
 
           if (user != null)
@@ -265,6 +299,192 @@ class _SettingsTile extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.xxs,
+      ),
+    );
+  }
+}
+
+class _DocumentsCard extends ConsumerStatefulWidget {
+  const _DocumentsCard();
+
+  @override
+  ConsumerState<_DocumentsCard> createState() => _DocumentsCardState();
+}
+
+class _DocumentsCardState extends ConsumerState<_DocumentsCard> {
+  final TextEditingController _condition = TextEditingController();
+  String _list = '';
+  String? _subjectUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _condition.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final ApiClient api = ref.read(apiClientProvider);
+    try {
+      final links = await api.get<Map<String, dynamic>>(
+        '/guardianships',
+        (dynamic raw) => Map<String, dynamic>.from(raw as Map),
+      );
+      final primaries = (links['primaries'] as List?) ?? const [];
+      for (final dynamic item in primaries) {
+        final map = Map<String, dynamic>.from(item as Map);
+        if (map['isMainSupervisor'] == true) {
+          _subjectUserId = map['primaryUserId'] as String?;
+          break;
+        }
+      }
+      final data = await api.get<Map<String, dynamic>>(
+        '/documents/mine',
+        (dynamic raw) => Map<String, dynamic>.from(raw as Map),
+      );
+      final docs = (data['documents'] as List?) ?? const [];
+      if (!mounted) return;
+      setState(() {
+        _list = docs.isEmpty
+            ? 'مدرکی ارسال نشده است.'
+            : docs.map((dynamic item) {
+                final map = Map<String, dynamic>.from(item as Map);
+                final status = map['status'] == 'approved'
+                    ? 'تأیید شده'
+                    : map['status'] == 'pending'
+                        ? 'در انتظار'
+                        : '${map['status']}';
+                final health = map['status'] == 'approved' ? map['healthCondition'] : null;
+                final name = map['userName'] ?? '';
+                return '$name $status${health == null ? '' : ' — مشکل: $health'}';
+              }).join('\n');
+      });
+    } catch (_) {
+      if (mounted) setState(() => _list = 'مدارک بارگذاری نشد.');
+    }
+  }
+
+  Future<void> _send() async {
+    final ByteData bytes = await rootBundle.load('assets/images/logo-hamghadam.jpg');
+    final String imageUrl =
+        'data:image/jpeg;base64,${base64Encode(bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes))}';
+    final Map<String, dynamic> body = <String, dynamic>{
+      'documentType': 'identity',
+      'imageUrl': imageUrl,
+    };
+    final String condition = _condition.text.trim();
+    if (condition.length >= 2) body['healthCondition'] = condition;
+    if (_subjectUserId != null) body['subjectUserId'] = _subjectUserId;
+    await ref.read(apiClientProvider).post<Map<String, dynamic>>(
+      '/documents',
+      (dynamic raw) => Map<String, dynamic>.from(raw as Map),
+      body: body,
+    );
+    _condition.clear();
+    await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text('ارسال مدارک', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(
+            controller: _condition,
+            decoration: const InputDecoration(hintText: 'مشکل شخص، مثلاً بیماری قلبی'),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(label: 'ارسال مدرک', onPressed: _send),
+          if (_list.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            Text(_list),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SupportCard extends ConsumerStatefulWidget {
+  const _SupportCard();
+
+  @override
+  ConsumerState<_SupportCard> createState() => _SupportCardState();
+}
+
+class _SupportCardState extends ConsumerState<_SupportCard> {
+  final TextEditingController _body = TextEditingController();
+  String _log = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _body.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await ref.read(apiClientProvider).get<Map<String, dynamic>>(
+        '/support/messages',
+        (dynamic raw) => Map<String, dynamic>.from(raw as Map),
+      );
+      final messages = (data['messages'] as List?) ?? const [];
+      if (!mounted) return;
+      setState(() {
+        _log = messages.map((dynamic item) {
+          final map = Map<String, dynamic>.from(item as Map);
+          final who = map['senderRole'] == 'admin' ? 'پشتیبانی' : 'شما';
+          return '$who: ${map['body']}';
+        }).join('\n');
+      });
+    } catch (_) {
+      if (mounted) setState(() => _log = 'پیامی بارگذاری نشد.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text('پیام به پشتیبانی', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(controller: _body, minLines: 2, maxLines: 4),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            label: 'ارسال پیام',
+            onPressed: () async {
+              final text = _body.text.trim();
+              if (text.length < 2) return;
+              await ref.read(apiClientProvider).post<Map<String, dynamic>>(
+                '/support/messages',
+                (dynamic raw) => Map<String, dynamic>.from(raw as Map),
+                body: <String, dynamic>{'body': text},
+              );
+              _body.clear();
+              await _load();
+            },
+          ),
+          if (_log.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            Text(_log),
+          ],
+        ],
       ),
     );
   }

@@ -24,6 +24,8 @@ class WatchedPerson {
     this.location,
     this.zoneStatus = 'unknown',
     this.zoneNames = const <String>[],
+    this.outsideZoneName,
+    this.outsideSince,
     this.gpsStale = false,
     this.silentSeconds = 0,
     this.isOnline = false,
@@ -45,6 +47,8 @@ class WatchedPerson {
 
   /// نام محدوده‌هایی که فرد داخلشان است
   final List<String> zoneNames;
+  final String? outsideZoneName;
+  final DateTime? outsideSince;
 
   /// آخرین موقعیت قدیمی است (سرور تشخیص قطع GPS داده)
   final bool gpsStale;
@@ -72,6 +76,23 @@ class WatchedPerson {
       }
     }
 
+    String? outsideZoneName;
+    DateTime? outsideSince;
+    final Object? zonesRaw = json['zones'];
+    if (zonesRaw is List) {
+      for (final Object? item in zonesRaw) {
+        final Map<String, dynamic>? zone = Json.mapOrNull(item);
+        if (zone == null || Json.str(zone, 'state') != 'outside') continue;
+        final String name = Json.str(zone, 'zoneName');
+        if (name.isNotEmpty && outsideZoneName == null) outsideZoneName = name;
+        final String? rawTime = Json.strOrNull(zone, 'lastTransitionAt');
+        final DateTime? time = rawTime == null ? null : DateTime.tryParse(rawTime);
+        if (time != null && (outsideSince == null || time.isBefore(outsideSince))) {
+          outsideSince = time;
+        }
+      }
+    }
+
     return WatchedPerson(
       userId: Json.str(json, 'userId'),
       person: RelatedPerson.tryFrom(userJson) ??
@@ -81,11 +102,11 @@ class WatchedPerson {
       hiddenMessage: Json.strOrNull(json, 'message'),
       location:
           locationJson == null ? null : TrackPoint.fromJson(locationJson),
-      // در پاسخ فهرست پایش، `status` یک شیء است (نه رشته مثل
-      // ‎/locations/status‎). این تفاوت در قرارداد سرور واقعی است.
       zoneStatus:
           statusJson == null ? 'unknown' : Json.str(statusJson, 'status', 'unknown'),
       zoneNames: zoneNames,
+      outsideZoneName: outsideZoneName,
+      outsideSince: outsideSince,
       gpsStale: gpsJson != null && Json.boolOf(gpsJson, 'isStale'),
       silentSeconds: gpsJson == null ? 0 : Json.intOf(gpsJson, 'silentSeconds'),
       isOnline: Json.boolOf(json, 'isOnline'),
@@ -103,6 +124,8 @@ class WatchedPerson {
       location: location ?? this.location,
       zoneStatus: zoneStatus,
       zoneNames: zoneNames,
+      outsideZoneName: outsideZoneName,
+      outsideSince: outsideSince,
       gpsStale: gpsStale,
       silentSeconds: silentSeconds,
       isOnline: isOnline ?? this.isOnline,

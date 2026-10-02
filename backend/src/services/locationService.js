@@ -35,6 +35,8 @@ import { evaluateZone, isCooldownElapsed, summarizeState, isScheduleActive } fro
 import { detectStop, shouldAlertStop, detectGpsLost } from './stopDetector.js';
 import { raiseAlert } from './alertService.js';
 import telemetryService from './telemetryService.js';
+import logRepository from '../repositories/logRepository.js';
+import { haversineMeters } from '../utils/geo.js';
 import hub from '../realtime/hub.js';
 import logger from '../utils/logger.js';
 import { forbidden, notFound } from '../utils/errors.js';
@@ -80,14 +82,28 @@ function gapSecondsFor(userId, recordedAt) {
 
 /**
  * ثبت سنجه‌های یک پینگ.
- * از موقعیت فقط دقت نگه داشته می‌شود؛ مختصات وارد جدول سنجش نمی‌شود.
+ * accuracy_m دقت اعلامی GPS است.
+ * error_m فاصلهٔ نقطهٔ مرجع واقعی تا مختصات ثبت‌شده است (تعریف پروپوزال).
  */
-function recordPingTelemetry(userId, ping, { processMs, batchSize }) {
+async function recordPingTelemetry(userId, ping, { processMs, batchSize }) {
   const recordedMs = new Date(ping.recordedAt).getTime();
   const receivedMs = ping.receivedAt ? new Date(ping.receivedAt).getTime() : Date.now();
 
-  // ساعت گوشی ممکن است جلوتر از سرور باشد؛ تأخیر منفی بی‌معناست و صفر می‌شود
   const e2eLatencyMs = Math.max(0, Math.round(receivedMs - recordedMs));
+
+  let referenceLat = null;
+  let referenceLng = null;
+  let errorM = null;
+  try {
+    const reference = await logRepository.getLocationReference(userId);
+    if (reference && ping.lat != null && ping.lng != null) {
+      referenceLat = reference.lat;
+      referenceLng = reference.lng;
+      errorM = Math.round(haversineMeters(reference.lat, reference.lng, ping.lat, ping.lng) * 10) / 10;
+    }
+  } catch {
+    // نبودن جدول در دیتابیس قدیمی نباید ثبت موقعیت را متوقف کند
+  }
 
   telemetryService.recordLocation({
     userId,
@@ -101,6 +117,9 @@ function recordPingTelemetry(userId, ping, { processMs, batchSize }) {
     batchSize,
     isQueuedReplay: ping.isQueuedReplay,
     gapSec: gapSecondsFor(userId, ping.recordedAt),
+    referenceLat,
+    referenceLng,
+    errorM,
   });
 }
 
@@ -172,7 +191,7 @@ export async function ingestPing(userId, data) {
     }
   }
 
-  recordPingTelemetry(userId, ping, {
+  await recordPingTelemetry(userId, ping, {
     processMs: Math.max(1, Math.round(Number(process.hrtime.bigint() - startedAt) / 1e6)),
     batchSize: data.batchSize ?? 1,
   });
@@ -213,7 +232,7 @@ export async function ingestBatch(userId, { pings }) {
   // آخرین پینگ در اینجا ثبت نمی‌شود؛ چند خط پایین‌تر از مسیر کاملِ ingestPing
   // عبور می‌کند و سنجه‌اش همان‌جا — همراه با زمان پردازش واقعی — ثبت می‌شود.
   for (const ping of inserted.slice(0, -1)) {
-    recordPingTelemetry(userId, ping, { processMs: null, batchSize: pings.length });
+    await recordPingTelemetry(userId, ping, { processMs: null, batchSize: pings.length });
   }
 
   // هیچ پینگ تازه‌ای درج نشد (همه تکراری بودند) — پاسخ موفق است تا کلاینت
@@ -274,6 +293,15 @@ async function evaluateGeofences(userId, ping, { allowAlerts }) {
     return { summary: summarizeState([]), states: [], alerts: [] };
   }
 
+  /**
+   * مرجعِ زمانِ این ارزیابی: زمان ثبتِ خودِ پینگ، نه زمان رسیدنش به سرور.
+   * برای پینگ زنده این دو یکی است، ولی برای بازپخشِ صف آفلاین پینگ ممکن است
+   * دقایق پیش ثبت شده باشد. ماندگاریِ واقعی باید از لحظه‌ای شمارش شود که
+   * کاربر واقعاً بیرون از محدوده قرار گرفته، نه از لحظه‌ای که اینترنتش
+   * برگشته و سرور پینگ را دیده.
+   */
+  const at = ping.recordedAt ? new Date(ping.recordedAt) : new Date();
+
   const previousStates = await safeZoneRepository.listStatesForUser(userId);
   const stateByZone = new Map(previousStates.map((s) => [s.zoneId, s]));
 
@@ -283,12 +311,12 @@ async function evaluateGeofences(userId, ping, { allowAlerts }) {
   for (const zone of zones) {
     const previous = stateByZone.get(zone.id) ?? null;
     const result = evaluateZone({ lat: ping.lat, lng: ping.lng }, zone, previous, geofenceConfig);
-    const scheduleOn = isScheduleActive(zone.schedule, new Date());
+    const scheduleOn = isScheduleActive(zone.schedule, at);
     const enterOk = zone.alertOnEnter !== false;
     const exitOk = zone.alertOnExit !== false;
 
     const reportable = (result.event === 'exit' && exitOk) || (result.event === 'enter' && enterOk);
-    const cooldownOk = isCooldownElapsed(previous?.lastAlertAt, geofenceConfig);
+    const cooldownOk = isCooldownElapsed(previous?.lastAlertAt, geofenceConfig, at.getTime());
     const willAlert = Boolean(allowAlerts && scheduleOn && reportable && cooldownOk);
 
     let dwellAlerted = false;
@@ -301,7 +329,7 @@ async function evaluateGeofences(userId, ping, { allowAlerts }) {
       const since = previous?.lastTransitionAt ? new Date(previous.lastTransitionAt).getTime() : null;
       const dwellMs = zone.dwellAlertMinutes * 60 * 1000;
       const lastDwell = previous?.lastDwellAlertAt ? new Date(previous.lastDwellAlertAt).getTime() : 0;
-      if (since && Date.now() - since >= dwellMs && lastDwell < since) {
+      if (since && at.getTime() - since >= dwellMs && lastDwell < since) {
         dwellAlerted = true;
       }
     }
@@ -316,6 +344,7 @@ async function evaluateGeofences(userId, ping, { allowAlerts }) {
       transitioned: result.transitioned,
       alerted: willAlert,
       dwellAlerted,
+      evaluatedAt: at,
     });
 
     states.push({
@@ -457,14 +486,17 @@ export async function getCurrentLocation(viewerId, subjectId) {
   const access = await assertCanViewLocation(viewerId, subjectId);
 
   if (!access.sharingEnabled) {
-    return {
-      userId: subjectId,
-      hidden: true,
-      reason: 'sharing_disabled',
-      message: 'کاربر اشتراک‌گذاری موقعیت را موقتاً خاموش کرده است.',
-      location: null,
-      status: null,
-    };
+    const override = await guardianshipRepository.isMainSupervisor(viewerId, subjectId);
+    if (!override) {
+      return {
+        userId: subjectId,
+        hidden: true,
+        reason: 'sharing_disabled',
+        message: 'کاربر اشتراک‌گذاری موقعیت را موقتاً خاموش کرده است.',
+        location: null,
+        status: null,
+      };
+    }
   }
 
   const [ping, zoneStates] = await Promise.all([
@@ -508,8 +540,11 @@ export async function getWatchList(viewerId) {
 export async function getHistory(viewerId, subjectId, { from, to, limit }) {
   const access = await assertCanViewLocation(viewerId, subjectId);
 
-  if (!access.sharingEnabled) {
-    return { hidden: true, reason: 'sharing_disabled', points: [], stats: null };
+  if (!access.sharingEnabled && !access.isSelf) {
+    const main = await guardianshipRepository.isMainSupervisor(viewerId, subjectId);
+    if (!main) {
+      return { hidden: true, reason: 'sharing_disabled', points: [], stats: null };
+    }
   }
 
   const [points, stats] = await Promise.all([

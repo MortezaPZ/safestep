@@ -56,6 +56,20 @@ const USERS = {
     role: 'admin',
     avatarColor: '#455A64',
   },
+  unverified: {
+    phone: '09121110008',
+    fullName: 'ناظر تأییدنشده',
+    role: 'guardian',
+    avatarColor: '#C62828',
+    verificationStatus: 'unverified',
+  },
+  unverifiedPrimary: {
+    phone: '09121110007',
+    fullName: 'کاربر تأییدنشده',
+    role: 'primary',
+    avatarColor: '#EF6C00',
+    verificationStatus: 'unverified',
+  },
 };
 
 const SAFE_ZONES = [
@@ -164,9 +178,16 @@ async function createUsers() {
 
   for (const [key, user] of Object.entries(USERS)) {
     const { rows } = await db.query(
-      `INSERT INTO users (phone, password_hash, full_name, role, avatar_color)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id, full_name, phone, role`,
-      [user.phone, passwordHash, user.fullName, user.role, user.avatarColor],
+      `INSERT INTO users (phone, password_hash, full_name, role, avatar_color, verification_status)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, phone, role`,
+      [
+        user.phone,
+        passwordHash,
+        user.fullName,
+        user.role,
+        user.avatarColor,
+        user.verificationStatus ?? 'verified',
+      ],
     );
     created[key] = rows[0];
 
@@ -186,8 +207,8 @@ async function createUsers() {
 async function createGuardianships(users) {
   // پسر: دسترسی کامل شامل اضطراری
   await db.query(
-    `INSERT INTO guardianships (primary_user_id, guardian_user_id, permissions, nickname)
-     VALUES ($1, $2, $3, $4)`,
+    `INSERT INTO guardianships (primary_user_id, guardian_user_id, permissions, nickname, is_main_supervisor)
+     VALUES ($1, $2, $3, $4, true)`,
     [
       users.primary.id,
       users.son.id,
@@ -478,6 +499,8 @@ if (isDirectRun) {
       `  │  ناظر           ${USERS.son.phone}   ${USERS.son.fullName} (دسترسی کامل + اضطراری)`,
       `  │  ناظر           ${USERS.daughter.phone}   ${USERS.daughter.fullName} (بدون دسترسی اضطراری)`,
       `  │  مدیر سامانه   ${USERS.admin.phone}   ${USERS.admin.fullName}`,
+      `  │  تأییدنشده     ${USERS.unverified.phone}   ${USERS.unverified.fullName} (دسترسی مراقبتی قفل)`,
+      `  │  کاربر تأییدنشده ${USERS.unverifiedPrimary.phone}   ${USERS.unverifiedPrimary.fullName} (ارسال مدرک)`,
       '  │',
       `  │  رمز عبور همه: ${env.seedPassword}`,
       '  └────────────────────────────────────────────────────────────┘',

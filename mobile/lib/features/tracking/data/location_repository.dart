@@ -18,6 +18,8 @@ class OwnStatus {
     this.statusReason,
     this.gpsStale = false,
     this.isSimulated = false,
+    this.lat,
+    this.lng,
   });
 
   final bool sharingEnabled;
@@ -36,6 +38,8 @@ class OwnStatus {
   final bool gpsStale;
 
   final bool isSimulated;
+  final double? lat;
+  final double? lng;
 
   factory OwnStatus.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic>? sharing = Json.mapOrNull(json['sharing']);
@@ -61,6 +65,8 @@ class OwnStatus {
       statusReason: Json.strOrNull(json, 'statusReason'),
       gpsStale: gps == null ? false : Json.boolOf(gps, 'isStale'),
       isSimulated: ping == null ? false : Json.boolOf(ping, 'isSimulated'),
+      lat: ping == null ? null : Json.dblOrNull(ping, 'lat'),
+      lng: ping == null ? null : Json.dblOrNull(ping, 'lng'),
     );
   }
 }

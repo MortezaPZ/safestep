@@ -284,3 +284,15 @@ export function signedDistanceToZoneM(point, zone) {
   const d = haversineDistance(point.lat, point.lng, zone.centerLat, zone.centerLng);
   return d - zone.radiusM;
 }
+
+/** نام مورد استفاده در سنجش دقت پروپوزال. */
+export const haversineMeters = haversineDistance;
+
+export const POSITION_ERROR_MAX_REPORTED_ACCURACY_M = 30;
+
+export function isValidPositionSample({ errorM, accuracyM, isQueuedReplay }) {
+  if (errorM == null || Number.isNaN(Number(errorM))) return false;
+  if (isQueuedReplay) return false;
+  if (accuracyM != null && Number(accuracyM) > POSITION_ERROR_MAX_REPORTED_ACCURACY_M) return false;
+  return true;
+}

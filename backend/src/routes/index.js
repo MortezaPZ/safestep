@@ -19,10 +19,11 @@ import {
   device,
   simulator,
   falls,
+  evaluation,
 } from '../controllers/index.js';
 
 import * as admin from '../controllers/adminController.js';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, requireVerified } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validate.js';
 import { authLimiter, sosLimiter, inviteLimiter, generalLimiter, fallLimiter } from '../middleware/rateLimit.js';
 import env from '../config/env.js';
@@ -165,6 +166,7 @@ router.delete(
 router.post(
   '/locations/ping',
   requireAuth,
+  requireVerified,
   generalLimiter,
   validate({
     body: z.object({
@@ -194,6 +196,7 @@ router.post(
 router.post(
   '/locations/batch',
   requireAuth,
+  requireVerified,
   generalLimiter,
   validate({
     body: z.object({
@@ -299,6 +302,7 @@ const safeZoneBody = {
   dwellAlertMinutes: z.number().int().min(1).max(1440).optional().nullable(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'کد رنگ معتبر نیست.').optional(),
   icon: z.string().max(32).optional(),
+  subjectUserId: schemas.uuid.optional(),
 };
 
 const safeZoneCreate = z.object(safeZoneBody).superRefine((val, ctx) => {
@@ -316,6 +320,7 @@ router.get('/safe-zones', requireAuth, safeZone.list);
 router.post(
   '/safe-zones',
   requireAuth,
+  requireVerified,
   validate({ body: safeZoneCreate }),
   safeZone.create,
 );
@@ -413,6 +418,7 @@ router.post(
 router.post(
   '/sos',
   requireAuth,
+  requireVerified,
   sosLimiter,
   validate({
     body: z.object({
@@ -513,6 +519,7 @@ router.get('/simulator/routes', requireAuth, simulator.routes);
 router.post(
   '/simulator/start',
   requireAuth,
+  requireVerified,
   validate({
     body: z.object({
       routeId: z.string().min(1, 'مسیر را انتخاب کنید.'),
@@ -522,6 +529,35 @@ router.post(
   }),
   simulator.start,
 );
+
+router.post(
+  '/evaluation/reference',
+  requireAuth,
+  validate({
+    body: z.object({
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+      label: z.string().max(120).optional(),
+    }),
+  }),
+  evaluation.reference,
+);
+
+router.get('/evaluation/reference', requireAuth, evaluation.currentReference);
+router.get('/evaluation/sus', requireAuth, evaluation.susForm);
+
+router.post(
+  '/evaluation/sus',
+  requireAuth,
+  validate({
+    body: z.object({
+      answers: z.array(z.number().int().min(1).max(5)).length(10),
+    }),
+  }),
+  evaluation.submitSus,
+);
+
+router.get('/evaluation/summary', requireAuth, requireAdmin, evaluation.summary);
 
 router.post('/simulator/stop', requireAuth, simulator.stop);
 router.get('/simulator/status', requireAuth, simulator.status);
@@ -533,6 +569,7 @@ router.post('/simulator/fall', requireAuth, simulator.fall);
 router.post(
   '/falls/detect',
   requireAuth,
+  requireVerified,
   fallLimiter,
   validate({
     body: z.object({
@@ -590,14 +627,17 @@ router.get(
 
 /* ═══════════════════════ پنل مدیریت (فقط ادمین) ═══════════════════════ */
 
+router.get('/documents/mine', requireAuth, admin.myIdentityDocuments);
+
 router.post(
   '/documents',
   requireAuth,
   validate({
     body: z.object({
       documentType: z.string().trim().min(1).max(40),
-      // کلاینت می‌تواند URL امن فایل یا data URL تصویر را ارسال کند.
       imageUrl: z.string().trim().min(1).max(8_000_000),
+      healthCondition: z.string().trim().min(2).max(80).optional(),
+      subjectUserId: schemas.uuid.optional(),
     }),
   }),
   admin.submitIdentityDocument,
@@ -618,6 +658,9 @@ const adminPaging = {
 };
 
 router.get('/admin/overview', requireAuth, requireAdmin, admin.overview);
+router.get('/admin/families', requireAuth, requireAdmin, admin.families);
+router.get('/admin/alerts', requireAuth, requireAdmin, admin.adminAlerts);
+router.get('/admin/falls', requireAuth, requireAdmin, admin.adminFalls);
 
 router.get(
   '/admin/documents',
@@ -625,7 +668,7 @@ router.get(
   requireAdmin,
   validate({
     query: z.object({
-      status: z.enum(['pending', 'approved', 'rejected']).default('pending'),
+      status: z.enum(['pending', 'approved', 'rejected', 'all']).default('pending'),
       limit: schemas.numericQuery(1, 200, 50),
       offset: schemas.numericQuery(0, 100000, 0),
     }),
@@ -637,8 +680,32 @@ router.post(
   '/admin/documents/:id/approve',
   requireAuth,
   requireAdmin,
-  validate({ params: z.object({ id: schemas.uuid }) }),
+  validate({
+    params: z.object({ id: schemas.uuid }),
+    body: z.object({
+      healthCondition: z.string().trim().min(2).max(80).optional(),
+    }).optional(),
+  }),
   admin.approveIdentityDocument,
+);
+
+router.get('/support/messages', requireAuth, admin.mySupport);
+router.post(
+  '/support/messages',
+  requireAuth,
+  validate({ body: z.object({ body: z.string().trim().min(2).max(2000) }) }),
+  admin.postSupport,
+);
+router.get('/admin/support', requireAuth, requireAdmin, admin.supportInbox);
+router.post(
+  '/admin/support/:userId/reply',
+  requireAuth,
+  requireAdmin,
+  validate({
+    params: z.object({ userId: schemas.uuid }),
+    body: z.object({ body: z.string().trim().min(2).max(2000) }),
+  }),
+  admin.supportReply,
 );
 
 router.post(

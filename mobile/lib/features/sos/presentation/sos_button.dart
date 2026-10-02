@@ -255,9 +255,18 @@ class _SosButtonState extends ConsumerState<SosButton>
           ),
         ),
 
-        const SizedBox(height: AppSpacing.md),
-
-        // کاربر باید **قبل از** اضطرار بداند هشدارش به چه کسی می‌رسد
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          widget.enabled ? 'برای ارسال، دکمه را نگه دارید' : 'دکمه غیرفعال است',
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: widget.enabled ? AppColors.dangerDark : null,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
         _ContactsHint(contacts: state.contacts, enabled: widget.enabled),
       ],
     );
@@ -353,25 +362,16 @@ class _IdleCircle extends StatelessWidget {
               color: enabled ? AppColors.dangerLight : Colors.transparent,
               border: Border.all(color: base, width: pressing ? 6 : 3),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Icon(Icons.sos_rounded, size: 64, color: base),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'درخواست کمک',
-                  style: TextStyle(
-                    color: enabled ? AppColors.dangerDark : base,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
+            child: Center(
+              child: Text(
+                'SOS',
+                style: TextStyle(
+                  color: enabled ? AppColors.dangerDark : base,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 28,
+                  letterSpacing: 0.5,
                 ),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  enabled ? 'نگه دارید' : 'غیرفعال',
-                  style: TextStyle(color: base, fontSize: 12),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -400,17 +400,18 @@ class _CountdownCircle extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Text(
+                Text(
                 Fa.digits(remaining.toString()),
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 72,
+                  fontSize: 36,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const Text(
-                'در حال ارسال…',
-                style: TextStyle(color: Colors.white, fontSize: 14),
+                'لغو در پایین',
+                maxLines: 1,
+                style: TextStyle(color: Colors.white, fontSize: 11),
               ),
             ],
           ),
@@ -504,6 +505,8 @@ class _ContactsHint extends StatelessWidget {
       'در صورت فشردن، به ${contacts.join('، ')} اطلاع داده می‌شود.',
       style: theme.textTheme.bodySmall,
       textAlign: TextAlign.center,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

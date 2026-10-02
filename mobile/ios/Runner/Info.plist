@@ -53,6 +53,33 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<!-- موقعیت: Geolocator برای درخواست اجازه از این توضیح‌ها استفاده میکند. -->
+	<!-- بدون این دو کلید، اپ آیاواس اجازهی مکان نمیگیرد و ردیابی کار نمیکند. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>برای نمایش موقعیت شما روی نقشه و پایش ایمنی، موقعیت مکانی شما را در حین استفاده از برنامه ثبت میکنیم.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>برای فعال ماندن اشتراک موقعیت و هشدارهای ایمنی در پسزمینه (مانند هشدار خروج از محدوده ایمن و تشخیص سقوط)، موقعیت شما را بهطور پیوسته ثبت میکنیم.</string>
+	<!-- نتایج سنجش سنسورها برای تشخیص سقوط. -->
+	<key>NSMotionUsageDescription</key>
+	<string>شتابسنج و ژیروسکوپ برای تشخیص سقوط در هنگام پایش ایمنی خوانده میشوند.</string>
+	<!-- وبسایت کالربک نشست (ورود از مسیر وبسایت). -->
+	<!-- LSApplicationQueriesSchemes: url_launcher برای بررسی/باز کردن لینک‌ها
+	     و شماره‌گیری مستقیم از صفحهٔ هشدار، نیاز به اعلام این schemeها دارد. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>tel</string>
+	</array>
+	<!-- پسزمینه: ارسال موقعیت زنده و دریافت نوتیفیکیشن هشدار. -->
+	<!-- UIBackgroundModes این قابلیتها را در آیاواس فعال میکند. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
+	<key>UIRequiresPersistentWiFi</key>
+	<false/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

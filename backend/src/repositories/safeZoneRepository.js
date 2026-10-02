@@ -139,25 +139,36 @@ export async function upsertZoneState({
   transitioned,
   alerted,
   dwellAlerted = false,
+  /**
+   * مهر زمانیِ پینگی که این ارزیابی بر اساس آن انجام شده.
+   * پیش‌فرض now() است، ولی باید recordedAt خودِ پینگ باشد تا گذار و
+   * ماندگاری با زمان واقعیِ حضور کاربر در مکان محاسبه شوند — نه با
+   * زمان رسیدن پینگ به سرور. برای بازپخشِ صف آفلاین این تفاوت
+   * دقیقاً همان چیزی است که ماندگاریِ واقعی را از یک هشدارِ زودهنگام
+   * جدا می‌کند.
+   */
+  evaluatedAt = null,
 }) {
+  const stamp = evaluatedAt ? new Date(evaluatedAt) : new Date();
+  const stampIso = stamp.toISOString();
   const { rows } = await db.query(
     `INSERT INTO zone_states
        (user_id, zone_id, state, consecutive_count, pending_state, last_distance_m,
         last_transition_at, last_alert_at, last_evaluated_at, last_dwell_alert_at)
      VALUES ($1, $2, $3, $4, $5, $6,
-             CASE WHEN $7::boolean THEN now() ELSE NULL END,
-             CASE WHEN $8::boolean THEN now() ELSE NULL END,
-             now(),
-             CASE WHEN $9::boolean THEN now() ELSE NULL END)
+             CASE WHEN $7::boolean THEN $10::timestamptz ELSE NULL END,
+             CASE WHEN $8::boolean THEN $10::timestamptz ELSE NULL END,
+             $10::timestamptz,
+             CASE WHEN $9::boolean THEN $10::timestamptz ELSE NULL END)
      ON CONFLICT (user_id, zone_id) DO UPDATE SET
        state              = EXCLUDED.state,
        consecutive_count  = EXCLUDED.consecutive_count,
        pending_state      = EXCLUDED.pending_state,
        last_distance_m    = EXCLUDED.last_distance_m,
-       last_transition_at = CASE WHEN $7::boolean THEN now() ELSE zone_states.last_transition_at END,
-       last_alert_at      = CASE WHEN $8::boolean THEN now() ELSE zone_states.last_alert_at END,
-       last_evaluated_at  = now(),
-       last_dwell_alert_at = CASE WHEN $9::boolean THEN now() ELSE zone_states.last_dwell_alert_at END
+       last_transition_at = CASE WHEN $7::boolean THEN EXCLUDED.last_transition_at ELSE zone_states.last_transition_at END,
+       last_alert_at      = CASE WHEN $8::boolean THEN EXCLUDED.last_alert_at ELSE zone_states.last_alert_at END,
+       last_evaluated_at  = EXCLUDED.last_evaluated_at,
+       last_dwell_alert_at = CASE WHEN $9::boolean THEN EXCLUDED.last_dwell_alert_at ELSE zone_states.last_dwell_alert_at END
      RETURNING *`,
     [
       userId,
@@ -169,6 +180,7 @@ export async function upsertZoneState({
       Boolean(transitioned),
       Boolean(alerted),
       Boolean(dwellAlerted),
+      stampIso,
     ],
   );
   return mapZoneState(rows[0]);

@@ -10,7 +10,13 @@ import { faNumber } from '../format.js';
 
 const TABS = [
   { id: 'overview', label: 'نمای کلی' },
-  { id: 'documents', label: 'مدارک ارسالی' },
+  { id: 'support', label: 'پیام پشتیبانی' },
+  { id: 'documents', label: 'کل مدارک' },
+  { id: 'pending', label: 'مدارک در انتظار' },
+  { id: 'approved', label: 'مدارک تأییدشده' },
+  { id: 'families', label: 'خانواده‌ها' },
+  { id: 'alerts', label: 'هشدارها' },
+  { id: 'falls', label: 'تشخیص سقوط' },
   { id: 'users', label: 'کاربران' },
   { id: 'devices', label: 'دستگاه‌ها' },
   { id: 'requests', label: 'لاگ درخواست‌ها' },
@@ -99,7 +105,13 @@ export function mountAdmin(container) {
     showLoading();
     try {
       if (tab === 'overview') await loadOverview();
-      else if (tab === 'documents') await loadDocuments();
+      else if (tab === 'support') await loadSupport();
+      else if (tab === 'documents') await loadDocuments('all');
+      else if (tab === 'pending') await loadDocuments('pending');
+      else if (tab === 'approved') await loadDocuments('approved');
+      else if (tab === 'families') await loadFamilies();
+      else if (tab === 'alerts') await loadAdminAlerts();
+      else if (tab === 'falls') await loadFalls();
       else if (tab === 'users') await loadUsers();
       else if (tab === 'devices') await loadDevices();
       else if (tab === 'requests') await loadRequests();
@@ -137,8 +149,72 @@ export function mountAdmin(container) {
     ));
   }
 
-  async function loadDocuments() {
-    const page = await api.adminDocuments({ status: 'pending', limit: 50 });
+  async function loadSupport() {
+    const data = await api.adminSupport();
+    const threads = data.threads ?? [];
+    paint(el('div.card', {}, el('div.card__body', {},
+      el('h2.card__title.mb-4', { text: 'پیام‌های پشتیبانی' }),
+      threads.length === 0
+        ? emptyState({ title: 'پیامی نیست', text: 'هنوز کسی به پشتیبانی پیام نداده است.' })
+        : el('div', {}, ...threads.map((thread) => el('div.card.mb-3', {}, el('div.card__body', {},
+          el('strong', { text: `${thread.fullName} — ${thread.phone}` }),
+          el('p.muted', { text: `${thread.messageCount} پیام` }),
+          el('button.btn.btn--secondary.btn--sm', {
+            type: 'button',
+            text: 'پاسخ',
+            onClick: async () => {
+              const text = window.prompt('پاسخ پشتیبانی');
+              if (!text) return;
+              await api.adminSupportReply(thread.userId, text);
+              toast('پاسخ ثبت شد');
+              load();
+            },
+          }),
+        )))),
+    )));
+  }
+
+  async function loadFamilies() {
+    const data = await api.adminFamilies();
+    const families = data.families ?? [];
+    paint(el('div', {}, ...families.map((family) => el('div.card.mb-3', {}, el('div.card__body', {},
+      el('h2.card__title', { text: family.primaryName }),
+      el('p', { text: `وضعیت مدرک: ${family.verificationStatus ?? '—'}` }),
+      family.healthCondition ? el('p', { text: `مشکل: ${family.healthCondition}` }) : null,
+      el('p.muted', { text: family.guardians.map((g) => g.fullName).join('، ') || 'ناظری ثبت نشده' }),
+    )))));
+  }
+
+  async function loadAdminAlerts() {
+    const data = await api.adminAlerts();
+    const alerts = data.alerts ?? [];
+    const groups = new Map();
+    for (const item of alerts) {
+      const key = item.subjectName ?? 'خانواده';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(item);
+    }
+    paint(el('div', {}, ...[...groups.entries()].map(([name, items]) => el('div.card.mb-3', {}, el('div.card__body', {},
+      el('h2.card__title', { text: name }),
+      ...items.map((item) => el('p', { text: `${item.title} — ${item.body}` })),
+    )))));
+  }
+
+  async function loadFalls() {
+    const data = await api.adminFalls();
+    const falls = data.falls ?? [];
+    paint(el('div.card', {}, el('div.card__body', {},
+      el('h2.card__title.mb-4', { text: 'گزارش تشخیص سقوط' }),
+      falls.length === 0
+        ? emptyState({ title: 'گزارشی نیست', text: 'وقتی سقوطی تشخیص داده شود، اینجا بدون مختصات دیده می‌شود.' })
+        : el('div', {}, ...falls.map((item) => el('p', {
+          text: `${item.subjectName}: ${item.title}`,
+        }))),
+    )));
+  }
+
+  async function loadDocuments(status = 'pending') {
+    const page = await api.adminDocuments({ status, limit: 50 });
     const documents = page.documents ?? page.items ?? [];
     paint(el('div.card', {},
       el('div.card__body', {},

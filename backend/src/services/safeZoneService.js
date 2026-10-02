@@ -16,7 +16,8 @@ import {
 } from '../utils/geo.js';
 import { thresholdsFor, effectiveHysteresisForZone, isScheduleActive } from './geofenceEngine.js';
 import env from '../config/env.js';
-import { badRequest, notFound } from '../utils/errors.js';
+import { badRequest, notFound, forbidden } from '../utils/errors.js';
+import * as guardianshipRepository from '../repositories/guardianshipRepository.js';
 import logger from '../utils/logger.js';
 
 const log = logger.child({ module: 'safe-zone' });
@@ -156,9 +157,17 @@ export async function create(userId, data) {
   return decorate(zone, current);
 }
 
+async function editableOwnerId(actorId, zone) {
+  if (!zone) throw notFound('محدوده‌ی امن یافت نشد.');
+  if (zone.userId === actorId) return zone.userId;
+  const main = await guardianshipRepository.isMainSupervisor(actorId, zone.userId);
+  if (!main) throw forbidden('فقط ناظر اصلی می‌تواند این محدوده را تغییر دهد.');
+  return zone.userId;
+}
+
 export async function update(zoneId, userId, patch) {
   const existing = await safeZoneRepository.findById(zoneId);
-  if (!existing || existing.userId !== userId) throw notFound('محدوده‌ی امن یافت نشد.');
+  userId = await editableOwnerId(userId, existing);
 
   let geom = {};
   if (patch.shape || patch.polygon || patch.centerLat !== undefined || patch.radiusM !== undefined) {
@@ -189,6 +198,8 @@ export async function update(zoneId, userId, patch) {
 }
 
 export async function remove(zoneId, userId) {
+  const existing = await safeZoneRepository.findById(zoneId);
+  userId = await editableOwnerId(userId, existing);
   const removed = await safeZoneRepository.remove(zoneId, userId);
   if (!removed) throw notFound('محدوده‌ی امن یافت نشد.');
   return { ok: true };

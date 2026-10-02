@@ -122,12 +122,12 @@ export function mountSettings(container, ctx) {
         }),
 
         ...CONFIGURABLE_ALERTS.map((type) => {
-          const meta = ALERT_LABELS[type];
+          const meta = ALERT_LABELS[type] ?? { label: type, icon: '🔔' };
           return switchRow({
             title: `${meta.icon} ${meta.label}`,
-            checked: settings.alertTypes.includes(type),
+            checked: (settings.alertTypes ?? []).includes(type),
             onChange: (enabled) => {
-              const next = new Set(settings.alertTypes);
+              const next = new Set(settings.alertTypes ?? []);
               if (enabled) next.add(type);
               else next.delete(type);
               patch({ alertTypes: [...next] });

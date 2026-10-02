@@ -17,7 +17,10 @@
     "test:watch": "vitest",
     "create:admin": "node src/db/createAdmin.js",
     "train:fall": "node scripts/falls/train.js",
-    "loadtest": "node scripts/loadtest.js"
+    "train:fall:real": "node scripts/falls/train_real.js",
+    "train:fall:sisfall": "node scripts/falls/train_sisfall.js",
+    "loadtest": "node scripts/loadtest.js",
+    "loadtest:postgres": "node scripts/loadtest-postgres.js"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.17",
@@ -36,9 +39,9 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "autocannon": "^8.0.0",
     "socket.io-client": "^4.8.1",
     "supertest": "^7.0.0",
-    "vitest": "^2.1.8",
-    "autocannon": "^8.0.0"
+    "vitest": "^2.1.8"
   }
 }

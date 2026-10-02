@@ -47,26 +47,21 @@ class AppCard extends StatelessWidget {
 
     Widget content = Padding(padding: padding, child: child);
 
-    if (accentColor != null) {
-      content = Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          // در RTL، این نوار به‌طور خودکار سمت راست قرار می‌گیرد
-          A11y.decorative(
-            Container(width: 5, color: accentColor),
-          ),
-          Expanded(child: content),
-        ],
-      );
-    }
-
     Widget card = AnimatedContainer(
       duration: AppMotion.of(context, AppMotion.fast),
       curve: AppMotion.curve,
       decoration: BoxDecoration(
         color: backgroundColor ?? theme.colorScheme.surface,
         borderRadius: radius,
-        border: Border.all(color: surface.border, width: surface.borderWidth),
+        border: BorderDirectional(
+          top: BorderSide(color: surface.border, width: surface.borderWidth),
+          bottom: BorderSide(color: surface.border, width: surface.borderWidth),
+          end: BorderSide(color: surface.border, width: surface.borderWidth),
+          start: BorderSide(
+            color: accentColor ?? surface.border,
+            width: accentColor == null ? surface.borderWidth : 5,
+          ),
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: onTap == null

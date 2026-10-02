@@ -26,7 +26,7 @@ import auditService from './auditService.js';
 import * as fallEventRepository from '../repositories/fallEventRepository.js';
 import { loadModel } from './fallDetection/classifier.js';
 import { invalidateAccountState } from '../middleware/auth.js';
-import { badRequest, notFound, conflict } from '../utils/errors.js';
+import { badRequest, notFound, conflict, forbidden } from '../utils/errors.js';
 import logger from '../utils/logger.js';
 
 const log = logger.child({ module: 'admin' });
@@ -72,14 +72,68 @@ export async function listIdentityDocuments(filters = {}) {
   return { documents: await adminRepository.listIdentityDocuments(filters) };
 }
 
-export async function submitIdentityDocument(userId, documentType, imageUrl) {
-  return { document: await adminRepository.createIdentityDocument(userId, documentType, imageUrl) };
+export async function myIdentityDocuments(userId) {
+  return { documents: await adminRepository.listIdentityDocumentsForUser(userId) };
+}
+
+export async function submitIdentityDocument(userId, documentType, imageUrl, healthCondition = null) {
+  const document = await adminRepository.createIdentityDocument(userId, documentType, imageUrl);
+  if (healthCondition) await adminRepository.setHealthCondition(userId, healthCondition);
+  await adminRepository.setVerificationStatus(userId, 'pending');
+  invalidateAccountState(userId);
+  return { document, verificationStatus: 'pending' };
+}
+
+export async function submitIdentityDocumentForPrimary(actor, primaryUserId, documentType, imageUrl, healthCondition = null) {
+  const allowed = await adminRepository.isMainSupervisor(actor.id, primaryUserId);
+  if (!allowed) {
+    throw forbidden('فقط ناظر اصلی می‌تواند مدرک کاربر تحت مراقبت را بفرستد.');
+  }
+  return submitIdentityDocument(primaryUserId, documentType, imageUrl, healthCondition);
 }
 
 export async function reviewIdentityDocument(id, status, actor, reason = null) {
   const document = await adminRepository.reviewIdentityDocument(id, status, actor.id, reason);
   if (!document) throw notFound('مدرک یافت نشد.');
-  return { document };
+  const next = status === 'approved' ? 'verified' : 'rejected';
+  await adminRepository.setVerificationStatus(document.userId, next);
+  if (status === 'approved' && actor.healthCondition) {
+    await adminRepository.setHealthCondition(document.userId, actor.healthCondition);
+  }
+  invalidateAccountState(document.userId);
+  return { document, verificationStatus: next };
+}
+
+export async function listFamilies() {
+  return { families: await adminRepository.listFamilies() };
+}
+
+export async function listAdminAlerts() {
+  return { alerts: await adminRepository.listAlertsWithoutLocation() };
+}
+
+export async function listAdminFalls() {
+  return { falls: await fallEventRepository.listRecentForAdmin() };
+}
+
+export async function postSupportMessage(userId, body) {
+  const text = String(body ?? '').trim();
+  if (text.length < 2) throw badRequest('متن پیام را بنویسید.');
+  return { message: await adminRepository.addSupportMessage(userId, 'user', text) };
+}
+
+export async function listMySupport(userId) {
+  return { messages: await adminRepository.listSupportMessages(userId) };
+}
+
+export async function listSupportInbox() {
+  return { threads: await adminRepository.listSupportThreads() };
+}
+
+export async function replySupport(userId, body) {
+  const text = String(body ?? '').trim();
+  if (text.length < 2) throw badRequest('متن پاسخ را بنویسید.');
+  return { message: await adminRepository.addSupportMessage(userId, 'admin', text) };
 }
 
 /**
@@ -365,6 +419,18 @@ export const VALID_STATUSES = ALL_USER_STATUSES;
 export default {
   listUsers,
   getUser,
+  listIdentityDocuments,
+  myIdentityDocuments,
+  submitIdentityDocument,
+  submitIdentityDocumentForPrimary,
+  reviewIdentityDocument,
+  listFamilies,
+  listAdminAlerts,
+  listAdminFalls,
+  postSupportMessage,
+  listMySupport,
+  listSupportInbox,
+  replySupport,
   suspendUser,
   activateUser,
   deleteUser,
