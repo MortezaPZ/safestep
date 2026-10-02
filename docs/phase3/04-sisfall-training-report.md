@@ -8,7 +8,7 @@
 - پنجرهٔ آموزش: 7212
 - سقوط: 1798
 - فعالیت روزمره: 5414
-- مدل: backend/src/services/fallDetection/model.json
+- مدل: src\services\fallDetection\model.json
 - نوع: sisfall-real
 
 دادهٔ خام داخل زیپ منبع نیست. وزن مدل داخل `model.json` است.
