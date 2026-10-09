@@ -30,8 +30,14 @@ export function mountGuardian(container, ctx) {
 
   /* ─────────────────────── نوار SOS ─────────────────────── */
 
+  function hasEmergency(entry) {
+    return (entry.permissions ?? []).includes('emergency');
+  }
+
   function renderSosStrip() {
     if (!activeSos) return null;
+    const subject = watching.find((item) => item.user?.id === activeSos.userId);
+    if (subject && !hasEmergency(subject)) return null;
 
     const subjectName = activeSos.subject?.fullName ?? 'کاربر';
 
@@ -203,11 +209,13 @@ export function mountGuardian(container, ctx) {
           text: 'نمایش روی نقشه',
           onClick: () => location && map?.panTo(location, 17),
         }),
-        el('button.btn.btn--ghost.btn--sm', {
-          type: 'button',
-          text: 'تاریخچه‌ی مسیر',
-          onClick: () => ctx.navigate('history', { userId: user.id }),
-        }),
+        hasEmergency(entry)
+          ? el('button.btn.btn--ghost.btn--sm', {
+              type: 'button',
+              text: 'تاریخچه‌ی مسیر',
+              onClick: () => ctx.navigate('history', { userId: user.id }),
+            })
+          : el('span.muted', { text: 'بدون دسترسی اضطراری: تاریخچه مسیر و فراخوان کمک برای شما نیست' }),
       ),
     );
   }
@@ -383,6 +391,16 @@ export function mountGuardian(container, ctx) {
 
     render(
       container,
+      el('div.card.mb-4', {}, el('div.card__body', {},
+        el('h2.card__title', {
+          text: watching.some(hasEmergency) ? 'ناظر اصلی' : 'ناظر بدون دسترسی اضطراری',
+        }),
+        el('p.muted', {
+          text: watching.some(hasEmergency)
+            ? 'دسترسی اضطراری دارید: درخواست کمک، فراخوان سقوط و تاریخچه مسیر را می‌بینید.'
+            : 'دسترسی شما محدودتر است: موقعیت عادی را می‌بینید، ولی درخواست کمک، فراخوان سقوط و تاریخچه مسیر برای شما نیست.',
+        }),
+      )),
       renderSosStrip(),
       el(
         'div.grid.grid--dashboard',
