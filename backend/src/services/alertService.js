@@ -261,7 +261,20 @@ export async function listAlerts(viewerId, { types, unreadOnly, limit, before, s
     alertRepository.countUnread(subjectIds, viewerId),
   ]);
 
-  const named = await Promise.all(alerts.map(async (item) => {
+  const links = await guardianshipRepository.listPrimariesFor(viewerId);
+  const emergencySubjects = new Set(
+    links.filter((link) => link.permissions.includes('emergency')).map((link) => link.primaryUserId),
+  );
+  const visibleAlerts = alerts.filter((item) => {
+    const subject = item.userId ?? item.user_id;
+    if (subject === viewerId) return true;
+    if (item.type === 'sos' || item.type === 'fall_detected') {
+      return emergencySubjects.has(subject);
+    }
+    return true;
+  });
+
+  const named = await Promise.all(visibleAlerts.map(async (item) => {
     if (item.userId !== viewerId && item.user_id !== viewerId) return item;
     const subjectId = item.userId ?? item.user_id;
     const { rows } = await db.query(

@@ -527,6 +527,7 @@ export async function getWatchList(viewerId) {
       return {
         guardianshipId: link.id,
         permissions: link.permissions,
+        isMainSupervisor: link.isMainSupervisor === true,
         user: link.primaryUser,
         ...current,
         isOnline: hub.isUserOnline(link.primaryUserId),
@@ -539,6 +540,16 @@ export async function getWatchList(viewerId) {
 
 export async function getHistory(viewerId, subjectId, { from, to, limit }) {
   const access = await assertCanViewLocation(viewerId, subjectId);
+  if (!access.isSelf) {
+    const emergency = await guardianshipRepository.hasPermission(
+      subjectId,
+      viewerId,
+      PERMISSIONS.EMERGENCY,
+    );
+    if (!emergency) {
+      throw forbidden('تاریخچه مسیر فقط برای ناظر با دسترسی اضطراری است.');
+    }
+  }
 
   if (!access.sharingEnabled && !access.isSelf) {
     const main = await guardianshipRepository.isMainSupervisor(viewerId, subjectId);
