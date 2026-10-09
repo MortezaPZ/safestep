@@ -1,24 +1,22 @@
-# تست بار روی PostgreSQL واقعی — 2026-09-24
+# PostgreSQL load test, 2026-09-24
 
-این گزارش با PostgreSQL 16.15 واقعی (باینری رسمی، پردازهٔ جدا، پورت 5433) تولید شده است.
-PGlite در این اجرا استفاده نشده است.
+Produced against real PostgreSQL 16.15 (official binaries, separate process, port 5433). PGlite was not used.
 
-سرور پایگاه داده: PostgreSQL 16.15 (حداکثر اتصال پیکربندی‌شده: 100)
-مدت هر سناریو: 8 ثانیه. درایور: pg. خطا: صفر.
+Database: PostgreSQL 16.15, `max_connections` 100. Each scenario ran for 8 seconds. Driver: `pg`. Errors: 0.
 
-| سناریو | درخواست | میانگین ms | p50 | p95 | p99 | خطا |
+| Scenario | Requests | Mean ms | p50 | p95 | p99 | Errors |
 | --- | --- | --- | --- | --- | --- | --- |
-| POST /locations/ping (هدف 50/s، 13 اتصال) | 674 | 151.98 | 139 | 281 | 291 | 0 |
-| POST /locations/ping (هدف 100/s، 25 اتصال) | 372 | 540.81 | 543 | 700 | 732 | 0 |
-| POST /locations/ping (هدف 200/s، 50 اتصال) | 300 | 1264.92 | 1032 | 1979 | 2083 | 0 |
+| POST /locations/ping (target 50/s, 13 connections) | 674 | 151.98 | 139 | 281 | 291 | 0 |
+| POST /locations/ping (target 100/s, 25 connections) | 372 | 540.81 | 543 | 700 | 732 | 0 |
+| POST /locations/ping (target 200/s, 50 connections) | 300 | 1264.92 | 1032 | 1979 | 2083 | 0 |
 | GET /locations/watching | 6064 | 25.98 | 24 | 35 | 43 | 0 |
 | GET /locations/history | 600 | 288.84 | 279 | 384 | 385 | 0 |
 
-## اتصال‌های دیتابیس در حین بار
+## Database connections during the load
 
-| زمان | کل | فعال | بیکار |
+| When | Total | Active | Idle |
 | --- | --- | --- | --- |
-| پیش از بار | 2 | 1 | 1 |
-| در اوج بار | 10 | 5 | 5 |
+| Before | 2 | 1 | 1 |
+| At the peak | 10 | 5 | 5 |
 
-این اجرا روی رایانهٔ محلی است، نه روی سرور ابری.
+This run is on a local computer, not a cloud server.

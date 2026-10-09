@@ -1,61 +1,57 @@
-# داده‌های ارزیابی و سوال‌های دفاع
+# Evaluation numbers
 
-پورت سامانه در اسناد تحویل `4080` است، نه `4000`.
+The delivery documents use port `4080`, not `4000`.
 
-## فرضیهٔ تحویل هشدار
+## Alert delivery
 
-فرضیه دو بخش دارد و هر دو عدد دارند.
+Accuracy, on a leave-one-out pass over the stored SisFall prototypes, threshold `0.80`: sensitivity `0.9889`, false-positive rate `0.0009`. The PostgreSQL 16.15 load test reported no request-delivery errors.
 
-بخش دقت: در ارزیابی کنارگذاشتنِ نمونه روی پیش‌نمونه‌های SisFall، آستانهٔ `0.80` حساسیت `0.9889` و نرخ مثبت کاذب `0.0009` داد. در آزمون بار PostgreSQL 16.15 هم خطای تحویل درخواست‌ها صفر بود.
+Latency for storing a location, mean:
 
-بخش تأخیر: میانگین تأخیر ثبت موقعیت با بار هدف `50` درخواست در ثانیه برابر `151.98` میلی‌ثانیه بود. با بار `100` به `540.81` و با بار `200` به `1264.92` میلی‌ثانیه رسید. خواندن فهرست تحت پایش میانگین `25.98` میلی‌ثانیه داشت.
-
-## تأخیر بر حسب بار
-
-منبع: `docs/evaluation/load-test-postgres-2026-09-24.md`
-
-| بار هدف | درخواست | میانگین ms | p50 | p95 | p99 |
+| Target rate | Requests | Mean ms | p50 | p95 | p99 |
 | --- | --- | --- | --- | --- | --- |
-| 50 در ثانیه | 674 | 151.98 | 139 | 281 | 291 |
-| 100 در ثانیه | 372 | 540.81 | 543 | 700 | 732 |
-| 200 در ثانیه | 300 | 1264.92 | 1032 | 1979 | 2083 |
+| 50/s | 674 | 151.98 | 139 | 281 | 291 |
+| 100/s | 372 | 540.81 | 543 | 700 | 732 |
+| 200/s | 300 | 1264.92 | 1032 | 1979 | 2083 |
 
-## منحنی ROC
+The "people I watch" list averaged `25.98` ms. Source: `docs/evaluation/load-test-postgres-2026-09-24.md`.
 
-فایل `roc-sisfall-loo.csv` ارزیابی کنارگذاشتنِ هر نمونه از ۱۴۴۳ پیش‌نمونهٔ ذخیره‌شدهٔ مدل `sisfall-real` است، نه مجموعهٔ آزمون مستقل. در آستانهٔ `0.80` حساسیت `0.9889` و نرخ مثبت کاذب `0.0009` است (۳۵۶ مثبت درست، ۱ مثبت کاذب، ۴ منفی کاذب).
+## ROC
 
-فایل `roc-threshold.csv` همان مدل را روی `dataset.csv` مصنوعی سنجیده است. AUC حدود `0.500` است. این فایل نشان می‌دهد دادهٔ مصنوعی جدا از توزیع SisFall است و نباید به‌عنوان دقت مدل در دفاع استفاده شود.
+`roc-sisfall-loo.csv` is leave-one-out over 1443 stored prototypes of the `sisfall-real` model, not a held-out test set. At threshold `0.80`: sensitivity `0.9889`, false-positive rate `0.0009` (356 true positives, 1 false positive, 4 false negatives).
 
-## حساسیت آستانهٔ حصار
+`roc-threshold.csv` scores that same model on the synthetic `dataset.csv`. AUC is about `0.500`. The synthetic file is not the SisFall distribution and is not the number to cite as model accuracy.
 
-فایل `geofence-false-alarms.csv`. شخص روی مرز دایرهٔ ۱۵۰ متری با نویز حدود ۱۵ متر:
+## Geofence hysteresis
 
-| هیسترزیس (متر) | خروج کاذب | خروج واقعی |
+`geofence-false-alarms.csv`. A person on the edge of a 150 m circle, with about 15 m of noise:
+
+| Hysteresis (m) | False exits | Real exits |
 | --- | --- | --- |
 | 0 | 100 | 1 |
 | 10 | 39 | 1 |
 | 25 | 0 | 1 |
 | 40 | 0 | 1 |
 
-## دقت نسبت به نقطهٔ مرجع
+## Position error
 
-فایل `position-error.csv`. نقطهٔ مرجع خانهٔ دمو است و `error_m` فاصلهٔ هاورسین است. نمونهٔ با دقت اعلامی GPS بیشتر از ۳۰ متر در قاعدهٔ پروپوزال نامعتبر است (`valid_sample = 0`).
+`position-error.csv`. The reference point is the demo home. `error_m` is the Haversine distance. A sample whose reported GPS accuracy is worse than 30 m is invalid under the proposal rule (`valid_sample = 0`).
 
-## بازآموزی SisFall
+## SisFall training
 
-مدل داخل `model.json` با برچسب `sisfall-real` و زمان آموزش `2026-10-02T21:20:52.395Z` است. ۱۷۹۸ فایل سقوط و ۲۷۰۷ فایل فعالیت روزمره خوانده شد. `dataset.csv` مصنوعی است و در استنتاج استفاده نمی‌شود.
+`model.json` is labeled `sisfall-real`, trained `2026-10-02T21:20:52.395Z`. The run read 1798 fall files and 2707 activity-of-daily-living files. The synthetic `dataset.csv` is not used at inference.
 
-## پرسش‌نامه SUS
+## SUS
 
-ده گویهٔ بروک. امتیاز فرد: گویه‌های فرد `(نمره - 1)`، گویه‌های زوج `(5 - نمره)`، جمع ضربدر `2.5`. بازه `0` تا `100`.
+Brooke's ten items. Odd items contribute `(score - 1)`. Even items contribute `(5 - score)`. The sum is multiplied by `2.5`. Range is 0 to 100.
 
-برگهٔ کامل در `sus-10-families.md` است. بیست پاسخ ساخت‌یافته برای دو نقش است، نه مصاحبهٔ میدانی. میانگین **80.4**. مراقبت‌شونده **79.8** و مراقبت‌کننده **81.0**.
+The sheet is `sus-10-families.md`. Twenty structured responses, two roles, not a field interview. Mean `80.4`. The person being cared for `79.8`. The caregiver `81.0`.
 
-## سوال‌های محتمل دفاع
+## Questions the numbers are meant to answer
 
-- تفاوت خطای موقعیت‌یابی با عدد دقت GPS گوشی چیست و نمونهٔ معتبر کدام است؟
-- چرا مدل سقوط با SisFall آموزش دیده و `dataset.csv` مصنوعی در استنتاج استفاده نمی‌شود؟
-- فراخوان اضطراری خودکار چه تفاوتی با دکمهٔ SOS دارد و به چه کسانی می‌رسد؟
-- چرا مدیر مختصات زنده و تاریخچهٔ مسیر را نمی‌بیند؟
-- ناظر اصلی بعد از قطع اشتراک موقعیت چه دسترسی‌ای دارد و ناظر محدود چه ندارد؟
-- آزمون بار روی چه پایگاه داده‌ای بوده و چرا عدد ابر در گزارش نیست؟
+- GPS-reported accuracy is not the same thing as error against the reference point. A sample worse than 30 m of reported accuracy is invalid.
+- The fall model is trained on SisFall. The synthetic `dataset.csv` is not used at inference, and its ROC is about chance.
+- An automatic emergency call is not the SOS button. SOS is started by the person and is delivered according to the emergency permission.
+- An admin does not receive live coordinates or route history.
+- After sharing is turned off, the primary guardian loses the live feed. A limited guardian did not have the emergency path.
+- The load test ran on PostgreSQL 16.15. There is no cloud-vendor latency number in the report.

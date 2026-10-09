@@ -1,24 +1,23 @@
-# گزارش آموزش روی دادهٔ واقعی — 2026-09-24
+# Training report on recorded activity, 2026-09-24
 
-## منبع دادهٔ واقعی
+## Source
 
-مجموعهٔ دادهٔ عمومی UCI: «Dataset for ADL Recognition with
-Wrist-worn Accelerometer» (۱۶ داوطلب، ۹۸۳ فایل، ۱۴ فعالیت روزمره).
+Public UCI set: "Dataset for ADL Recognition with Wrist-worn Accelerometer" (16 volunteers, 983 files, 14 activities).
+
 https://archive.ics.uci.edu/dataset/283
 
-این داده از انسان‌های واقعی با شتاب‌سنج مچی ضبط شده و در پوشهٔ
-`backend/data/falls/real/HMP_Dataset/` قرار دارد. هیچ فایلی جعل نشده.
+The files are wrist-accelerometer recordings of real people, stored under `backend/data/falls/real/HMP_Dataset/`. No file in that folder was fabricated.
 
-## ترکیب کلاس‌ها
+## Class mix
 
-| کلاس | تعداد پنجره | منبع |
+| Class | Windows | Source |
 | --- | --- | --- |
-| ۰ — فعالیت روزمره (منفی) | 4000 | **واقعی** — UCI |
-| ۱ — سقوط (مثبت) | 2000 | شبیه‌سازی (corpora عمومی سقوط واقعی موجود نیست) |
+| 0, activity of daily living (negative) | 4000 | Real, UCI |
+| 1, fall (positive) | 2000 | Simulated. A usable public corpus of real human falls was not available |
 
-## تعداد پنجره به تفکیک فعالیت واقعی
+## Windows by activity
 
-| فعالیت | فایل | پنجره |
+| Activity | Files | Windows |
 | --- | --- | --- |
 | Brush_teeth | 12 | 603 |
 | Climb_stairs | 102 | 684 |
@@ -42,26 +41,23 @@ https://archive.ics.uci.edu/dataset/283
 | Walk | 100 | 1770 |
 | Walk_MODEL | 20 | 40 |
 
-## چرا کلاس مثبت شبیه‌سازی است
+## Why the positive class is simulated
 
-مجموعهٔ دادهٔ عمومی شامل سقوطِ واقعیِ انسان (با مجوز قابل استفاده در
-یک پروژهٔ دانشگاهی) در دسترس نیست. بزرگ‌ترین نقطهٔ ضعفِ مدلِ قبلی،
-تشخیصِ اشتباهِ فعالیت‌های روزمرهٔ واقعی به‌عنوان سقوط (False Positive)
-بود. این مجموعه دقیقاً همان کلاس منفی را با دادهٔ واقعی جایگزین کرد.
+A public dataset of real human falls with a license that allows a university project was not available. The previous model's main weakness was marking real daily activity as a fall. This set replaces that negative class with real recordings.
 
-## معیار اعتبارسنجی متقاطع (۵-fold)
+## 5-fold validation
 
-| مدل | دقت | precision | recall | f1 |
+| Model | Accuracy | Precision | Recall | F1 |
 | --- | --- | --- | --- | --- |
 | KNN | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
 | SVM | 0.9993 | 1.0000 | 0.9980 | 0.9990 |
 
-## وضعیت مدل
+The perfect KNN score is on this mixed set (real activity, simulated falls). It is not a claim about SisFall. The later SisFall model is the one used for the defense numbers.
 
-مدل جدید در `src/services/fallDetection/model.json` نوشته شد و جایگزین شد.
+## Model file
 
-دستور اجرا:
+The run wrote `src/services/fallDetection/model.json`.
 
-```
+```bash
 npm run train:fall:real
 ```

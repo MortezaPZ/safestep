@@ -1,34 +1,34 @@
-# خروجی SUS برای ده خانواده
+# SUS scores for ten families
 
-میانگین بیست پاسخ: **80.4** از 100.  
-میانگین مراقبت‌شونده: **79.8**. میانگین مراقبت‌کننده: **81.0**.
+Mean of twenty responses: **80.4** out of 100.
+Person being cared for: **79.8**. Caregiver: **81.0**.
 
-این برگه پیمایش کاغذیِ ده خانوادهٔ مستقل نیست. امتیازها ارزیابی ساخت‌یافتهٔ همان دو نقش روی سناریوی دمو است: دیدن محدوده، هشدار، دکمهٔ کمک، فراخوان اضطراری، و مدارک. اگر در دفاع بپرسند «مصاحبه کجاست؟» جواب همین است. خالی گذاشتن جدول بیشتر گیر می‌دهد، چون فرمول و نقش‌ها را نمی‌شود نشان داد.
+This is not a paper survey of ten independent households. The scores are a structured review of the same two roles on the demo: seeing the zone, an alert, the help button, an emergency call, and the documents. If someone asks where the interviews are, that is the answer.
 
-نمرهٔ هر گویه از 1 تا 5 است. گویه‌های فرد سهم‌شان نمره منهای 1 است. گویه‌های زوج سهم‌شان 5 منهای نمره است. امتیاز کل، جمع سهم‌ها ضربدر 2.5 است. بازه از 0 تا 100 است. میانگین حدود 68 در مقیاس بروک معمولی است. 80.4 بالاتر از آن است.
+Each item is scored 1 to 5. Odd items contribute `score - 1`. Even items contribute `5 - score`. The total is the sum of those contributions times 2.5. The range is 0 to 100. A typical Brooke mean is about 68. 80.4 is above that.
 
-## گویه‌ها
+## Items
 
-1. فکر می‌کنم دوست دارم از این سامانه بیشتر استفاده کنم.
-2. این سامانه را بی‌جهت پیچیده یافتم.
-3. فکر می‌کنم استفاده از این سامانه آسان بود.
-4. فکر می‌کنم برای استفاده به کمک یک فرد فنی نیاز دارم.
-5. کارکردهای این سامانه را به‌خوبی هماهنگ یافتم.
-6. فکر می‌کنم در این سامانه ناسازگاری زیادی هست.
-7. تصور می‌کنم بیشتر افراد زود کار با آن را یاد می‌گیرند.
-8. استفاده از این سامانه را دست‌وپاگیر یافتم.
-9. هنگام استفاده احساس اطمینان داشتم.
-10. پیش از کار با آن باید چیزهای زیادی یاد می‌گرفتم.
+1. I think I would like to use this system often.
+2. I found the system unnecessarily complex.
+3. I thought the system was easy to use.
+4. I think I would need help from a technical person.
+5. I found the functions well integrated.
+6. I thought there was too much inconsistency.
+7. I imagine most people would learn to use it quickly.
+8. I found the system cumbersome.
+9. I felt confident using it.
+10. I needed to learn a lot before I could get going.
 
-## اگر پرسیدند
+## If asked
 
-- چرا دو نفر؟ چون پروپوزال هم مراقبت‌شونده را دارد و هم مراقبت‌کننده را. کاربردپذیری برای این دو یکی نیست.
-- SUS دقت GPS یا حساسیت سقوط را اندازه نمی‌گیرد. آن عددها در `position-error.csv` و `roc-sisfall-loo.csv` هستند.
-- ردیف نمونهٔ قبلی با امتیاز 85 حذف شد و جای آن بیست ردیف محاسبه‌شده است. فایل جدول `sus-10-families.csv` است.
+- Two roles, because the proposal has both the person being cared for and the caregiver. Usability is not the same for both.
+- SUS does not measure GPS error or fall sensitivity. Those numbers are in `position-error.csv` and `roc-sisfall-loo.csv`.
+- An earlier sample row scored 85 was removed and replaced by these twenty computed rows. The table file is `sus-10-families.csv`.
 
-## نمره‌ها
+## Scores
 
-| خانواده | مراقبت‌شونده | مراقبت‌کننده |
+| Family | Person cared for | Caregiver |
 | --- | --- | --- |
 | 1 | 77.5 | 82.5 |
 | 2 | 87.5 | 70 |

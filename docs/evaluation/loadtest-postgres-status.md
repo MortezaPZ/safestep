@@ -1,7 +1,7 @@
-# آزمون بار روی PostgreSQL واقعی — وضعیت اجرا
+# PostgreSQL load test status
 
-**وضعیت:** اجرا شد. نتیجه در `load-test-postgres-2026-09-24.md` است.
+The run completed. Numbers are in `load-test-postgres-2026-09-24.md`.
 
-PostgreSQL 16.15 به‌صورت پردازهٔ جدا روی پورت 5433 بالا آمد، مهاجرت‌ها روی همان دیتابیس اجرا شد، و `scripts/loadtest-postgres.js` با `DB_DRIVER=pg` عدد تولید کرد. PGlite در این سنجش استفاده نشد.
+PostgreSQL 16.15 was a separate process on port 5433. Migrations ran on that database. `scripts/loadtest-postgres.js` used `DB_DRIVER=pg`. PGlite was not used.
 
-این ماشین سرور ابری نیست. عددها از PostgreSQL محلی هستند.
+This machine is not a cloud server. The numbers are from local PostgreSQL.
