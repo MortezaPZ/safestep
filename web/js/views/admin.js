@@ -218,8 +218,14 @@ export function mountAdmin(container) {
     const documents = page.documents ?? page.items ?? [];
     paint(el('div.card', {},
       el('div.card__body', {},
-        el('h2.card__title.mb-2', { text: 'مدارک در انتظار بررسی' }),
-        el('p.muted.mb-4', { text: 'تصویر مدرک را پیش از تأیید یا رد مشاهده کنید.' }),
+        el('h2.card__title.mb-2', {
+          text: status === 'approved' ? 'مدارک تأییدشده' : status === 'all' ? 'کل مدارک' : 'مدارک در انتظار تأیید',
+        }),
+        el('p.muted.mb-4', {
+          text: status === 'approved'
+            ? 'بعد از تأیید، مشکل سلامت شخص اینجا دیده می‌شود.'
+            : 'تصویر مدرک را پیش از تأیید یا رد مشاهده کنید.',
+        }),
         documents.length === 0
           ? emptyState({ title: 'مدرکی برای بررسی نیست', text: 'مدرک ارسال‌شده‌ای در انتظار بررسی وجود ندارد.' })
           : documentTable(documents),
@@ -236,7 +242,13 @@ export function mountAdmin(container) {
     const tbody = el('tbody');
     for (const item of documents) {
       tbody.append(el('tr', {},
-        el('td', { text: item.userName ?? item.userPhone ?? '—' }),
+        el('td', {},
+          el('div', { text: item.userName ?? '—' }),
+          item.userPhone ? el('div.phone-ltr', { text: item.userPhone }) : null,
+          item.status === 'approved' && item.healthCondition
+            ? el('div', { text: `مشکل: ${item.healthCondition}` })
+            : null,
+        ),
         el('td', { text: item.typeLabel ?? item.type ?? '—' }),
         el('td', { text: item.createdAt ?? '—' }),
         el('td', {}, el('div.row.row--wrap.gap-2', {},
