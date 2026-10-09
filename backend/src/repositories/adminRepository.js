@@ -377,6 +377,7 @@ export async function listFamilies() {
         healthCondition: row.verification_status === 'verified' ? row.health_condition : null,
         verificationStatus: row.verification_status,
         guardians: [],
+        zoneLabel: null,
       });
     }
     if (row.guardian_name) {
@@ -386,6 +387,27 @@ export async function listFamilies() {
         isMainSupervisor: row.is_main_supervisor === true,
         permissions: row.permissions ?? [],
       });
+    }
+  }
+  const ids = [...families.keys()];
+  if (ids.length > 0) {
+    const { rows: zoneRows } = await db.query(
+      `SELECT z.user_id, s.state, z.name
+         FROM safe_zones z
+         LEFT JOIN zone_states s ON s.zone_id = z.id AND s.user_id = z.user_id
+        WHERE z.user_id = ANY($1::uuid[]) AND z.is_active = TRUE`,
+      [ids],
+    );
+    for (const zone of zoneRows) {
+      const family = families.get(zone.user_id);
+      if (!family) continue;
+      const label = zone.state === 'inside'
+        ? `داخل «${zone.name}»`
+        : zone.state === 'outside'
+          ? `خارج از «${zone.name}»`
+          : `محدوده «${zone.name}»`;
+      if (zone.state === 'inside') family.zoneLabel = label;
+      else if (!family.zoneLabel) family.zoneLabel = label;
     }
   }
   return [...families.values()];

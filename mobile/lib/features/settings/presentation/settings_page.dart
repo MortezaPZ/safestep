@@ -161,11 +161,24 @@ class SettingsPage extends ConsumerWidget {
                   title: 'اعلان لحظه‌ای',
                   subtitle: ref.watch(pushStatusProvider).reason,
                   onTap: () async {
-                    await ref.read(pushServiceProvider).initialize();
-                    ref.read(pushStatusProvider.notifier).state = PushStatus(
-                      available: ref.read(pushServiceProvider).available,
-                      reason: ref.read(pushServiceProvider).reason,
-                    );
+                    try {
+                      final String reason = await ref.read(pushServiceProvider).enableAndConfirm();
+                      ref.read(pushStatusProvider.notifier).state = PushStatus(
+                        available: true,
+                        reason: reason,
+                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('اعلان لحظه‌ای فعال شد')),
+                        );
+                      }
+                    } catch (error) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('اعلان فعال نشد: $error')),
+                        );
+                      }
+                    }
                   },
                 ),
                 const Divider(height: 1),
@@ -214,13 +227,25 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsTile(
                   icon: Icons.personal_injury_outlined,
                   title: 'تشخیص سقوط',
-                  subtitle: 'گزارش سقوط ازدست‌رفته و شبیه‌سازی در حالت اشکال‌زدایی',
+                  subtitle: 'با زدن این گزینه گزارش سقوط برای ناظر و مدیر ثبت می‌شود',
                   onTap: () async {
-                    await ref.read(fallRepositoryProvider).reportMissed();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('گزارش سقوط ازدست‌رفته ثبت شد')),
-                      );
+                    if (ref.read(currentUserProvider)?.role == UserRole.admin) {
+                      context.go(AppRoutes.adminFalls);
+                      return;
+                    }
+                    try {
+                      await ref.read(fallRepositoryProvider).reportMissed();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('گزارش سقوط ثبت شد و برای ناظر و مدیر ارسال شد')),
+                        );
+                      }
+                    } catch (error) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('گزارش ثبت نشد: $error')),
+                        );
+                      }
                     }
                   },
                 ),
@@ -395,7 +420,10 @@ class _DocumentsCardState extends ConsumerState<_DocumentsCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text('ارسال مدارک', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            _subjectUserId == null ? 'ارسال مدارک' : 'ارسال مدارک کاربر اصلی',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: _condition,

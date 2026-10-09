@@ -138,12 +138,19 @@ export async function reportMissed(user, body = {}) {
     lat: body.lat,
     lng: body.lng,
     detectionSource: 'manual',
-    classifiedAsFall: false,
+    classifiedAsFall: true,
     userFeedback: FALL_FEEDBACK.CONFIRMED,
     feedbackAt: new Date(),
     respondedWithinSec: 0,
   });
-  return { fallEvent: row };
+  await raiseAlert({
+    userId: user.id,
+    type: ALERT_TYPES.FALL_DETECTED,
+    location: { lat: body.lat, lng: body.lng },
+    context: { confidence: 1, auto: true },
+    metadata: { fallEventId: row.id, manualReport: true },
+  });
+  return { fallEvent: row, reported: true };
 }
 
 export async function listFalls(viewer, { userId, limit, before }) {

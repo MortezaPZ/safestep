@@ -132,9 +132,26 @@ class WatchingController extends StateNotifier<WatchingState> {
     try {
       final WatchedPerson fresh = await _repository.currentLocation(userId);
 
-      final List<WatchedPerson> updated = state.people
-          .map((WatchedPerson p) => p.userId == userId ? fresh : p)
-          .toList(growable: false);
+      final List<WatchedPerson> updated = state.people.map((WatchedPerson p) {
+        if (p.userId != userId) return p;
+        return WatchedPerson(
+          userId: p.userId,
+          person: p.person,
+          permissions: p.permissions,
+          hidden: fresh.hidden,
+          hiddenMessage: fresh.hiddenMessage ?? p.hiddenMessage,
+          location: fresh.location ?? p.location,
+          zoneStatus: fresh.zoneStatus,
+          zoneNames: fresh.zoneNames.isEmpty ? p.zoneNames : fresh.zoneNames,
+          outsideZoneName: fresh.outsideZoneName ?? p.outsideZoneName,
+          outsideSince: fresh.outsideSince ?? p.outsideSince,
+          gpsStale: fresh.gpsStale,
+          silentSeconds: fresh.silentSeconds,
+          isOnline: p.isOnline,
+          guardianshipId: p.guardianshipId,
+          isMainSupervisor: p.isMainSupervisor,
+        );
+      }).toList(growable: false);
 
       state = state.copyWith(people: updated);
     } on AppException {

@@ -30,6 +30,7 @@ class WatchedPerson {
     this.silentSeconds = 0,
     this.isOnline = false,
     this.guardianshipId,
+    this.isMainSupervisor = false,
   });
 
   final String userId;
@@ -58,6 +59,7 @@ class WatchedPerson {
   final bool isOnline;
 
   final String? guardianshipId;
+  final bool isMainSupervisor;
 
   bool get hasLocation => location != null;
 
@@ -111,6 +113,7 @@ class WatchedPerson {
       silentSeconds: gpsJson == null ? 0 : Json.intOf(gpsJson, 'silentSeconds'),
       isOnline: Json.boolOf(json, 'isOnline'),
       guardianshipId: Json.strOrNull(json, 'guardianshipId'),
+      isMainSupervisor: Json.boolOf(json, 'isMainSupervisor'),
     );
   }
 
@@ -130,6 +133,7 @@ class WatchedPerson {
       silentSeconds: silentSeconds,
       isOnline: isOnline ?? this.isOnline,
       guardianshipId: guardianshipId,
+      isMainSupervisor: isMainSupervisor,
     );
   }
 }

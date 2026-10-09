@@ -9,6 +9,7 @@ import '../features/auth/presentation/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/register_page.dart';
 import '../features/home/presentation/guardian_home_page.dart';
+import '../features/home/presentation/supervisor_zones_page.dart';
 import '../features/home/presentation/primary_home_page.dart';
 import '../features/fall/presentation/fall_check_page.dart';
 import '../features/onboarding/presentation/role_select_page.dart';
@@ -68,6 +69,11 @@ class AppRoutes {
 
   /// خانه‌ی درست هر نقش.
   static const String admin = '/admin';
+  static const String adminMap = '/admin/map';
+  static const String adminAlerts = '/admin/alerts';
+  static const String adminFamilies = '/admin/families';
+  static const String adminFalls = '/admin/falls';
+  static const String supervisorZones = '/supervisor/zones';
 
   static String homeFor(UserRole role) {
     if (role == UserRole.admin) return admin;
@@ -140,7 +146,10 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
       if (location == AppRoutes.guardian && auth.user!.role != UserRole.guardian) {
         return AppRoutes.homeFor(auth.user!.role);
       }
-      if (location == AppRoutes.admin && auth.user!.role != UserRole.admin) {
+      if (location.startsWith('/admin') && auth.user!.role != UserRole.admin) {
+        return AppRoutes.homeFor(auth.user!.role);
+      }
+      if (location.startsWith('/supervisor') && auth.user!.role != UserRole.guardian) {
         return AppRoutes.homeFor(auth.user!.role);
       }
 
@@ -174,6 +183,32 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.admin,
         builder: (BuildContext context, GoRouterState state) => const AdminHomePage(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'map',
+            builder: (BuildContext context, GoRouterState state) =>
+                const AdminSectionPage(section: AdminSection.map),
+          ),
+          GoRoute(
+            path: 'alerts',
+            builder: (BuildContext context, GoRouterState state) =>
+                const AdminSectionPage(section: AdminSection.alerts),
+          ),
+          GoRoute(
+            path: 'families',
+            builder: (BuildContext context, GoRouterState state) =>
+                const AdminSectionPage(section: AdminSection.families),
+          ),
+          GoRoute(
+            path: 'falls',
+            builder: (BuildContext context, GoRouterState state) =>
+                const AdminSectionPage(section: AdminSection.falls),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: AppRoutes.supervisorZones,
+        builder: (BuildContext context, GoRouterState state) => const SupervisorZonesPage(),
       ),
       GoRoute(
         path: AppRoutes.myMap,

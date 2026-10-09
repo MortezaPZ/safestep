@@ -8,6 +8,8 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../app/router.dart';
 import '../../../core/accessibility/a11y.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/socket_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -16,7 +18,9 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/osm_tile_layer.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../pairing/domain/pairing_models.dart';
 import '../../realtime/realtime_controller.dart';
+import '../../tracking/presentation/zone_overlay.dart';
 import '../domain/watched_person.dart';
 import 'watching_controller.dart';
 
@@ -49,6 +53,7 @@ class _LiveMapPageState extends ConsumerState<LiveMapPage> {
 
   /// آخرین نقطه‌ای که دوربین رویش رفته — تا برای نقطه‌ی تکراری حرکت نکنیم
   DateTime? _lastCameraMove;
+  List<MapZone> _zones = const <MapZone>[];
 
   static const double _defaultZoom = 16;
 
@@ -57,7 +62,20 @@ class _LiveMapPageState extends ConsumerState<LiveMapPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(watchingControllerProvider.notifier).refreshPerson(widget.userId);
+      _loadZones();
     });
+  }
+
+  Future<void> _loadZones() async {
+    try {
+      final Map<String, dynamic> data = await ref.read(apiClientProvider).get<Map<String, dynamic>>(
+        ApiEndpoints.safeZones,
+        (dynamic raw) => Map<String, dynamic>.from(raw as Map),
+        query: <String, dynamic>{'subjectUserId': widget.userId},
+      );
+      if (!mounted) return;
+      setState(() => _zones = MapZone.parseList(data['zones']));
+    } catch (_) {}
   }
 
   Future<void> _moveCamera(TrackPoint point, {bool animate = true}) async {
@@ -98,11 +116,12 @@ class _LiveMapPageState extends ConsumerState<LiveMapPage> {
       appBar: AppBar(
         title: Text(person.person.fullName),
         actions: <Widget>[
-          IconButton(
-            tooltip: 'تاریخچه‌ی مسیر',
-            icon: const Icon(Icons.timeline_rounded),
-            onPressed: () => context.push(AppRoutes.historyFor(widget.userId)),
-          ),
+          if (person.permissions.contains(SharePermission.emergency))
+            IconButton(
+              tooltip: 'تاریخچه‌ی مسیر',
+              icon: const Icon(Icons.timeline_rounded),
+              onPressed: () => context.push(AppRoutes.historyFor(widget.userId)),
+            ),
         ],
       ),
       body: Column(
@@ -170,6 +189,7 @@ class _LiveMapPageState extends ConsumerState<LiveMapPage> {
           ),
           children: <Widget>[
             const OsmTileLayer(),
+            ...zoneLayers(_zones),
             if (point.accuracyM != null && point.accuracyM! > 0)
               CircleLayer(
                 circles: <CircleMarker>[
@@ -209,7 +229,9 @@ class _LiveMapPageState extends ConsumerState<LiveMapPage> {
     if (person.zoneStatus == 'inside' && person.zoneNames.isNotEmpty) {
       return 'داخل «${person.zoneNames.first}»';
     }
-    if (person.zoneStatus == 'outside') return 'خارج از محدوده‌های امن';
+    if (person.zoneStatus == 'outside') {
+      return 'خارج از «${person.outsideZoneName ?? 'محدوده امن'}»';
+    }
     return 'وضعیت محدوده نامشخص';
   }
 }
@@ -309,12 +331,18 @@ class _StatusPanel extends ConsumerWidget {
 
             const SizedBox(height: AppSpacing.sm),
 
-            AppButton(
-              label: 'تاریخچه‌ی مسیر',
-              icon: Icons.timeline_rounded,
-              variant: AppButtonVariant.outlined,
-              onPressed: () => context.push(AppRoutes.historyFor(person.userId)),
-            ),
+            if (person.permissions.contains(SharePermission.emergency))
+              AppButton(
+                label: 'تاریخچه‌ی مسیر',
+                icon: Icons.timeline_rounded,
+                variant: AppButtonVariant.outlined,
+                onPressed: () => context.push(AppRoutes.historyFor(person.userId)),
+              )
+            else
+              Text(
+                'تاریخچه مسیر فقط برای ناظر با دسترسی اضطراری است.',
+                style: theme.textTheme.bodySmall,
+              ),
           ],
         ),
       ),
@@ -327,7 +355,9 @@ class _StatusPanel extends ConsumerWidget {
     if (person.zoneStatus == 'inside' && person.zoneNames.isNotEmpty) {
       return 'در «${person.zoneNames.first}»';
     }
-    if (person.zoneStatus == 'outside') return 'خارج از محدوده‌های امن';
+    if (person.zoneStatus == 'outside') {
+      return 'خارج از «${person.outsideZoneName ?? 'محدوده امن'}»';
+    }
     return 'در حال پایش';
   }
 

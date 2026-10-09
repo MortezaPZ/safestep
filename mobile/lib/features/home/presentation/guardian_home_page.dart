@@ -138,10 +138,31 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
             );
           }
 
+          final bool main = state.people.any((WatchedPerson person) => person.isMainSupervisor);
+          final bool emergency = state.people.any(
+            (WatchedPerson person) => person.permissions.contains(SharePermission.emergency),
+          );
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const SizedBox(height: AppSpacing.md),
+              Text(main ? 'ناظر اصلی' : emergency ? 'ناظر با دسترسی اضطراری' : 'ناظر بدون دسترسی اضطراری'),
+              const SizedBox(height: AppSpacing.sm),
+              if (main) ...<Widget>[
+                AppButton(
+                  label: 'تعریف محدوده امن',
+                  icon: Icons.add_location_alt_outlined,
+                  onPressed: () => context.push(AppRoutes.supervisorZones),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                AppButton(
+                  label: 'ارسال مدارک کاربر اصلی',
+                  icon: Icons.badge_outlined,
+                  variant: AppButtonVariant.outlined,
+                  onPressed: () => context.push(AppRoutes.supervisorZones),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
 
               for (int i = 0; i < state.people.length; i++)
                 Padding(
@@ -319,7 +340,12 @@ class _PersonStatusCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(person.person.fullName, style: theme.textTheme.titleMedium),
+                    Text(
+                      (person.person.healthCondition ?? '').trim().isEmpty
+                          ? person.person.fullName
+                          : '${person.person.fullName} — مشکل: ${person.person.healthCondition}',
+                      style: theme.textTheme.titleMedium,
+                    ),
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
                       _statusText(person),

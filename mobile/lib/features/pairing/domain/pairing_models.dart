@@ -153,12 +153,14 @@ class RelatedPerson {
     required this.fullName,
     this.phone,
     this.avatarColor = '#2F6FED',
+    this.healthCondition,
   });
 
   final String id;
   final String fullName;
   final String? phone;
   final String avatarColor;
+  final String? healthCondition;
 
   static RelatedPerson? tryFrom(Map<String, dynamic>? json) {
     if (json == null) return null;
@@ -170,6 +172,7 @@ class RelatedPerson {
       fullName: Json.str(json, 'fullName', 'بدون نام'),
       phone: Json.strOrNull(json, 'phone'),
       avatarColor: Json.str(json, 'avatarColor', '#2F6FED'),
+      healthCondition: Json.strOrNull(json, 'healthCondition'),
     );
   }
 }

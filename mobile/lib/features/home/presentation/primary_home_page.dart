@@ -109,6 +109,20 @@ class _PrimaryHomePageState extends ConsumerState<PrimaryHomePage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  if (user != null &&
+                      user.verificationStatus == 'verified' &&
+                      (user.healthCondition ?? '').trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                      child: Text('مشکل: ${user.healthCondition}'),
+                    ),
+                  if (user != null && user.verificationStatus != 'verified')
+                    const Padding(
+                      padding: EdgeInsets.only(top: AppSpacing.sm),
+                      child: Text(
+                        'مدارک هنوز تأیید نشده. تا تأیید مدیر، ارسال موقعیت، محدوده امن، حالت نمایش و دکمه اضطراری قفل است.',
+                      ),
+                    ),
                   const SizedBox(height: AppSpacing.md),
                   const Text('موقعیت روی نقشه'),
                   const SizedBox(height: AppSpacing.sm),

@@ -127,6 +127,8 @@ class AppUser {
     this.avatarColor = '#2F6FED',
     this.status = 'active',
     this.createdAt,
+    this.verificationStatus = 'verified',
+    this.healthCondition,
   });
 
   final String id;
@@ -136,6 +138,8 @@ class AppUser {
   final String avatarColor;
   final String status;
   final DateTime? createdAt;
+  final String verificationStatus;
+  final String? healthCondition;
 
   bool get isSuspended => status == 'suspended';
 
@@ -148,6 +152,8 @@ class AppUser {
       avatarColor: Json.str(json, 'avatarColor', '#2F6FED'),
       status: Json.str(json, 'status', 'active'),
       createdAt: Json.date(json, 'createdAt'),
+      verificationStatus: Json.str(json, 'verificationStatus', 'verified'),
+      healthCondition: Json.strOrNull(json, 'healthCondition'),
     );
   }
 

@@ -18,12 +18,14 @@ class PushService {
   final DeviceRegistrar _registrar;
   final FlutterLocalNotificationsPlugin _local = FlutterLocalNotificationsPlugin();
   bool _available = false;
+  bool _ready = false;
   String _reason = 'اعلان ابری پیکربندی نشده';
 
   bool get available => _available;
   String get reason => _reason;
 
   Future<void> initialize({void Function(String alertId)? onOpenAlert}) async {
+    if (_ready) return;
     const AndroidInitializationSettings androidInit =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     await _local.initialize(
@@ -64,7 +66,26 @@ class PushService {
     }
 
     _available = true;
+    _ready = true;
     _reason = 'اعلان محلی فعال است';
+  }
+
+  Future<String> enableAndConfirm() async {
+    await initialize();
+    const AndroidNotificationDetails android = AndroidNotificationDetails(
+      'safestep_alerts',
+      'هشدارها',
+      channelDescription: 'خروج از محدوده و هشدارهای عادی',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    await _local.show(
+      1,
+      'هم‌قدم',
+      'اعلان لحظه‌ای فعال شد',
+      const NotificationDetails(android: android),
+    );
+    return _reason;
   }
 }
 
