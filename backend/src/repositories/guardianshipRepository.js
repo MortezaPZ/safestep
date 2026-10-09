@@ -46,7 +46,9 @@ export async function listPrimariesFor(guardianUserId, { includeRevoked = false 
     `SELECT g.*,
             u.full_name    AS primary_name,
             u.phone        AS primary_phone,
-            u.avatar_color AS primary_avatar_color
+            u.avatar_color AS primary_avatar_color,
+            u.health_condition AS primary_health,
+            u.verification_status AS primary_verification
      FROM guardianships g
      JOIN users u ON u.id = g.primary_user_id
      WHERE g.guardian_user_id = $1

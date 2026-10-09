@@ -26,6 +26,7 @@ export function mapUser(row) {
     lastLoginAt: d(row.last_login_at),
     phoneVerifiedAt: d(row.phone_verified_at),
     verificationStatus: row.verification_status ?? 'unverified',
+    healthCondition: row.verification_status === 'verified' ? (row.health_condition ?? null) : null,
   };
 }
 
@@ -95,6 +96,7 @@ export function mapGuardianship(row) {
             fullName: row.primary_name,
             phone: row.primary_phone,
             avatarColor: row.primary_avatar_color,
+            healthCondition: row.primary_verification === 'verified' ? (row.primary_health ?? null) : null,
           },
         }
       : {}),

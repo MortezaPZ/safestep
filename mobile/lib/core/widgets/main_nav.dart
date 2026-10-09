@@ -50,7 +50,7 @@ class MainNav extends ConsumerWidget {
                 : AppRoutes.home);
       case 'map':
         if (admin) {
-          context.go(AppRoutes.admin);
+          context.go(AppRoutes.adminMap);
           return;
         }
         if (guardian) {
@@ -64,8 +64,12 @@ class MainNav extends ConsumerWidget {
           context.go(AppRoutes.myMap);
         }
       case 'alerts':
-        context.go(AppRoutes.alerts);
+        context.go(admin ? AppRoutes.adminAlerts : AppRoutes.alerts);
       case 'family':
+        if (admin) {
+          context.go(AppRoutes.adminFamilies);
+          return;
+        }
         context.go(guardian ? AppRoutes.redeem : AppRoutes.guardians);
       case 'settings':
         context.go(AppRoutes.settings);
