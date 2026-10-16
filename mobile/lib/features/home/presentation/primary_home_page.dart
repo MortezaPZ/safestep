@@ -11,7 +11,9 @@ import '../../../core/utils/fa.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
+
 import 'package:safestep/l10n/app_localizations.dart';
+
 import '../../../core/widgets/app_snackbar.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -51,6 +53,7 @@ class _PrimaryHomePageState extends ConsumerState<PrimaryHomePage> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final bool isEnglish = Localizations.localeOf(context).languageCode == 'en';
     final AppUser? user = ref.watch(currentUserProvider);
 
     final List<Guardianship> guardians = ref
@@ -97,10 +100,14 @@ class _PrimaryHomePageState extends ConsumerState<PrimaryHomePage> {
         children: <Widget>[
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => ref.read(pairingControllerProvider.notifier).load(),
+              onRefresh: () =>
+                  ref.read(pairingControllerProvider.notifier).load(),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.md),
+                padding: const EdgeInsets.only(
+                  top: AppSpacing.md,
+                  bottom: AppSpacing.md,
+                ),
                 children: <Widget>[
                   if (user != null)
                     Text(
@@ -130,6 +137,39 @@ class _PrimaryHomePageState extends ConsumerState<PrimaryHomePage> {
                   const SizedBox(height: AppSpacing.md),
                   const TrackingCard(),
                   const SizedBox(height: AppSpacing.md),
+                  AppCard(
+                    onTap: () => context.push(AppRoutes.evaluation),
+                    semanticLabel: isEnglish
+                        ? 'Field evaluation and usability questionnaire'
+                        : 'ارزیابی میدانی و پرسشنامه‌ی کاربردپذیری',
+                    child: Row(
+                      children: <Widget>[
+                        const Icon(Icons.assignment_outlined, size: 28),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                isEnglish
+                                    ? 'Field evaluation'
+                                    : 'ارزیابی میدانی',
+                                style: theme.textTheme.titleSmall,
+                              ),
+                              Text(
+                                isEnglish
+                                    ? 'Reference point and SUS questionnaire'
+                                    : 'ثبت نقطه‌ی مرجع و پرسشنامه‌ی SUS',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
                   _WatchersCard(guardians: guardians),
                 ],
               ),
@@ -137,7 +177,12 @@ class _PrimaryHomePageState extends ConsumerState<PrimaryHomePage> {
           ),
           const Divider(height: 1),
           Padding(
-            padding: const EdgeInsets.fromLTRB(0, AppSpacing.sm, 0, AppSpacing.sm),
+            padding: const EdgeInsets.fromLTRB(
+              0,
+              AppSpacing.sm,
+              0,
+              AppSpacing.sm,
+            ),
             child: Center(child: SosButton(enabled: hasEmergencyContact)),
           ),
         ],
@@ -155,8 +200,9 @@ class _ConnectionDot extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final SocketStatus status =
-        ref.watch(realtimeControllerProvider.select((RealtimeState s) => s.status));
+    final SocketStatus status = ref.watch(
+      realtimeControllerProvider.select((RealtimeState s) => s.status),
+    );
 
     final bool connected = status == SocketStatus.connected;
 
@@ -254,9 +300,9 @@ class _WatchersCard extends StatelessWidget {
               for (final Guardianship link in guardians)
                 Chip(
                   avatar: CircleAvatar(
-                    backgroundColor:
-                        AppColors.parse(link.guardianUser?.avatarColor)
-                            .withOpacity(0.2),
+                    backgroundColor: AppColors.parse(
+                      link.guardianUser?.avatarColor,
+                    ).withOpacity(0.2),
                     child: Text(
                       Fa.initials(link.guardianUser?.fullName ?? '؟'),
                       style: theme.textTheme.labelSmall,

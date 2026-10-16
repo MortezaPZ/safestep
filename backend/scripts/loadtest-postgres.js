@@ -9,7 +9,7 @@
  *
  * اجرا:
  *   DATABASE_URL=postgres://safestep:***@localhost:5432/safestep \
- *   LOADTEST_DURATION=15 node scripts/loadtest-postgres.js
+ *   LOADTEST_DURATION=8 node scripts/loadtest-postgres.js
  *
  * رد کردن در صورتی که Postgres نباشد:
  *   EXIT_CODE=4 و پیام روشن.
@@ -98,7 +98,8 @@ const { runMigrations } = await import('../src/db/migrate.js');
 const { hashPassword } = await import('../src/utils/crypto.js');
 const telemetryService = (await import('../src/services/telemetryService.js')).default;
 
-const DURATION = Number(process.env.LOADTEST_DURATION || 15);
+const DURATION = Number(process.env.LOADTEST_DURATION || 8);
+let nextLoadPhone = Number(String(Date.now()).slice(-7));
 
 async function listen(app) {
   const server = http.createServer(app);
@@ -113,16 +114,38 @@ async function seedLoad(nPrimary) {
   const hash = await hashPassword(PASSWORD);
   const primaries = [];
   for (let i = 0; i < nPrimary; i += 1) {
-    const phone = `0914${String(1000000 + i).slice(-7)}`;
-    const { rows } = await db.query(
-      `INSERT INTO users (phone, password_hash, full_name, role, verification_status)
-       VALUES ($1,$2,$3,'primary','verified') RETURNING id`,
-      [phone, hash, `بار ${i}`],
-    );
-    await db.query('INSERT INTO user_settings (user_id) VALUES ($1)', [rows[0].id]);
-    primaries.push({ id: rows[0].id, phone });
+    const user = await createLoadUser('primary', `بار ${i}`, hash);
+    await db.query('INSERT INTO user_settings (user_id) VALUES ($1)', [user.id]);
+    primaries.push(user);
   }
   return primaries;
+}
+
+async function createLoadUser(role, fullName, hash) {
+  const prefix = role === 'guardian' ? '0915' : '0914';
+  for (let attempt = 0; attempt < 10_000_000; attempt += 1) {
+    const phone = `${prefix}${String(nextLoadPhone).padStart(7, '0')}`;
+    nextLoadPhone = (nextLoadPhone + 1) % 10_000_000;
+    const { rows } = await db.query(
+      `INSERT INTO users (phone, password_hash, full_name, role, verification_status)
+       VALUES ($1,$2,$3,$4,'verified') ON CONFLICT (phone) DO NOTHING RETURNING id`,
+      [phone, hash, fullName, role],
+    );
+    if (rows[0]) return { id: rows[0].id, phone };
+  }
+  throw new Error('Could not allocate a unique phone number for the load-test account.');
+}
+
+async function seedEmergencyContact(primaryId) {
+  const hash = await hashPassword(PASSWORD);
+  const guardian = await createLoadUser('guardian', 'مراقب بار SOS', hash);
+  const guardianId = guardian.id;
+  await db.query('INSERT INTO user_settings (user_id) VALUES ($1)', [guardianId]);
+  await db.query(
+    `INSERT INTO guardianships (primary_user_id, guardian_user_id, permissions)
+     VALUES ($1,$2,ARRAY['view_location','receive_alerts','emergency']::text[])`,
+    [primaryId, guardianId],
+  );
 }
 
 async function login(port, phone) {
@@ -197,12 +220,12 @@ function toMd(rows, { probe, poolBefore, poolAfter, duration }) {
   }
   if (poolBefore || poolAfter) {
     lines.push('');
-    lines.push('## اتصال‌های دیتابیس در حین بار');
+    lines.push('## شمار اتصال‌های دیتابیس پیش و پس از سناریوها');
     lines.push('');
     lines.push('| زمان | کل | فعال | بیکار |');
     lines.push('| --- | --- | --- | --- |');
     if (poolBefore) lines.push(`| پیش از بار | ${poolBefore.total} | ${poolBefore.active} | ${poolBefore.idle} |`);
-    if (poolAfter) lines.push(`| در اوج بار | ${poolAfter.total} | ${poolAfter.active} | ${poolAfter.idle} |`);
+    if (poolAfter) lines.push(`| پس از سناریوها | ${poolAfter.total} | ${poolAfter.active} | ${poolAfter.idle} |`);
   }
   return `${lines.join('\n')}\n`;
 }
@@ -215,7 +238,7 @@ async function main() {
     process.stderr.write('دستور اجرای صحیح:\n');
     process.stderr.write(
       '  DATABASE_URL=postgres://safestep:***@localhost:5432/safestep ' +
-        'LOADTEST_DURATION=15 node scripts/loadtest-postgres.js\n\n',
+        'LOADTEST_DURATION=8 node scripts/loadtest-postgres.js\n\n',
     );
     process.exitCode = 4;
     return;
@@ -238,11 +261,13 @@ async function main() {
   telemetryService.setEnabled(true);
 
   const primaries = await seedLoad(50);
+  await seedEmergencyContact(primaries[0].id);
   const app = createApp();
   const { server, port } = await listen(app);
   const token = await login(port, primaries[0].phone);
   const auth = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
   const pingBody = JSON.stringify({ lat: 35.72, lng: 51.33, accuracyM: 8, batteryLevel: 80 });
+  const sosBody = JSON.stringify({ lat: 35.72, lng: 51.33, accuracyM: 8, batteryLevel: 80, note: 'load-test burst' });
 
   const rows = [];
   const poolBefore = await poolStats();
@@ -259,7 +284,6 @@ async function main() {
     });
   }
 
-  const poolAfter = await poolStats();
 
   rows.push({
     title: 'GET /locations/watching',
@@ -276,6 +300,15 @@ async function main() {
     )),
   });
 
+  rows.push({
+    title: 'POST /sos burst (10 connections)',
+    ...(await runCannon(`http://127.0.0.1:${port}/api/v1/sos`, {
+      method: 'POST', headers: auth, body: sosBody, connections: 10,
+      duration: DURATION, title: 'sos-burst',
+    })),
+  });
+
+  const poolAfter = await poolStats();
   const md = toMd(rows, { probe, poolBefore, poolAfter, duration: DURATION });
 
   fs.mkdirSync(REPORT_DIR, { recursive: true });

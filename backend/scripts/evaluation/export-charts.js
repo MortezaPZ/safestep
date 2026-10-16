@@ -8,7 +8,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { predict } from '../../src/services/fallDetection/classifier.js';
 import { evaluateTransition } from '../../src/services/geofenceEngine.js';
-import { destinationPoint, haversineMeters, isValidPositionSample } from '../../src/utils/geo.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.resolve(here, '../../../docs/evaluation');
@@ -21,47 +20,55 @@ function writeCsv(name, rows) {
 }
 
 const csvPath = path.resolve(here, '../../data/falls/dataset.csv');
-const lines = fs.readFileSync(csvPath, 'utf8').trim().split(/\r?\n/).slice(1);
-const scored = [];
-for (const line of lines) {
-  const cols = line.split(',');
-  const label = Number(cols[0]);
-  const features = cols.slice(1, 15).map(Number);
-  if (features.length !== 14 || features.some((n) => Number.isNaN(n))) continue;
-  const result = predict(features);
-  scored.push({ label, confidence: result.confidence, isFall: result.isFall ? 1 : 0 });
-}
-
-const positives = scored.filter((row) => row.label === 1).length;
-const negatives = scored.length - positives;
-const roc = ['threshold,tpr,fpr,tp,fp,fn,tn,source'];
-for (let step = 0; step <= 20; step += 1) {
-  const threshold = step / 20;
-  let tp = 0;
-  let fp = 0;
-  let fn = 0;
-  let tn = 0;
-  for (const row of scored) {
-    const predicted = row.confidence >= threshold ? 1 : 0;
-    if (predicted === 1 && row.label === 1) tp += 1;
-    else if (predicted === 1 && row.label === 0) fp += 1;
-    else if (predicted === 0 && row.label === 1) fn += 1;
-    else tn += 1;
+let syntheticRocSummary = null;
+if (fs.existsSync(csvPath)) {
+  const lines = fs.readFileSync(csvPath, 'utf8').trim().split(/\r?\n/).slice(1);
+  const scored = [];
+  for (const line of lines) {
+    const cols = line.split(',');
+    const label = Number(cols[0]);
+    const features = cols.slice(1, 15).map(Number);
+    if (features.length !== 14 || features.some((n) => Number.isNaN(n))) continue;
+    const result = predict(features);
+    scored.push({ label, confidence: result.confidence });
   }
-  const tpr = positives ? tp / positives : 0;
-  const fpr = negatives ? fp / negatives : 0;
-  roc.push([threshold.toFixed(2), tpr.toFixed(4), fpr.toFixed(4), tp, fp, fn, tn, 'synthetic-dataset.csv'].join(','));
+
+  const positives = scored.filter((row) => row.label === 1).length;
+  const negatives = scored.length - positives;
+  const roc = ['threshold,tpr,fpr,tp,fp,fn,tn,source'];
+  for (let step = 0; step <= 20; step += 1) {
+    const threshold = step / 20;
+    let tp = 0;
+    let fp = 0;
+    let fn = 0;
+    let tn = 0;
+    for (const row of scored) {
+      const predicted = row.confidence >= threshold ? 1 : 0;
+      if (predicted === 1 && row.label === 1) tp += 1;
+      else if (predicted === 1 && row.label === 0) fp += 1;
+      else if (predicted === 0 && row.label === 1) fn += 1;
+      else tn += 1;
+    }
+    const tpr = positives ? tp / positives : 0;
+    const fpr = negatives ? fp / negatives : 0;
+    roc.push([threshold.toFixed(2), tpr.toFixed(4), fpr.toFixed(4), tp, fp, fn, tn, 'synthetic-dataset.csv'].join(','));
+  }
+
+  let auc = 0;
+  const points = roc.slice(1).map((line) => line.split(',').map(Number));
+  const ordered = [...points].sort((a, b) => a[2] - b[2]);
+  for (let i = 1; i < ordered.length; i += 1) {
+    const dx = ordered[i][2] - ordered[i - 1][2];
+    auc += dx * (ordered[i][1] + ordered[i - 1][1]) / 2;
+  }
+  writeCsv('roc-threshold.csv', roc);
+  syntheticRocSummary = `samples=${scored.length} auc≈${auc.toFixed(3)} positives=${positives} negatives=${negatives}`;
+} else {
+  process.stdout.write('Synthetic dataset not packaged; skipped roc-threshold.csv regeneration.\n');
 }
 
-let auc = 0;
-const points = roc.slice(1).map((line) => line.split(',').map(Number));
-const ordered = [...points].sort((a, b) => a[2] - b[2]);
-for (let i = 1; i < ordered.length; i += 1) {
-  const dx = ordered[i][2] - ordered[i - 1][2];
-  auc += dx * (ordered[i][1] + ordered[i - 1][1]) / 2;
-}
-
-const fence = ['hysteresis_m,false_exit_count,true_exit_count,source'];
+const fence = ['hysteresis_m,debounce_count,false_exit_count,true_exit_count,source'];
+const debounceCount = 1;
 for (const hysteresisM of [0, 10, 25, 40]) {
   let state = { state: 'inside', consecutiveCount: 0, pendingState: null };
   let falseExits = 0;
@@ -69,7 +76,7 @@ for (const hysteresisM of [0, 10, 25, 40]) {
   for (let i = 0; i < 240; i += 1) {
     const noise = ((i * 13) % 31) - 15;
     const distance = radius + noise;
-    const next = evaluateTransition(state, distance, radius, { hysteresisM, debounceCount: 1, cooldownSec: 0 });
+    const next = evaluateTransition(state, distance, radius, { hysteresisM, debounceCount, cooldownSec: 0 });
     if (next.event === 'exit') falseExits += 1;
     state = next;
   }
@@ -77,21 +84,11 @@ for (const hysteresisM of [0, 10, 25, 40]) {
   let trueExits = 0;
   for (let i = 0; i < 30; i += 1) {
     const distance = radius - 40 + i * 4;
-    const next = evaluateTransition(walk, distance, radius, { hysteresisM, debounceCount: 2, cooldownSec: 0 });
+    const next = evaluateTransition(walk, distance, radius, { hysteresisM, debounceCount, cooldownSec: 0 });
     if (next.event === 'exit') trueExits += 1;
     walk = next;
   }
-  fence.push([hysteresisM, falseExits, trueExits, 'geofence-engine-simulation'].join(','));
-}
-
-const home = { lat: 35.7219, lng: 51.3347 };
-const position = ['offset_m,reported_accuracy_m,error_m,valid_sample,source'];
-for (const offset of [3, 8, 12, 18, 25, 35, 48]) {
-  const point = destinationPoint(home.lat, home.lng, offset, 40);
-  const errorM = Math.round(haversineMeters(home.lat, home.lng, point.lat, point.lng) * 10) / 10;
-  const accuracyM = offset < 30 ? 12 : 36;
-  const valid = isValidPositionSample({ errorM, accuracyM, isQueuedReplay: false });
-  position.push([offset, accuracyM, errorM, valid ? 1 : 0, 'demo-home-reference-geometry'].join(','));
+  fence.push([hysteresisM, debounceCount, falseExits, trueExits, 'geofence-engine-simulation'].join(','));
 }
 
 const model = (await import('../../src/services/fallDetection/classifier.js')).loadModel();
@@ -141,7 +138,5 @@ for (let step = 0; step <= 20; step += 1) {
   ].join(','));
 }
 writeCsv('roc-sisfall-loo.csv', looRows);
-writeCsv('roc-threshold.csv', roc);
 writeCsv('geofence-false-alarms.csv', fence);
-writeCsv('position-error.csv', position);
-process.stdout.write(`samples=${scored.length} auc≈${auc.toFixed(3)} positives=${positives} negatives=${negatives}\n`);
+if (syntheticRocSummary) process.stdout.write(`${syntheticRocSummary}\n`);

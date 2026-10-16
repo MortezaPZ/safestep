@@ -2,6 +2,8 @@
 
 Produced against real PostgreSQL 16.15 (official binaries, separate process, port 5433). PGlite was not used.
 
+This is the historical run. It lasted 8 seconds per scenario and did not include an SOS burst. The current load-test script has an SOS scenario, but this report contains no SOS result.
+
 Database: PostgreSQL 16.15, `max_connections` 100. Each scenario ran for 8 seconds. Driver: `pg`. Errors: 0.
 
 | Scenario | Requests | Mean ms | p50 | p95 | p99 | Errors |
@@ -12,11 +14,11 @@ Database: PostgreSQL 16.15, `max_connections` 100. Each scenario ran for 8 secon
 | GET /locations/watching | 6064 | 25.98 | 24 | 35 | 43 | 0 |
 | GET /locations/history | 600 | 288.84 | 279 | 384 | 385 | 0 |
 
-## Database connections during the load
+## Database connection snapshot after the ping scenarios
 
 | When | Total | Active | Idle |
 | --- | --- | --- | --- |
 | Before | 2 | 1 | 1 |
-| At the peak | 10 | 5 | 5 |
+| After ping scenarios | 10 | 5 | 5 |
 
 This run is on a local computer, not a cloud server.

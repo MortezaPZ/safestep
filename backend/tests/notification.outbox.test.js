@@ -25,6 +25,7 @@ const { createAdmin } = await import('../src/db/createAdmin.js');
 const env = (await import('../src/config/env.js')).default;
 const notificationAdapter = await import('../src/services/notificationAdapter.js');
 const notificationOutbox = await import('../src/services/notificationOutbox.js');
+const { invalidateAccountState } = await import('../src/middleware/auth.js');
 
 const PASSWORD = 'Test@1234';
 const FAKE_SA = JSON.stringify({
@@ -41,7 +42,10 @@ async function signUp(phone, fullName, role) {
     .post('/api/v1/auth/register')
     .send({ phone, password: PASSWORD, fullName, role });
   expect(res.status).toBe(201);
-  return { token: res.body.accessToken, id: res.body.user.id };
+  const id = res.body.user.id;
+  await db.query("UPDATE users SET verification_status = 'verified' WHERE id = $1", [id]);
+  invalidateAccountState(id);
+  return { token: res.body.accessToken, id };
 }
 
 function enableFcm() {

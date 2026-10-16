@@ -22,6 +22,7 @@ const { createApp } = await import('../src/app.js');
 const { default: db } = await import('../src/db/index.js');
 const { runMigrations } = await import('../src/db/migrate.js');
 const { destinationPoint } = await import('../src/utils/geo.js');
+const { invalidateAccountState } = await import('../src/middleware/auth.js');
 
 const HOME = { lat: 35.7219, lng: 51.3347 };
 const PASSWORD = 'Test@1234';
@@ -35,7 +36,10 @@ async function signUp(phone, fullName, role) {
     .send({ phone, password: PASSWORD, fullName, role });
 
   expect(res.status).toBe(201);
-  return { token: res.body.accessToken, id: res.body.user.id, user: res.body.user };
+  const id = res.body.user.id;
+  await db.query("UPDATE users SET verification_status = 'verified' WHERE id = $1", [id]);
+  invalidateAccountState(id);
+  return { token: res.body.accessToken, id, user: res.body.user };
 }
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });

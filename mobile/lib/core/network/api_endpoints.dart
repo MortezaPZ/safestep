@@ -56,6 +56,11 @@ class ApiEndpoints {
   static const String safeZones = '/safe-zones';
   static String safeZone(String id) => '/safe-zones/$id';
 
+  /* ─────────────────────── ارزیابی میدانی ─────────────────────── */
+
+  static const String evaluationReference = '/evaluation/reference';
+  static const String evaluationSus = '/evaluation/sus';
+
   /* ─────────────────────── تنظیمات و دستگاه ─────────────────────── */
 
   static const String fallsDetect = '/falls/detect';

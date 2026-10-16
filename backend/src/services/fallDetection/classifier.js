@@ -76,7 +76,18 @@ export function predict(features, model = loadModel()) {
   };
 }
 
-export function cannedPositiveFeatures() {
+export function cannedPositiveFeatures(model = loadModel()) {
+  // Simulator fixtures must exercise the active model, even when it was
+  // retrained on a different source than the synthetic demo generator.
+  for (const [vector, label] of model.knn.points) {
+    if (label !== 1) continue;
+    const features = vector.map((value, index) =>
+      value * model.standardization.std[index] + model.standardization.mean[index],
+    );
+    if (predict(features, model).isFall) return features;
+  }
+
+  // Keep a fallback for older or custom models without stored positive points.
   return cannedFallFeatures();
 }
 

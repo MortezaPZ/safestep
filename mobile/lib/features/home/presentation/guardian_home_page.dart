@@ -95,6 +95,11 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
       bottomBar: const MainNav(current: 'home'),
       actions: <Widget>[
         const _ConnectionDot(),
+        IconButton(
+          onPressed: () => context.push(AppRoutes.evaluation),
+          icon: const Icon(Icons.assignment_outlined),
+          tooltip: 'ارزیابی میدانی و پرسشنامه SUS',
+        ),
         _AlertsButton(unread: unread),
         IconButton(
           onPressed: () async {
@@ -130,7 +135,8 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
               child: EmptyView(
                 icon: Icons.group_outlined,
                 title: 'هنوز به کسی وصل نشده‌اید',
-                message: 'از فردی که می‌خواهید همراهش باشید بخواهید کد دعوت '
+                message:
+                    'از فردی که می‌خواهید همراهش باشید بخواهید کد دعوت '
                     'شش‌رقمی‌اش را برایتان بفرستد.',
                 actionLabel: 'وارد کردن کد دعوت',
                 onAction: _openRedeem,
@@ -138,15 +144,24 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
             );
           }
 
-          final bool main = state.people.any((WatchedPerson person) => person.isMainSupervisor);
+          final bool main = state.people.any(
+            (WatchedPerson person) => person.isMainSupervisor,
+          );
           final bool emergency = state.people.any(
-            (WatchedPerson person) => person.permissions.contains(SharePermission.emergency),
+            (WatchedPerson person) =>
+                person.permissions.contains(SharePermission.emergency),
           );
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const SizedBox(height: AppSpacing.md),
-              Text(main ? 'ناظر اصلی' : emergency ? 'ناظر با دسترسی اضطراری' : 'ناظر بدون دسترسی اضطراری'),
+              Text(
+                main
+                    ? 'ناظر اصلی'
+                    : emergency
+                    ? 'ناظر با دسترسی اضطراری'
+                    : 'ناظر بدون دسترسی اضطراری',
+              ),
               const SizedBox(height: AppSpacing.sm),
               if (main) ...<Widget>[
                 AppButton(
@@ -289,7 +304,8 @@ class _PersonStatusCard extends StatelessWidget {
 
     // فهرست خالی یعنی سرور سطوح دسترسی را در این پاسخ نفرستاده، نه اینکه
     // دسترسی وجود ندارد؛ در آن حالت پیام هشدار نمایش داده نمی‌شود.
-    final bool canView = person.permissions.isEmpty ||
+    final bool canView =
+        person.permissions.isEmpty ||
         person.permissions.contains(SharePermission.viewLocation);
 
     return AppCard(
@@ -311,8 +327,9 @@ class _PersonStatusCard extends StatelessWidget {
                       backgroundColor: avatarColor.withOpacity(0.15),
                       child: Text(
                         Fa.initials(person.person.fullName),
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(color: avatarColor),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: avatarColor,
+                        ),
                       ),
                     ),
                     if (person.isOnline)
@@ -370,7 +387,9 @@ class _PersonStatusCard extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    A11y.decorative(const Icon(Icons.schedule_rounded, size: 16)),
+                    A11y.decorative(
+                      const Icon(Icons.schedule_rounded, size: 16),
+                    ),
                     const SizedBox(width: AppSpacing.xxs),
                     Text(
                       Fa.timeAgo(point.recordedAt),
@@ -388,7 +407,9 @@ class _PersonStatusCard extends StatelessWidget {
                               ? Icons.battery_alert_rounded
                               : Icons.battery_full_rounded,
                           size: 16,
-                          color: point.batteryLevel! <= 15 ? AppColors.warning : null,
+                          color: point.batteryLevel! <= 15
+                              ? AppColors.warning
+                              : null,
                         ),
                       ),
                       const SizedBox(width: AppSpacing.xxs),
@@ -401,8 +422,9 @@ class _PersonStatusCard extends StatelessWidget {
                 if (point.isSimulated)
                   Text(
                     'حالت نمایش',
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(color: AppColors.simulated),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppColors.simulated,
+                    ),
                   ),
               ],
             ),
@@ -431,7 +453,10 @@ class _PersonStatusCard extends StatelessWidget {
       final String name = person.outsideZoneName ?? 'محدوده امن';
       final DateTime? since = person.outsideSince;
       if (since == null) return 'خارج از «$name» است';
-      final int minutes = DateTime.now().difference(since).inMinutes.clamp(1, 100000);
+      final int minutes = DateTime.now()
+          .difference(since)
+          .inMinutes
+          .clamp(1, 100000);
       return 'خارج از «$name» است، حدود $minutes دقیقه';
     }
     return 'در حال پایش';

@@ -1,5 +1,5 @@
-hysteresis_m,false_exit_count,true_exit_count,source
-0,100,1,geofence-engine-simulation
-10,39,1,geofence-engine-simulation
-25,0,1,geofence-engine-simulation
-40,0,1,geofence-engine-simulation
+hysteresis_m,debounce_count,false_exit_count,true_exit_count,source
+0,1,100,1,geofence-engine-simulation
+10,1,39,1,geofence-engine-simulation
+25,1,0,1,geofence-engine-simulation
+40,1,0,1,geofence-engine-simulation

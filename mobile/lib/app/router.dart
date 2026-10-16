@@ -11,6 +11,7 @@ import '../features/auth/presentation/register_page.dart';
 import '../features/home/presentation/guardian_home_page.dart';
 import '../features/home/presentation/supervisor_zones_page.dart';
 import '../features/home/presentation/primary_home_page.dart';
+import '../features/evaluation/presentation/evaluation_page.dart';
 import '../features/fall/presentation/fall_check_page.dart';
 import '../features/onboarding/presentation/role_select_page.dart';
 import '../features/pairing/presentation/guardians_page.dart';
@@ -48,6 +49,7 @@ class AppRoutes {
 
   static const String alerts = '/alerts';
   static const String fallCheck = '/fall-check';
+  static const String evaluation = '/evaluation';
 
   /// نقشه‌ی زنده‌ی یک فرد تحت پایش
   static String mapFor(String userId) => '/watch/$userId';
@@ -143,13 +145,15 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
       if (location == AppRoutes.home && auth.user!.role == UserRole.admin) {
         return AppRoutes.admin;
       }
-      if (location == AppRoutes.guardian && auth.user!.role != UserRole.guardian) {
+      if (location == AppRoutes.guardian &&
+          auth.user!.role != UserRole.guardian) {
         return AppRoutes.homeFor(auth.user!.role);
       }
       if (location.startsWith('/admin') && auth.user!.role != UserRole.admin) {
         return AppRoutes.homeFor(auth.user!.role);
       }
-      if (location.startsWith('/supervisor') && auth.user!.role != UserRole.guardian) {
+      if (location.startsWith('/supervisor') &&
+          auth.user!.role != UserRole.guardian) {
         return AppRoutes.homeFor(auth.user!.role);
       }
 
@@ -159,15 +163,18 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
     routes: <RouteBase>[
       GoRoute(
         path: AppRoutes.splash,
-        builder: (BuildContext context, GoRouterState state) => const SplashPage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const SplashPage(),
       ),
       GoRoute(
         path: AppRoutes.roleSelect,
-        builder: (BuildContext context, GoRouterState state) => const RoleSelectPage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const RoleSelectPage(),
       ),
       GoRoute(
         path: AppRoutes.login,
-        builder: (BuildContext context, GoRouterState state) => const LoginPage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const LoginPage(),
       ),
       GoRoute(
         path: AppRoutes.register,
@@ -178,11 +185,13 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.home,
-        builder: (BuildContext context, GoRouterState state) => const PrimaryHomePage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const PrimaryHomePage(),
       ),
       GoRoute(
         path: AppRoutes.admin,
-        builder: (BuildContext context, GoRouterState state) => const AdminHomePage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const AdminHomePage(),
         routes: <RouteBase>[
           GoRoute(
             path: 'map',
@@ -208,23 +217,28 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.supervisorZones,
-        builder: (BuildContext context, GoRouterState state) => const SupervisorZonesPage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const SupervisorZonesPage(),
       ),
       GoRoute(
         path: AppRoutes.myMap,
-        builder: (BuildContext context, GoRouterState state) => const MyMapPage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const MyMapPage(),
       ),
       GoRoute(
         path: AppRoutes.guardian,
-        builder: (BuildContext context, GoRouterState state) => const GuardianHomePage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const GuardianHomePage(),
       ),
       GoRoute(
         path: AppRoutes.invite,
-        builder: (BuildContext context, GoRouterState state) => const InvitePage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const InvitePage(),
       ),
       GoRoute(
         path: AppRoutes.redeem,
-        builder: (BuildContext context, GoRouterState state) => const RedeemPage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const RedeemPage(),
       ),
       GoRoute(
         path: AppRoutes.alerts,
@@ -235,8 +249,14 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.fallCheck,
         builder: (BuildContext context, GoRouterState state) => FallCheckPage(
           fallEventId: state.uri.queryParameters['id'] ?? '',
-          countdownSec: int.tryParse(state.uri.queryParameters['sec'] ?? '') ?? 30,
+          countdownSec:
+              int.tryParse(state.uri.queryParameters['sec'] ?? '') ?? 30,
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.evaluation,
+        builder: (BuildContext context, GoRouterState state) =>
+            const EvaluationPage(),
       ),
       GoRoute(
         path: '/watch/:userId',
@@ -259,7 +279,8 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.settings,
-        builder: (BuildContext context, GoRouterState state) => const SettingsPage(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const SettingsPage(),
         routes: <RouteBase>[
           GoRoute(
             path: 'accessibility',
