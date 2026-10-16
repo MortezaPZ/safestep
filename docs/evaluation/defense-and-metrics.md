@@ -1,57 +1,40 @@
-# Evaluation numbers
+# Evaluation results and limits
 
-The delivery documents use port `4080`, not `4000`.
+## Fall classifier
 
-## Alert delivery
+The current `backend/src/services/fallDetection/model.json` is labeled `sisfall-real` and records five-fold validation metrics. These are the SisFall figures to use when describing the current model:
 
-Accuracy, on a leave-one-out pass over the stored SisFall prototypes, threshold `0.80`: sensitivity `0.9889`, false-positive rate `0.0009`. The PostgreSQL 16.15 load test reported no request-delivery errors.
+| Model | Accuracy | Precision | Recall | F1 | TP | FP | TN | FN |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| KNN, k=5 | 0.9951 | 0.9867 | 0.9939 | 0.9903 | 1787 | 24 | 5390 | 11 |
+| Linear SVM | 0.9813 | 0.9776 | 0.9466 | 0.9619 | 1702 | 39 | 5375 | 96 |
 
-Latency for storing a location, mean:
+The model metadata reports 7,212 SisFall windows: 1,798 fall windows and 5,414 activity windows. The raw SisFall recordings are not included in this source package.
 
-| Target rate | Requests | Mean ms | p50 | p95 | p99 |
-| --- | --- | --- | --- | --- | --- |
-| 50/s | 674 | 151.98 | 139 | 281 | 291 |
-| 100/s | 372 | 540.81 | 543 | 700 | 732 |
-| 200/s | 300 | 1264.92 | 1032 | 1979 | 2083 |
+`backend/scripts/falls/train_sisfall.js` includes a stratified five-fold out-of-fold sweep over the combined rule's SVM margin and KNN agree-ratio thresholds. No new sweep table is included here because neither the raw recordings nor a prepared feature CSV is bundled. Set `SISFALL_FEATURE_CSV` to a prepared 15-column CSV and run `npm run train:fall:sisfall` to regenerate it; that run will also retrain and replace the deployed model.
 
-The "people I watch" list averaged `25.98` ms. Source: `docs/evaluation/load-test-postgres-2026-09-24.md`.
+`roc-sisfall-loo.csv` is not held-out validation. Its leave-one-out loop uses 1,443 prototypes selected from the full 7,212-window set, so each held-out prototype has already participated in the full-data selection. Do not cite its 0.9889 sensitivity as a generalization estimate; use the five-fold metrics stored in `model.json`.
 
-## ROC
+## Synthetic ROC
 
-`roc-sisfall-loo.csv` is leave-one-out over 1443 stored prototypes of the `sisfall-real` model, not a held-out test set. At threshold `0.80`: sensitivity `0.9889`, false-positive rate `0.0009` (356 true positives, 1 false positive, 4 false negatives).
+`roc-threshold.csv` scores the synthetic `dataset.csv`, not SisFall. Its AUC is **1.000**: at threshold 0.05 it reports 2,000 true positives and zero false positives. This perfect separation describes the synthetic generator only and is not a model-accuracy result to use in the thesis.
 
-`roc-threshold.csv` scores that same model on the synthetic `dataset.csv`. AUC is about `0.500`. The synthetic file is not the SisFall distribution and is not the number to cite as model accuracy.
+## Geofence simulation
 
-## Geofence hysteresis
-
-`geofence-false-alarms.csv`. A person on the edge of a 150 m circle, with about 15 m of noise:
-
-| Hysteresis (m) | False exits | Real exits |
-| --- | --- | --- |
-| 0 | 100 | 1 |
-| 10 | 39 | 1 |
-| 25 | 0 | 1 |
-| 40 | 0 | 1 |
+`geofence-false-alarms.csv` is a deterministic engine simulation of boundary noise and a constructed outward walk. Both columns use the same `debounce_count=1`. It is useful for comparing hysteresis settings, but it is not a measurement from a real walk.
 
 ## Position error
 
-`position-error.csv`. The reference point is the demo home. `error_m` is the Haversine distance. A sample whose reported GPS accuracy is worse than 30 m is invalid under the proposal rule (`valid_sample = 0`).
-
-## SisFall training
-
-`model.json` is labeled `sisfall-real`, trained `2026-10-02T21:20:52.395Z`. The run read 1798 fall files and 2707 activity-of-daily-living files. The synthetic `dataset.csv` is not used at inference.
+No real-walk GPS samples have been collected in this package. The former `position-error.csv` was a geometry self-check: it moved a point by an offset and measured the distance back to the same point. It contained no GPS fixes or walking data, so it has been removed from the evaluation artifacts. Collect 20–30 real-walk samples against a surveyed reference before reporting position error.
 
 ## SUS
 
-Brooke's ten items. Odd items contribute `(score - 1)`. Even items contribute `(5 - score)`. The sum is multiplied by `2.5`. Range is 0 to 100.
+No independent participant survey has been collected. The former twenty rows were a structured review of the demo by two roles, not responses from ten independent families. Those response rows have been removed from the evaluation artifacts. The mobile app now has a SUS form; collect real responses before reporting a SUS mean.
 
-The sheet is `sus-10-families.md`. Twenty structured responses, two roles, not a field interview. Mean `80.4`. The person being cared for `79.8`. The caregiver `81.0`.
+## Alert delivery to a phone
 
-## Questions the numbers are meant to answer
+FCM is not active in the current build, and there is no measured phone-receipt latency. After FCM is configured, export the relevant `alert_deliveries` rows and measure delivery on real devices. Server-side request time is not phone-receipt time.
 
-- GPS-reported accuracy is not the same thing as error against the reference point. A sample worse than 30 m of reported accuracy is invalid.
-- The fall model is trained on SisFall. The synthetic `dataset.csv` is not used at inference, and its ROC is about chance.
-- An automatic emergency call is not the SOS button. SOS is started by the person and is delivered according to the emergency permission.
-- An admin does not receive live coordinates or route history.
-- After sharing is turned off, the primary guardian loses the live feed. A limited guardian did not have the emergency path.
-- The load test ran on PostgreSQL 16.15. There is no cloud-vendor latency number in the report.
+## PostgreSQL load test
+
+`load-test-postgres-2026-09-24.md` is a historical local run against PostgreSQL 16.15. Each scenario lasted 8 seconds; that run covered location ping, watching, and history, but did not include an SOS burst. The current `backend/scripts/loadtest-postgres.js` includes an SOS burst scenario and defaults to 8 seconds per scenario. A new SOS result must come from running that script against real PostgreSQL; the old report does not support an SOS performance claim. These local measurements are not cloud-vendor latency figures.

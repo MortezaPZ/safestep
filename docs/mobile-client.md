@@ -54,6 +54,14 @@ On a real phone, set the same server address on the login screen.
 
 An iOS IPA is not produced on Windows.
 
+## Field evaluation
+
+Open **Field evaluation** from the primary or guardian home page to register a reference point or submit the SUS questionnaire. For position-error measurements, enter coordinates for a known surveyed point. The GPS button only fills an approximate phone fix; it is not ground truth.
+
+## Mobile test coverage
+
+`mobile/test/widget_test.dart` currently contains one test, which checks server-address normalization. The source package does not contain 25 mobile tests.
+
 ## Video
 
 Short guide: `docs/mobile-guide.mp4`.

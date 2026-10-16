@@ -6,7 +6,7 @@ Public UCI set: "Dataset for ADL Recognition with Wrist-worn Accelerometer" (16 
 
 https://archive.ics.uci.edu/dataset/283
 
-The files are wrist-accelerometer recordings of real people, stored under `backend/data/falls/real/HMP_Dataset/`. No file in that folder was fabricated.
+The source describes wrist-accelerometer recordings of real people. The raw files and prepared feature CSV are not included in this source package.
 
 ## Class mix
 
@@ -56,7 +56,7 @@ The perfect KNN score is on this mixed set (real activity, simulated falls). It 
 
 ## Model file
 
-The run wrote `src/services/fallDetection/model.json`.
+The reproducible entry point is `npm run train:fall:real`. It expects a prepared 15-column feature CSV (label plus fourteen features), supplied with `REAL_FALL_FEATURE_CSV`. It writes a separate `model-real.json` and will not overwrite the deployed SisFall model. The raw source files are not included, so the prior report figures cannot be regenerated from this package alone.
 
 ```bash
 npm run train:fall:real

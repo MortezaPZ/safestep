@@ -127,6 +127,21 @@ describe('سناریوی کلیدی: جلوگیری از هشدارهای لرز
     expect(events).toEqual(['exit']);
   });
 
+  it('روش ساده و موتور پیشنهادی را روی همان دنباله‌ی خروج واقعی مقایسه می‌کند', () => {
+    const seq = [145, 165, 145, 165, 200, 250, 400, 600];
+    let naiveState = 'inside';
+    const naiveEvents = [];
+    for (const distance of seq) {
+      const next = distance > RADIUS ? 'outside' : 'inside';
+      if (next !== naiveState) naiveEvents.push(next === 'outside' ? 'exit' : 'enter');
+      naiveState = next;
+    }
+
+    const { events: hysteresisEvents } = runSequence(seq);
+    expect(naiveEvents).toEqual(['exit', 'enter', 'exit']);
+    expect(hysteresisEvents).toEqual(['exit']);
+  });
+
   it('یک رفت و برگشت کامل، فقط دو رویداد تولید می‌کند', () => {
     const seq = [
       100, 110, 120, // داخل

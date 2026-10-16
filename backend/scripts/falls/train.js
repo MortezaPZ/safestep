@@ -12,7 +12,7 @@ const DATA_CSV = path.join(ROOT, 'data/falls/dataset.csv');
 const MODEL_PATH = path.join(ROOT, 'src/services/fallDetection/model.json');
 const REPORT_PATH = path.resolve(ROOT, '../docs/phase3/02-training-report.md');
 
-function parseCsv(text) {
+export function parseCsv(text) {
   const lines = text.split(/\r?\n/).filter((l) => l && !l.startsWith('#'));
   const rows = [];
   for (const line of lines.slice(1)) {
@@ -86,16 +86,28 @@ function knnPredict(train, testZ, k) {
   });
 }
 
-function trainSvm(train, lambda, epochs = 40) {
+function seededRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function trainSvm(train, lambda, epochs = 40, seed = 1) {
   const n = train.length;
   const dim = 14;
+  const random = seededRandom(seed);
   let w = Array(dim).fill(0);
   let b = 0;
   let t = 0;
   const shuffled = [...train];
   for (let e = 0; e < epochs; e += 1) {
     for (let i = shuffled.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     for (const p of shuffled) {
@@ -121,6 +133,88 @@ function svmPredict(model, zs) {
     for (let i = 0; i < z.length; i += 1) m += model.w[i] * z[i];
     return m >= 0 ? 1 : 0;
   });
+}
+
+/**
+ * Out-of-fold sweep for the deployed OR rule over SVM margin and KNN vote.
+ * Scaling is fitted on each training fold, so each score is produced without
+ * using that row's label or feature distribution to fit its fold.
+ */
+export function sweepRuleThresholds(rows, {
+  k = 5,
+  lambda = 1e-2,
+  marginThresholds = [-1, -0.5, 0, 0.5, 1, 1.5, 2],
+  agreeThresholds = [0.5, 0.6, 0.7, 0.8, 0.9, 1],
+} = {}) {
+  if (!Array.isArray(rows) || rows.length < 5) {
+    throw new Error('At least five labeled feature rows are required for a five-fold sweep.');
+  }
+
+  const folds = stratifiedFolds(rows, 5);
+  const outOfFold = [];
+  for (let foldIndex = 0; foldIndex < folds.length; foldIndex += 1) {
+    const test = folds[foldIndex];
+    const trainRows = folds.flatMap((fold, index) => (index === foldIndex ? [] : fold));
+    const { mean, std } = stats(trainRows);
+    const train = trainRows.map((row) => ({
+      label: row.label,
+      z: zscore(row.features, mean, std),
+    }));
+    const svm = trainSvm(train, lambda, 40, 0x5eed + foldIndex);
+
+    for (const row of test) {
+      const z = zscore(row.features, mean, std);
+      let margin = svm.b;
+      for (let i = 0; i < z.length; i += 1) margin += svm.w[i] * z[i];
+
+      const neighbors = train
+        .map((point) => {
+          let distance = 0;
+          for (let i = 0; i < z.length; i += 1) distance += (z[i] - point.z[i]) ** 2;
+          return { distance, label: point.label };
+        })
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, k);
+      const agreeRatio = neighbors.filter((point) => point.label === 1).length / neighbors.length;
+      outOfFold.push({ label: row.label, margin, agreeRatio });
+    }
+  }
+
+  return marginThresholds.flatMap((marginThreshold) =>
+    agreeThresholds.map((agreeThreshold) => {
+      let tp = 0;
+      let fp = 0;
+      let fn = 0;
+      let tn = 0;
+      for (const row of outOfFold) {
+        const bothModelsVoteFall = row.margin >= 0 && row.agreeRatio >= 0.5;
+        const predicted = bothModelsVoteFall ||
+          row.margin > marginThreshold || row.agreeRatio >= agreeThreshold;
+        if (predicted && row.label === 1) tp += 1;
+        else if (predicted) fp += 1;
+        else if (row.label === 1) fn += 1;
+        else tn += 1;
+      }
+      const precision = tp + fp ? tp / (tp + fp) : 0;
+      const sensitivity = tp + fn ? tp / (tp + fn) : 0;
+      const accuracy = (tp + tn) / outOfFold.length;
+      const f1 = precision + sensitivity ? 2 * precision * sensitivity / (precision + sensitivity) : 0;
+      return {
+        marginThreshold,
+        agreeThreshold,
+        sensitivity,
+        falsePositiveRate: fp + tn ? fp / (fp + tn) : 0,
+        precision,
+        accuracy,
+        f1,
+        tp,
+        fp,
+        fn,
+        tn,
+        source: 'stratified-5-fold-out-of-fold',
+      };
+    }),
+  );
 }
 
 export function trainFromRows(rows) {

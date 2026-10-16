@@ -22,6 +22,7 @@ const { default: db } = await import('../src/db/index.js');
 const { runMigrations } = await import('../src/db/migrate.js');
 const { createAdmin } = await import('../src/db/createAdmin.js');
 const { default: telemetryService } = await import('../src/services/telemetryService.js');
+const { invalidateAccountState } = await import('../src/middleware/auth.js');
 
 const PASSWORD = 'Test@1234';
 const HOME = { lat: 35.7219, lng: 51.3347 };
@@ -35,7 +36,10 @@ async function signUp(phone, fullName, role = 'primary') {
     .post('/api/v1/auth/register')
     .send({ phone, password: PASSWORD, fullName, role });
   expect(res.status).toBe(201);
-  return { token: res.body.accessToken, id: res.body.user.id, user: res.body.user };
+  const id = res.body.user.id;
+  await db.query("UPDATE users SET verification_status = 'verified' WHERE id = $1", [id]);
+  invalidateAccountState(id);
+  return { token: res.body.accessToken, id, user: res.body.user };
 }
 
 async function login(phone, password = PASSWORD) {

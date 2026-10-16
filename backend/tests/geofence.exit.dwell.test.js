@@ -28,6 +28,7 @@ process.env.GEOFENCE_COOLDOWN_SEC = '0';
 const { createApp } = await import('../src/app.js');
 const { default: db } = await import('../src/db/index.js');
 const { runMigrations } = await import('../src/db/migrate.js');
+const { invalidateAccountState } = await import('../src/middleware/auth.js');
 
 const PASSWORD = 'Test@1234';
 const HOME = { lat: 35.7219, lng: 51.3347 };
@@ -51,7 +52,10 @@ async function signUp(phone, name) {
     phone, password: PASSWORD, fullName: name, role: 'primary',
   });
   expect(res.status).toBe(201);
-  return { token: res.body.accessToken, id: res.body.user.id };
+  const id = res.body.user.id;
+  await db.query("UPDATE users SET verification_status = 'verified' WHERE id = $1", [id]);
+  invalidateAccountState(id);
+  return { token: res.body.accessToken, id };
 }
 
 beforeAll(async () => {

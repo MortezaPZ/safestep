@@ -10,8 +10,8 @@ process.env.DEMO_MODE = 'true';
 const { createApp } = await import('../src/app.js');
 const { default: db } = await import('../src/db/index.js');
 const { runMigrations } = await import('../src/db/migrate.js');
-const { cannedFallFeatures } = await import('../scripts/falls/generate_synthetic.js');
 const { generateDataset } = await import('../scripts/falls/generate_synthetic.js');
+const { cannedPositiveFeatures } = await import('../src/services/fallDetection/classifier.js');
 const fallWatchdog = await import('../src/services/fallWatchdog.js');
 const { invalidateAccountState } = await import('../src/middleware/auth.js');
 
@@ -23,7 +23,10 @@ async function signUp(phone, fullName, role) {
     .post('/api/v1/auth/register')
     .send({ phone, password: PASSWORD, fullName, role });
   expect(res.status).toBe(201);
-  return { token: res.body.accessToken, id: res.body.user.id, user: res.body.user };
+  const id = res.body.user.id;
+  await db.query("UPDATE users SET verification_status = 'verified' WHERE id = $1", [id]);
+  invalidateAccountState(id);
+  return { token: res.body.accessToken, id, user: res.body.user };
 }
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
@@ -83,7 +86,7 @@ describe('API تشخیص سقوط', () => {
       .post('/api/v1/falls/detect')
       .set(auth(primary.token))
       .send({
-        features: cannedFallFeatures(),
+        features: cannedPositiveFeatures(),
         detectedAt: new Date().toISOString(),
         lat: 35.7,
         lng: 51.4,
@@ -101,7 +104,7 @@ describe('API تشخیص سقوط', () => {
   it('تکرار clientEventId بی‌اثر است', async () => {
     const id = randomUUID();
     const body = {
-      features: cannedFallFeatures(),
+      features: cannedPositiveFeatures(),
       clientEventId: id,
     };
     const a = await request(app).post('/api/v1/falls/detect').set(auth(primary.token)).send(body);
@@ -126,7 +129,7 @@ describe('API تشخیص سقوط', () => {
     const res = await request(app)
       .post('/api/v1/falls/detect')
       .set(auth(guardianEm.token))
-      .send({ features: cannedFallFeatures(), clientEventId: randomUUID() });
+      .send({ features: cannedPositiveFeatures(), clientEventId: randomUUID() });
     expect(res.status).toBe(403);
   });
 
@@ -134,7 +137,7 @@ describe('API تشخیص سقوط', () => {
     const created = await request(app)
       .post('/api/v1/falls/detect')
       .set(auth(primary.token))
-      .send({ features: cannedFallFeatures(), clientEventId: randomUUID() });
+      .send({ features: cannedPositiveFeatures(), clientEventId: randomUUID() });
     const fb = await request(app)
       .post(`/api/v1/falls/${created.body.fallEventId}/feedback`)
       .set(auth(primary.token))
@@ -149,7 +152,7 @@ describe('API تشخیص سقوط', () => {
     const created = await request(app)
       .post('/api/v1/falls/detect')
       .set(auth(primary.token))
-      .send({ features: cannedFallFeatures(), clientEventId: randomUUID() });
+      .send({ features: cannedPositiveFeatures(), clientEventId: randomUUID() });
     const fb = await request(app)
       .post(`/api/v1/falls/${created.body.fallEventId}/feedback`)
       .set(auth(primary.token))
@@ -165,7 +168,7 @@ describe('API تشخیص سقوط', () => {
     const created = await request(app)
       .post('/api/v1/falls/detect')
       .set(auth(primary.token))
-      .send({ features: cannedFallFeatures(), clientEventId: randomUUID() });
+      .send({ features: cannedPositiveFeatures(), clientEventId: randomUUID() });
     await request(app)
       .post(`/api/v1/falls/${created.body.fallEventId}/feedback`)
       .set(auth(primary.token))
@@ -181,7 +184,7 @@ describe('API تشخیص سقوط', () => {
     const created = await request(app)
       .post('/api/v1/falls/detect')
       .set(auth(primary.token))
-      .send({ features: cannedFallFeatures(), clientEventId: randomUUID() });
+      .send({ features: cannedPositiveFeatures(), clientEventId: randomUUID() });
     const fb = await request(app)
       .post(`/api/v1/falls/${created.body.fallEventId}/feedback`)
       .set(auth(primary.token))
@@ -233,7 +236,7 @@ describe('API تشخیص سقوط', () => {
     const created = await request(app)
       .post('/api/v1/falls/detect')
       .set(auth(primary.token))
-      .send({ features: cannedFallFeatures(), clientEventId: randomUUID() });
+      .send({ features: cannedPositiveFeatures(), clientEventId: randomUUID() });
     await db.query(
       `UPDATE fall_events SET detected_at = now() - interval '10 minutes' WHERE id = $1`,
       [created.body.fallEventId],

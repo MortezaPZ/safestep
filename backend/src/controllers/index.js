@@ -174,7 +174,11 @@ export const safeZone = {
   create: asyncHandler(async (req, res) => {
     const subjectId = req.body.subjectUserId;
     if (req.user.role === 'primary') {
-      throw forbidden('تعریف محدوده امن فقط برای ناظر اصلی است.');
+      if (subjectId && subjectId !== req.user.id) {
+        throw forbidden('کاربر اصلی فقط می‌تواند محدوده‌ی خودش را تعریف کند.');
+      }
+      res.status(201).json(await safeZoneService.create(req.user.id, req.body));
+      return;
     }
     if (!subjectId) {
       throw badRequest('کاربر اصلی این محدوده را مشخص کنید.');

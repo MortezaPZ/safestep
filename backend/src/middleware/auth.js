@@ -164,11 +164,8 @@ export function requireRole(...roles) {
  */
 export const requireAdmin = requireRole(ROLES.ADMIN);
 
-const GATED_SKIP = new Set(['test']);
-
 /** تا مدارک تأیید نشده، قابلیت‌های مراقبتی قفل است. */
 export function requireVerified(req, _res, next) {
-  if (GATED_SKIP.has(env.nodeEnv)) return next();
   if (!req.user) return next(unauthorized());
   if (req.user.role === ROLES.ADMIN) return next();
   if (req.user.verificationStatus === 'verified') return next();
