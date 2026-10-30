@@ -55,20 +55,11 @@ Seed and run the API, then open the web console. Guardian accounts, zones, and a
 
 ## Testing
 
-```bash
-cd backend
-npm test
-```
+Run the backend suite from the backend directory with npm test.
 
-The suite includes unit tests and integration tests. Some safe-zone cases still return 403 where the tests expect 201. Those failures are in the suite. They were not deleted to make the run green.
-
+Known issue: some safe-zone integration cases return HTTP 403 where the tests expect HTTP 201. The affected cases are in backend/tests/safezones.integration.test.js and should be resolved before a production release.
 ## Limitations
 
 - iOS has not been archived on a Mac in this workspace
-- The safe-zone integration failures above are still open
 - Map tiles need a network. The API can run without them
 - Production secrets must be long random values. The examples in `.env` files are for local use
-
-## License
-
-See the repository license file if one is present.

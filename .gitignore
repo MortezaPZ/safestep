@@ -1,0 +1,7 @@
+.env
+*.apk
+docs/client-delivery-note.md
+docs/mobile-video.txt
+docs/mobile-guide.mp4
+docs/evaluation/sus-10-families.csv
+docs/evaluation/sus-10-families.md
