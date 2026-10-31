@@ -61,7 +61,3 @@ Run the backend suite from the backend directory with npm test.
 - Fall-model accuracy and alert thresholds need validation on independent real-world data and devices.
 - Map tiles need a network; the API can run without them.
 - Production secrets must be long random values. Examples in .env files are for local use.
-
-## License
-
-See the repository license file if one is present.
