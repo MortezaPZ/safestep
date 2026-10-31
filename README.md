@@ -1,73 +1,66 @@
 # SafeStep
 
-A safety and tracking system for someone who wants to go out independently, and for the family that needs a reliable alert when something goes wrong.
+A safety and location-tracking system for people who want to move independently and for the family members who support them.
 
 ## Overview
 
-The person can see who is watching and can stop sharing. The family still gets an emergency signal when the person asks for help, and the backend can raise a fall, a geofence exit, or a lost GPS fix.
+The mobile app shares location with active guardians. Users can see who is watching and turn sharing off. Emergency signals remain available, and the backend can detect falls, geofence exits, and lost GPS fixes.
 
 ## Features
 
-- Live location for an active guardianship
-- Safe zones, with hysteresis so a noisy GPS fix on the boundary does not flap
-- Fall detection trained on SisFall, plus the earlier synthetic dataset kept separate from that evaluation
-- Alerts, SOS, and an append-style notification outbox
-- A web console for guardians and admins
-- A Flutter client for Android and iOS
+- Live location for active guardianships, with controls for viewing and stopping sharing
+- Safe zones with hysteresis for noisy GPS readings at zone boundaries
+- Fall detection trained on SisFall; synthetic training data is kept separate from that evaluation
+- SOS, alerts, and an append-style notification outbox
+- Guardian and administrator web console
+- Flutter app for Android and iOS
+- Evaluation dashboard for reviewing fall-model and location-monitoring results
 
-## Technology Stack
+## Technology
 
 - Node.js 20+ and Express
-- PostgreSQL in production
-- PGlite for the local test database
-- Flutter
-- Socket.IO
+- PostgreSQL in production; PGlite for local tests
+- Flutter and Socket.IO
 
 ## Architecture
 
-```
-mobile/     Flutter client
-web/        Guardian and admin interface
-backend/    HTTP API, Socket.IO, geofence and fall services
-docs/       Deployment and evaluation notes
-```
+    mobile/     Flutter app
+    web/        Guardian and administrator interface
+    backend/    HTTP API, Socket.IO, geofence and fall services
+    docs/       Deployment, evaluation, and platform notes
 
-The API does not import the test runner. Production uses `DB_DRIVER=pg`. Tests use the embedded PostgreSQL-compatible engine so the suite does not need a server.
-
-Fall-model metrics, load-test numbers, and the geofence hysteresis table are in `docs/evaluation/defense-and-metrics.md`. iOS build status is in `docs/ios-build-status.md`. A networked PostgreSQL deployment is in `docs/deployment-postgres.md`.
+Production uses DB_DRIVER=pg. The API does not import the test runner.
 
 ## Installation
 
-```powershell
-cd backend
-npm install
-npm test
-npm start
-```
+From the backend directory:
 
-`npm start` runs `node src/server.js`. Do not commit a real `.env`.
+    npm install
+    npm test
+    npm start
 
-The Flutter project is in `mobile/`. An iOS archive needs Xcode on macOS. This Windows tree cannot produce an IPA. The Info.plist permission keys required by location, motion, and background alerts are documented in `docs/ios-build-status.md`.
+The start command runs node src/server.js. Do not commit a real .env file.
+
+The Flutter project is in mobile/. A signed iOS distribution archive has not been verified; see the iOS build guide for build requirements and platform limitations.
 
 ## Usage
 
-Seed and run the API, then open the web console. Guardian accounts, zones, and alerts are part of the backend. The demo-oriented walkthrough with seeded phone numbers lives in the separate `safestep-demo` repository. This repository is the full product tree, including the Flutter app.
+Seed and run the API, then open the web console. The separate safestep-demo repository contains a seeded walkthrough. This repository is the full product tree, including the Flutter app.
+
+## Documentation
+
+Evaluation data, measured metrics, and model limitations are in the [evaluation materials](docs/evaluation/) and [training reports](docs/phase3/). PostgreSQL deployment instructions are in [docs/deployment-postgres.md](docs/deployment-postgres.md). iOS permissions and build requirements are in [the iOS build guide](docs/ios-build.md).
 
 ## Testing
 
-```bash
-cd backend
-npm test
-```
-
-The backend suite includes unit and integration tests. The mobile test directory currently contains one test in `mobile/test/widget_test.dart`, for server-address normalization; there are not 25 mobile tests in this package.
+Run the backend suite from the backend directory with npm test.
 
 ## Limitations
 
-- iOS has not been archived on a Mac in this workspace
-- Real-walk position-error samples, independent SUS responses, and FCM phone-delivery latency have not been collected yet
-- Map tiles need a network. The API can run without them
-- Production secrets must be long random values. The examples in `.env` files are for local use
+- A signed iOS distribution archive has not been verified; see docs/ios-build.md.
+- Fall-model accuracy and alert thresholds need validation on independent real-world data and devices.
+- Map tiles need a network; the API can run without them.
+- Production secrets must be long random values. Examples in .env files are for local use.
 
 ## License
 
