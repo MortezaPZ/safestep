@@ -34,7 +34,7 @@ docs/       Deployment and evaluation notes
 
 The API does not import the test runner. Production uses `DB_DRIVER=pg`. Tests use the embedded PostgreSQL-compatible engine so the suite does not need a server.
 
-Fall-model metrics, load-test numbers, and the geofence hysteresis table are in `docs/evaluation/defense-and-metrics.md`. iOS build status is in `docs/ios-build-status.md`. A networked PostgreSQL deployment is in `docs/deployment-postgres.md`.
+Evaluation methodology, measured results, and limitations are in [docs/evaluation/results-and-limitations.md](docs/evaluation/results-and-limitations.md). iOS permissions and build requirements are in [docs/ios-build.md](docs/ios-build.md). PostgreSQL deployment is in [docs/deployment-postgres.md](docs/deployment-postgres.md).
 
 ## Installation
 
@@ -47,7 +47,7 @@ npm start
 
 `npm start` runs `node src/server.js`. Do not commit a real `.env`.
 
-The Flutter project is in `mobile/`. An iOS archive needs Xcode on macOS. This Windows tree cannot produce an IPA. The Info.plist permission keys required by location, motion, and background alerts are documented in `docs/ios-build-status.md`.
+The Flutter project is in mobile/. No signed iOS distribution archive has been verified; see docs/ios-build.md for build requirements and platform limits.
 
 ## Usage
 
@@ -63,6 +63,6 @@ Run the backend suite from the backend directory with npm test.
 
 ## Limitations
 
-- iOS has not been archived on a Mac in this workspace
+- A signed iOS distribution archive has not been verified; see docs/ios-build.md.
 - Map tiles need a network. The API can run without them
 - Production secrets must be long random values. The examples in `.env` files are for local use
