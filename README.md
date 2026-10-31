@@ -53,11 +53,14 @@ The Flutter project is in `mobile/`. An iOS archive needs Xcode on macOS. This W
 
 Seed and run the API, then open the web console. Guardian accounts, zones, and alerts are part of the backend. The demo-oriented walkthrough with seeded phone numbers lives in the separate `safestep-demo` repository. This repository is the full product tree, including the Flutter app.
 
+## Safe-zone ownership
+
+A primary user can create zones for their own account. A main supervisor can create zones for a linked primary user.
+
 ## Testing
 
 Run the backend suite from the backend directory with npm test.
 
-Known issue: some safe-zone integration cases return HTTP 403 where the tests expect HTTP 201. The affected cases are in backend/tests/safezones.integration.test.js and should be resolved before a production release.
 ## Limitations
 
 - iOS has not been archived on a Mac in this workspace
