@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import path from 'node:path';
 import { groupFolds, parseCsv, trainFromRows } from '../scripts/falls/train.js';
 import {
   convertRecording,
@@ -6,6 +7,7 @@ import {
   parseTxt,
   selectWindowStarts,
 } from '../scripts/falls/convert_sisfall.js';
+import { thresholdSweepCsv } from '../scripts/falls/train_sisfall.js';
 
 describe('SisFall conversion', () => {
   it('parses nine-channel rows with trailing semicolons and converts physical units', () => {
@@ -48,6 +50,34 @@ describe('SisFall conversion', () => {
     expect(result.rows[0][1]).toBe('SA03F01T01');
     expect(result.rows[0][2]).toBe(1);
     expect(result.rows[0]).toHaveLength(17);
+  });
+
+  it('uses the subject folder when a SisFall filename disagrees with its folder', () => {
+    const lines = Array.from({ length: 1200 }, () => '0,0,256,0,0,0,0,0,0;').join('\n');
+    const result = convertRecording(path.join('SA15', 'D17_SE15_R01.txt'), lines);
+
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[0][0]).toBe('SA15');
+    expect(result.rows[0][1]).toBe('D17_SE15_R01');
+  });
+
+  it('uses out-of-fold recall for the sensitivity column in the threshold CSV', () => {
+    const output = thresholdSweepCsv([{
+      marginThreshold: 0,
+      agreeThreshold: 0.5,
+      recall: 0.8,
+      falsePositiveRate: 0.1,
+      precision: 0.9,
+      accuracy: 0.85,
+      f1: 0.8471,
+      tp: 8,
+      fp: 1,
+      fn: 2,
+      tn: 9,
+      source: 'test',
+    }]);
+
+    expect(output.split('\n')[1]).toBe('0,0.5,0.8000,0.1000,0.9000,0.8500,0.8471,8,1,2,9,test');
   });
 });
 

@@ -2,20 +2,19 @@
 
 ## Fall classifier
 
-The current `backend/src/services/fallDetection/model.json` is labeled `sisfall-real` and records five-fold validation metrics. These are the SisFall figures to use when describing the current model:
+The current `backend/src/services/fallDetection/model.json` is labeled `sisfall-public-simulated-falls`. It was retrained from 7,212 windows converted from 4,505 recordings in a pinned public SisFall mirror. Validation groups all windows by subject and performs nested five-fold cross-validation:
 
 | Model | Accuracy | Precision | Recall | F1 | TP | FP | TN | FN |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| KNN, k=5 | 0.9951 | 0.9867 | 0.9939 | 0.9903 | 1787 | 24 | 5390 | 11 |
-| Linear SVM | 0.9813 | 0.9776 | 0.9466 | 0.9619 | 1702 | 39 | 5375 | 96 |
+| KNN, k=9 | 0.9908 | 0.9800 | 0.9833 | 0.9817 | 1768 | 36 | 5378 | 30 |
+| Linear SVM | 0.9479 | 0.9740 | 0.8126 | 0.8860 | 1461 | 39 | 5375 | 337 |
+| Combined rule | 0.9886 | 0.9837 | 0.9705 | 0.9770 | 1745 | 29 | 5385 | 53 |
 
-The model metadata reports 7,212 SisFall windows: 1,798 fall windows and 5,414 activity windows. The raw SisFall recordings are not included in this source package.
+The model keeps all 7,212 training windows as KNN points. SisFall falls were safely simulated during collection. The dataset README says older participants performed ADLs only except SE06, a Judo expert who also simulated falls; these scores therefore do not establish fall performance for frail older adults, unexpected real-world falls, or a new device population. See `docs/phase3/04-sisfall-training-report.md` for the pinned mirror revision, archive hash, conversion details, and the archive's recording-count discrepancy.
 
-The checked-in model contains five-fold metrics for KNN and SVM, but it does not contain a cross-validated confusion matrix for the deployed ensemble rule. The updated training script now calculates the ensemble matrix and threshold sweep; do not quote new ensemble numbers until the grouped SisFall training input is available and the script has been run.
+`docs/evaluation/fall-rule-threshold-sweep.csv` contains 48 out-of-fold combinations of the combined rule's `margin` and `agreeRatio` thresholds. The `sensitivity` column is serialized from out-of-fold recall. Treat this as a diagnostic sweep; select production thresholds only with a separate participant-level validation set.
 
-`backend/scripts/falls/train_sisfall.js` includes a subject-grouped, nested five-fold out-of-fold sweep over the combined rule's SVM margin and KNN agree-ratio thresholds. No new sweep table is included here because neither the raw recordings nor a prepared feature CSV is bundled. Set `SISFALL_FEATURE_CSV` to a prepared 17-column CSV (`subject_id`, `recording_id`, `label`, and fourteen features) and run `npm run train:fall:sisfall` to regenerate it; that run will also retrain and replace the deployed model.
-
-`roc-sisfall-loo.csv` is not held-out validation. Its leave-one-out loop uses 1,443 prototypes selected from the full 7,212-window set, so each held-out prototype has already participated in the full-data selection. Do not cite its 0.9889 sensitivity as a generalization estimate; use the five-fold metrics stored in `model.json`.
+`roc-sisfall-loo.csv` is a legacy artifact from the previous 1,443-prototype model. It is not held-out validation: its prototypes were selected using the full 7,212-window set. Do not cite its 0.9889 sensitivity as a generalization estimate or as a metric for the current model. Use only the subject-grouped CV results above.
 
 ## Synthetic ROC
 
