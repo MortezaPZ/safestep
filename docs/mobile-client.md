@@ -60,7 +60,7 @@ Open **Field evaluation** from the primary or guardian home page to register a r
 
 ## Mobile test coverage
 
-`mobile/test/` contains two tests: server-address normalization and centered fall-window timing. The source package does not contain 25 mobile tests. Flutter test execution requires Pub.dev access for `image_picker`.
+`mobile/test/` contains three tests: server-address normalization, centered fall-window timing, and the field-evaluation form. All three passed with `flutter test --no-pub`. Direct Pub.dev access returned HTTP 403 in the development environment, so dependencies were resolved through a mirror; a clean environment needs Pub.dev or a compatible mirror for packages such as `image_picker`. The source package does not contain 25 mobile tests.
 
 ## Video
 
