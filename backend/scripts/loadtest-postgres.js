@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import autocannon from 'autocannon';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const REPORT_DIR = path.resolve(ROOT, 'docs/evaluation');
+const REPORT_DIR = path.resolve(ROOT, '../docs/evaluation');
 const PASSWORD = 'Load@1234';
 
 // این مقادیر باید قبل از import کردن config تنظobuf شوند تا env.db.driver
@@ -199,7 +199,7 @@ async function poolStats() {
   }
 }
 
-function toMd(rows, { probe, poolBefore, poolAfter, duration }) {
+function toMd(rows, { probe, poolBefore, poolAfter, telemetry, duration }) {
   const date = new Date().toISOString().slice(0, 10);
   const lines = [
     `# تست بار روی PostgreSQL واقعی — ${date}`,
@@ -226,6 +226,14 @@ function toMd(rows, { probe, poolBefore, poolAfter, duration }) {
     lines.push('| --- | --- | --- | --- |');
     if (poolBefore) lines.push(`| پیش از بار | ${poolBefore.total} | ${poolBefore.active} | ${poolBefore.idle} |`);
     if (poolAfter) lines.push(`| پس از سناریوها | ${poolAfter.total} | ${poolAfter.active} | ${poolAfter.idle} |`);
+  }
+  if (telemetry) {
+    lines.push('');
+    lines.push('## وضعیت بافر تله‌متری پیش از تخلیه');
+    lines.push('');
+    lines.push(`ثبت تله‌متری ${telemetry.enabled ? 'فعال' : 'خاموش'} بود؛ ` +
+      `${telemetry.pending} رکورد در صف و ${telemetry.dropped} رکورد کنار گذاشته‌شده ثبت شد.`);
+    lines.push('این شمارش، تحویل اعلان به گوشی را اندازه‌گیری نمی‌کند.');
   }
   return `${lines.join('\n')}\n`;
 }
@@ -309,7 +317,8 @@ async function main() {
   });
 
   const poolAfter = await poolStats();
-  const md = toMd(rows, { probe, poolBefore, poolAfter, duration: DURATION });
+  const telemetry = telemetryService.status();
+  const md = toMd(rows, { probe, poolBefore, poolAfter, telemetry, duration: DURATION });
 
   fs.mkdirSync(REPORT_DIR, { recursive: true });
   const file = path.join(REPORT_DIR, `load-test-postgres-${new Date().toISOString().slice(0, 10)}.md`);

@@ -37,4 +37,4 @@ FCM is not active in the current build, and there is no measured phone-receipt l
 
 ## PostgreSQL load test
 
-`load-test-postgres-2026-09-24.md` is a historical local run against PostgreSQL 16.15. Each scenario lasted 8 seconds; that run covered location ping, watching, and history, but did not include an SOS burst. The current `backend/scripts/loadtest-postgres.js` includes an SOS burst scenario and defaults to 8 seconds per scenario. A new SOS result must come from running that script against real PostgreSQL; the old report does not support an SOS performance claim. These local measurements are not cloud-vendor latency figures.
+`load-test-postgres-2026-11-01.md` is a fresh local run against PostgreSQL 17.11. Each scenario lasted 8 seconds and included an SOS burst. All HTTP scenarios reported zero request errors. The run emitted telemetry-buffer overflow warnings, so its HTTP latency and error figures do not establish complete telemetry capture or phone-delivery latency. `load-test-postgres-2026-09-24.md` remains the historical run without SOS. Both runs used local PostgreSQL; neither is a cloud-vendor latency measurement.
