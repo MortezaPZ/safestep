@@ -72,7 +72,7 @@ cd backend
 npm test
 ```
 
-The backend suite includes unit and integration tests. The mobile test directory contains two tests: server-address normalization and the centered fall-detection window; this package does not contain 25 mobile tests. Flutter execution currently needs Pub.dev access for `image_picker`.
+The backend suite includes unit and integration tests. `mobile/test/` contains three tests: server-address normalization, centered fall-window timing, and the field-evaluation form; this package does not contain 25 mobile tests. All three passed with `flutter test --no-pub`. Direct Pub.dev access returned HTTP 403 in the development environment, so dependencies were resolved through a mirror. A clean environment needs Pub.dev or a compatible mirror for packages such as `image_picker`.
 
 ## Limitations
 

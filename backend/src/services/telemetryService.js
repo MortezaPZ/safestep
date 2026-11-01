@@ -24,9 +24,9 @@ const log = logger.child({ module: 'telemetry' });
 /** حداکثر رکورد در حافظه پیش از آنکه قدیمی‌ترین‌ها کنار گذاشته شوند. */
 const MAX_BUFFER = 2000;
 /** فاصله‌ی تخلیه‌ی خودکار بافر. */
-const FLUSH_INTERVAL_MS = 5000;
+const FLUSH_INTERVAL_MS = 1000;
 /** حداکثر رکورد در هر INSERT — تا تعداد پارامترها از سقف Postgres رد نشود. */
-const MAX_BATCH = 200;
+const MAX_BATCH = 500;
 
 const buffers = {
   requests: [],

@@ -78,7 +78,7 @@ class _LiveMapPageState extends ConsumerState<LiveMapPage> {
     } catch (_) {}
   }
 
-  Future<void> _moveCamera(TrackPoint point, {bool animate = true}) async {
+  Future<void> _moveCamera(TrackPoint point) async {
     _mapController.move(LatLng(point.lat, point.lng), _defaultZoom);
     _lastCameraMove = point.recordedAt;
   }

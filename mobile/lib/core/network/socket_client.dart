@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
-import '../constants/app_config.dart';
 import 'server_origin.dart';
 
 /// نام رویدادهای WebSocket.

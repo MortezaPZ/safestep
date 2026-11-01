@@ -298,19 +298,16 @@ class _SettingsTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.enabled = true,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
-  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      enabled: enabled,
       leading: Icon(icon, size: 26),
       title: Text(title),
       subtitle: Text(subtitle),

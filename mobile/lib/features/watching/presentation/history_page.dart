@@ -375,8 +375,6 @@ class _RouteMap extends StatelessWidget {
     final List<Polyline> lines = <Polyline>[];
 
     int index = 0;
-    int segment = 0;
-
     while (index < points.length - 1) {
       final int end = (index + segmentSize).clamp(0, points.length - 1);
 
@@ -400,7 +398,6 @@ class _RouteMap extends StatelessWidget {
       );
 
       index = end;
-      segment++;
     }
 
     return lines;
