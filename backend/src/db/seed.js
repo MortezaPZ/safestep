@@ -307,7 +307,7 @@ async function createLocationHistory(users) {
     chunk.forEach((p, index) => {
       const base = index * 7;
       values.push(
-        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, TRUE)`,
+        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, TRUE, 'simulator')`,
       );
       params.push(users.primary.id, p.lat, p.lng, 8.5, p.speedMps, p.batteryLevel, p.recordedAt);
     });
@@ -317,7 +317,7 @@ async function createLocationHistory(users) {
     // می‌شوند و uuid و timestamptz رد می‌شوند.
     await db.query(
       `INSERT INTO location_pings
-         (user_id, lat, lng, accuracy_m, speed_mps, battery_level, recorded_at, is_simulated)
+         (user_id, lat, lng, accuracy_m, speed_mps, battery_level, recorded_at, is_simulated, source)
        VALUES ${values.join(', ')}`,
       params,
     );

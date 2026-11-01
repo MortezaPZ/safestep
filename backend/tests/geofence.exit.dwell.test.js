@@ -47,15 +47,35 @@ async function pingAt(token, point, recordedAt) {
     .send({ ...point, recordedAt: recordedAt.toISOString(), accuracyM: 6 });
 }
 
-async function signUp(phone, name) {
+async function signUp(phone, name, role = 'primary') {
   const res = await request(app).post('/api/v1/auth/register').send({
-    phone, password: PASSWORD, fullName: name, role: 'primary',
+    phone, password: PASSWORD, fullName: name, role,
   });
   expect(res.status).toBe(201);
   const id = res.body.user.id;
   await db.query("UPDATE users SET verification_status = 'verified' WHERE id = $1", [id]);
   invalidateAccountState(id);
   return { token: res.body.accessToken, id };
+}
+
+async function makeMainSupervisor(primary, phone) {
+  const guardian = await signUp(phone, 'ناظر آزمون', 'guardian');
+  const invite = await request(app)
+    .post('/api/v1/guardianships/invites')
+    .set(auth(primary.token))
+    .send({ permissions: ['view_location', 'receive_alerts'] });
+  expect(invite.status).toBe(201);
+  const redeemed = await request(app)
+    .post('/api/v1/guardianships/redeem')
+    .set(auth(guardian.token))
+    .send({ code: invite.body.code });
+  expect(redeemed.status).toBe(201);
+  const selected = await request(app)
+    .patch(`/api/v1/guardianships/${redeemed.body.guardianship.id}/main-supervisor`)
+    .set(auth(primary.token))
+    .send({});
+  expect(selected.status).toBe(200);
+  return guardian;
 }
 
 beforeAll(async () => {
@@ -70,18 +90,20 @@ afterAll(async () => {
 
 describe('خروج واقعی از محدوده‌ی امن هشدار می‌سازد', () => {
   let user;
+  let supervisor;
   const RADIUS = 120;
   // مقصدِ واقعاً بیرون: فراتر از شعاع + هیسترزیس
   const OUT = destinationPoint(HOME.lat, HOME.lng, RADIUS + 400, 75);
 
   it('کاربر ثبت‌نام می‌کند', async () => {
     user = await signUp('09152220001', 'حصار خروج', 'primary');
+    supervisor = await makeMainSupervisor(user, '09152220011');
   });
 
   it('محدوده‌ی دایره‌ای با ماندگاری ۳ دقیقه‌ای ساخته می‌شود', async () => {
     const res = await request(app)
       .post('/api/v1/safe-zones')
-      .set(auth(user.token))
+      .set(auth(supervisor.token))
       .send({
         name: 'خانه',
         centerLat: HOME.lat,
@@ -90,6 +112,7 @@ describe('خروج واقعی از محدوده‌ی امن هشدار می‌س
         alertOnExit: true,
         alertOnEnter: true,
         dwellAlertMinutes: 3,
+        subjectUserId: user.id,
       });
     expect(res.status).toBe(201);
     expect(res.body.dwellAlertMinutes).toBe(3);
@@ -123,21 +146,24 @@ describe('خروج واقعی از محدوده‌ی امن هشدار می‌س
 
 describe('ماندن بیرون از محدوده (dwell) هشدار می‌سازد', () => {
   let user;
+  let supervisor;
   const RADIUS = 100;
   const OUT = destinationPoint(HOME.lat, HOME.lng, RADIUS + 500, 190);
   const DWELL_MIN = 3;
 
   it('کاربر و محدوده را می‌سازد', async () => {
     user = await signUp('09152220002', 'حصار ماندگاری', 'primary');
+    supervisor = await makeMainSupervisor(user, '09152220012');
     const res = await request(app)
       .post('/api/v1/safe-zones')
-      .set(auth(user.token))
+      .set(auth(supervisor.token))
       .send({
         name: 'خانه',
         centerLat: HOME.lat,
         centerLng: HOME.lng,
         radiusM: RADIUS,
         dwellAlertMinutes: DWELL_MIN,
+        subjectUserId: user.id,
       });
     expect(res.status).toBe(201);
   });
@@ -194,6 +220,7 @@ describe('ماندن بیرون از محدوده (dwell) هشدار می‌سا
 
 describe('محدوده با ماندگاری خاموش، هشدار ماندگاری نمی‌دهد', () => {
   const user = { token: null, id: null };
+  let supervisor;
   const RADIUS = 90;
   const OUT = destinationPoint(HOME.lat, HOME.lng, RADIUS + 300, 10);
 
@@ -201,14 +228,16 @@ describe('محدوده با ماندگاری خاموش، هشدار ماندگ�
     const signed = await signUp('09152220003', 'بدون ماندگاری');
     user.token = signed.token;
     user.id = signed.id;
+    supervisor = await makeMainSupervisor(signed, '09152220013');
     const res = await request(app)
       .post('/api/v1/safe-zones')
-      .set(auth(user.token))
+      .set(auth(supervisor.token))
       .send({
         name: 'خانه',
         centerLat: HOME.lat,
         centerLng: HOME.lng,
         radiusM: RADIUS,
+        subjectUserId: user.id,
       });
     expect(res.status).toBe(201);
     expect(res.body.dwellAlertMinutes).toBeNull();

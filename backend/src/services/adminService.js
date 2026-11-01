@@ -27,6 +27,7 @@ import * as fallEventRepository from '../repositories/fallEventRepository.js';
 import { loadModel } from './fallDetection/classifier.js';
 import { invalidateAccountState } from '../middleware/auth.js';
 import { badRequest, notFound, conflict, forbidden } from '../utils/errors.js';
+import { validateIdentityImageDataUrl } from '../utils/sensitiveData.js';
 import logger from '../utils/logger.js';
 
 const log = logger.child({ module: 'admin' });
@@ -77,8 +78,17 @@ export async function myIdentityDocuments(userId) {
 }
 
 export async function submitIdentityDocument(userId, documentType, imageUrl, healthCondition = null) {
-  const document = await adminRepository.createIdentityDocument(userId, documentType, imageUrl);
-  if (healthCondition) await adminRepository.setHealthCondition(userId, healthCondition);
+  try {
+    validateIdentityImageDataUrl(imageUrl);
+  } catch (error) {
+    throw badRequest(error.message);
+  }
+  const document = await adminRepository.createIdentityDocument(
+    userId,
+    documentType,
+    imageUrl,
+    healthCondition,
+  );
   await adminRepository.setVerificationStatus(userId, 'pending');
   invalidateAccountState(userId);
   return { document, verificationStatus: 'pending' };
@@ -96,10 +106,6 @@ export async function reviewIdentityDocument(id, status, actor, reason = null) {
   const document = await adminRepository.reviewIdentityDocument(id, status, actor.id, reason);
   if (!document) throw notFound('مدرک یافت نشد.');
   const next = status === 'approved' ? 'verified' : 'rejected';
-  await adminRepository.setVerificationStatus(document.userId, next);
-  if (status === 'approved' && actor.healthCondition) {
-    await adminRepository.setHealthCondition(document.userId, actor.healthCondition);
-  }
   invalidateAccountState(document.userId);
   return { document, verificationStatus: next };
 }

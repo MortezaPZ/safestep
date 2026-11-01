@@ -26,6 +26,7 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
   bool _loading = true;
   bool _capturing = false;
   bool _savingReference = false;
+  bool _samplingReference = false;
   bool _loadingSus = true;
   bool _submittingSus = false;
   String? _referenceError;
@@ -188,6 +189,54 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
       if (mounted) setState(() => _referenceError = _message(error));
     } finally {
       if (mounted) setState(() => _savingReference = false);
+    }
+  }
+
+  Future<void> _recordReferenceSample() async {
+    setState(() {
+      _samplingReference = true;
+      _referenceError = null;
+      _referenceMessage = null;
+    });
+    try {
+      if (await _repository.currentReference() == null) {
+        throw StateError('save_reference_first');
+      }
+      final LocationPermissionService permissions = ref.read(
+        locationPermissionServiceProvider,
+      );
+      final LocationPermissionState permission = await permissions.requestForeground();
+      if (permission != LocationPermissionState.granted &&
+          permission != LocationPermissionState.whileInUseOnly) {
+        throw StateError('location_permission');
+      }
+      final Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 12),
+      );
+      final ReferenceSample sample = await _repository.recordReferenceSample(
+        lat: position.latitude,
+        lng: position.longitude,
+        accuracyM: position.accuracy,
+      );
+      if (!mounted) return;
+      setState(() => _referenceMessage = sample.valid
+          ? (_isPersian
+              ? 'نمونه ثبت شد: خطای ${Fa.distance(sample.errorM)}، دقت اعلامی ${Fa.distance(sample.accuracyM)}.'
+              : 'Sample recorded: ${Fa.distance(sample.errorM)} error, ${Fa.distance(sample.accuracyM)} reported accuracy.')
+          : (_isPersian
+              ? 'نمونه با دقت ${Fa.distance(sample.accuracyM)} ثبت شد اما برای محاسبه‌ی معتبر (حداکثر ۳۰ متر) پذیرفته نیست.'
+              : 'Sample recorded, but ${Fa.distance(sample.accuracyM)} reported accuracy exceeds the 30 m validity limit.'));
+    } catch (error) {
+      if (!mounted) return;
+      final String message = error is StateError && error.message == 'save_reference_first'
+          ? (_isPersian ? 'ابتدا نقطه‌ی مرجع نقشه‌برداری‌شده را ذخیره کنید.' : 'Save the surveyed reference point first.')
+          : error is StateError && error.message == 'location_permission'
+              ? (_isPersian ? 'برای ثبت نمونه، مجوز مکان لازم است.' : 'Location permission is required to record a sample.')
+              : _message(error);
+      setState(() => _referenceError = message);
+    } finally {
+      if (mounted) setState(() => _samplingReference = false);
     }
   }
 
@@ -362,6 +411,14 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
                 label: Text(
                   fa ? 'ذخیره‌ی نقطه‌ی مرجع' : 'Save reference point',
                 ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: _samplingReference ? null : _recordReferenceSample,
+                icon: _samplingReference
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.my_location_outlined),
+                label: Text(fa ? 'ثبت نمونه‌ی GPS در همین نقطه' : 'Record GPS sample at this point'),
               ),
               if (_referenceError != null) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),

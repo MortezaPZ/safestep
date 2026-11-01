@@ -32,6 +32,26 @@ async function signUp(phone, name, role) {
   return { token: res.body.accessToken, id };
 }
 
+async function makeMainSupervisor(primary, phone) {
+  const guardian = await signUp(phone, 'ناظر آزمون', 'guardian');
+  const invite = await request(app)
+    .post('/api/v1/guardianships/invites')
+    .set(auth(primary.token))
+    .send({ permissions: ['view_location', 'receive_alerts'] });
+  expect(invite.status).toBe(201);
+  const redeemed = await request(app)
+    .post('/api/v1/guardianships/redeem')
+    .set(auth(guardian.token))
+    .send({ code: invite.body.code });
+  expect(redeemed.status).toBe(201);
+  const selected = await request(app)
+    .patch(`/api/v1/guardianships/${redeemed.body.guardianship.id}/main-supervisor`)
+    .set(auth(primary.token))
+    .send({});
+  expect(selected.status).toBe(200);
+  return guardian;
+}
+
 beforeAll(async () => {
   await db.connect();
   await runMigrations();
@@ -44,10 +64,12 @@ afterAll(async () => {
 
 describe('محدوده‌ی چندضلعی و زمان‌بندی', () => {
   let user;
+  let supervisor;
   let zoneId;
 
   it('کاربر ثبت‌نام می‌کند', async () => {
     user = await signUp('09151110001', 'چندضلعی', 'primary');
+    supervisor = await makeMainSupervisor(user, '09151110002');
   });
 
   it('ساخت چندضلعی از API', async () => {
@@ -59,8 +81,11 @@ describe('محدوده‌ی چندضلعی و زمان‌بندی', () => {
     ];
     const res = await request(app)
       .post('/api/v1/safe-zones')
-      .set(auth(user.token))
-      .send({ name: 'محله', shape: 'polygon', polygon: poly, dwellAlertMinutes: 1 });
+      .set(auth(supervisor.token))
+      .send({
+        name: 'محله', shape: 'polygon', polygon: poly, dwellAlertMinutes: 1,
+        subjectUserId: user.id,
+      });
     expect(res.status, JSON.stringify(res.body)).toBe(201);
     expect(res.body.shape).toBe('polygon');
     zoneId = res.body.id;
@@ -104,12 +129,13 @@ describe('محدوده‌ی چندضلعی و زمان‌بندی', () => {
     ];
     const created = await request(app)
       .post('/api/v1/safe-zones')
-      .set(auth(user.token))
+      .set(auth(supervisor.token))
       .send({
         name: 'فقط جمعه',
         shape: 'polygon',
         polygon: poly,
         schedule: { timezone: 'UTC', windows: [{ days: [5], from: '00:00', to: '00:01' }] },
+        subjectUserId: user.id,
       });
     expect(created.status).toBe(201);
     const inside = { lat: 35.795, lng: 51.405 };

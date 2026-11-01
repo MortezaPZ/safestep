@@ -1,86 +1,74 @@
-# گزارش رسیدگی به بازخورد کارفرما
+# گزارش موردبه‌مورد رسیدگی به چهار فایل بازخورد
 
-این گزارش هر مورد را جداگانه به درخواست کارفرما وصل می‌کند و محل بررسی آن را در برنامه، آزمون‌ها یا مستندات مشخص می‌کند. وضعیت‌های «انجام شد» به اصلاح کد یا مستندات اشاره دارند؛ برای داده‌هایی که باید از افراد یا دستگاه‌های واقعی جمع‌آوری شوند، وضعیت جمع‌آوری جداگانه نوشته شده است.
+این گزارش، موارد شماره‌دار ۱ تا ۵۸ را به ترتیب شمارهٔ بازخوردها فهرست می‌کند. محل هر تغییر، نام بخش برنامه، آزمون یا سندی است که باید بررسی شود. «انجام شد» به پیاده‌سازی کد یا اصلاح مستند اشاره دارد؛ هرجا دادهٔ واقعی، گوشی، کلید انتشار یا سرویس بیرونی لازم بوده، محدودیت همان‌جا ثبت شده است.
 
-## ۱. فایل‌های ارزیابی که دادهٔ واقعی نبودند
+| شماره | نتیجه و محل دقیق بررسی |
+| ---: | --- |
+| ۱ | **پیاده شد.** `TrackingController.start()` سرویس `FallDetectorService` را راه می‌اندازد و در پایان ردیابی آن را متوقف می‌کند؛ ویژگی‌های گوشی از `/falls/detect` فرستاده می‌شوند. پنجرهٔ پس از ضربه در مورد ۵۶ آمده است. فایل‌ها: `mobile/lib/features/tracking/presentation/tracking_controller.dart`, `mobile/lib/features/fall/data/fall_detector_service.dart`. آزمون موبایل در این محیط به‌علت دسترسی Pub.dev اجرا نشد؛ مورد ۳۹ را ببینید. |
+| ۲ | **انجام شد.** `reportMissed()` رویداد را با `classifiedAsFall: false` ذخیره می‌کند تا گزارش سقوط ازدست‌رفته در خانهٔ FN شمرده شود. محل: `backend/src/services/fallService.js`, تابع `reportMissed()`؛ محاسبهٔ ماتریس: `backend/src/repositories/fallEventRepository.js`, تابع `metrics()`. |
+| ۳ | **بخش نرم‌افزاری انجام شد؛ دادهٔ میدانی باقی است.** فایل‌های ساختگی `position-error.csv` و `sus-10-families.csv` در خروجی ارزیابی نیستند. مستند محدودیت‌ها: `docs/evaluation/defense-and-metrics.md`. ۲۰ تا ۳۰ نمونهٔ واقعی پیاده‌روی و پاسخ‌های مستقل SUS باید توسط تیم در محل جمع شود. |
+| ۴ | **انجام شد.** سنجه‌های دقت و تأخیر، پینگ‌های `source='simulator'` را حذف می‌کنند و تعداد شبیه‌سازی را جدا نشان می‌دهند. راهنمای گردآوری داده، `DEMO_MODE=false` را الزام می‌کند. محل: `backend/src/repositories/logRepository.js`, تابع `locationMetrics()`؛ `README.md`, بخش «اجرای ارزیابی». |
+| ۵ | **انجام شد.** AUC فایل ROC مصنوعی در `docs/evaluation/defense-and-metrics.md` برابر ۱٫۰۰۰ گزارش شده و فقط ویژگی مولد مصنوعی دانسته شده است. `roc-sisfall-loo.csv` نیز برآورد تعمیم معرفی نمی‌شود؛ مرجع گزارش، اعتبارسنجی پنج‌لایهٔ `backend/src/services/fallDetection/model.json` است. |
+| ۶ | **انجام شد.** `export-charts.js` از یک `debounceCount` مشترک برای هر دو ستون CSV استفاده می‌کند؛ آزمون روش ساده و موتور geofence روی همان دنبالهٔ خروج واقعی اجرا می‌شود. محل: `backend/scripts/evaluation/export-charts.js`, `backend/tests/geofence.test.js`, `docs/evaluation/geofence-false-alarms.csv`. داده شبیه‌سازی‌شده است، نه پیاده‌روی واقعی. |
+| ۷ | **انجام شد.** اجرای کامل بک‌اند: ۱۹ فایل و ۲۳۰ آزمون موفق؛ شامل `backend/tests/geofence.exit.dwell.test.js`, `backend/tests/safezones.integration.test.js` و smoke test ورود واقعی مرورگر در Chromium (`backend/tests/web.browser.smoke.test.js`). |
+| ۸ | **اسکریپت‌ها اضافه شدند؛ بازآموزی تازه محدود به دادهٔ منبع است.** فرمان‌های `train:fall:real` و `train:fall:sisfall` به `backend/scripts/falls/train_real.js` و `backend/scripts/falls/train_sisfall.js` وصل‌اند. فایل‌های خام SisFall و CSV ویژگی‌ها در بسته نیستند، پس از اجرای دوبارهٔ آموزش یا ادعای بازتولید عدد تازه خودداری شده است. |
+| ۹ | **انجام شد و با fixture آزموده شد.** مبدل `convert_sisfall.js` سمی‌کالن انتهای ردیف را می‌پذیرد، واحد شتاب و ژیروسکوپ را تبدیل می‌کند، ۲۰۰ را به ۵۰ هرتز کاهش می‌دهد، پنجرهٔ سقوط را حول قله می‌گیرد، دو پنجرهٔ فعالیت می‌سازد و شناسهٔ فرد/ضبط را نگه می‌دارد. روش انتخاب و محاسبهٔ ۱٬۷۹۸ + ۵٬۴۱۴ پنجره: `docs/phase3/04-sisfall-training-report.md`; آزمون‌ها: `backend/tests/fall.training.test.js`. چون خام SisFall موجود نیست، شمارش فایل‌های منبع هنوز از نو تأیید نشده است. |
+| ۱۰ | **انجام شد.** تصویر مدرک و وضعیت سلامت با AES-256-GCM در پایگاه ذخیره می‌شوند؛ نوع واقعی JPEG/PNG/WebP و سقف ۵ MiB بررسی می‌شود؛ دادهٔ قدیمی نیز پس از مهاجرت رمز می‌شود. محل: `backend/src/utils/sensitiveData.js`, `backend/src/repositories/sensitiveDataRepository.js`, `backend/src/db/migrations/012_identity_document_encryption.sql`. کلید تولید باید پایدار و خصوصی تنظیم شود. |
+| ۱۱ | **انجام شد.** تأیید مدرک دیگر مقدار سلامت ارسالی ادمین را نمی‌پذیرد؛ مقدار ثبت‌شدهٔ خود کاربر پس از تأیید منتقل می‌شود. آزمون یکپارچه تلاش ادمین برای جایگزینی را رد می‌کند: `backend/tests/admin.integration.test.js`; منطق: `backend/src/repositories/adminRepository.js`. |
+| ۱۲ | **انجام شد.** ورود یک‌کلیکی حساب‌های نمایشی و رمز ثابت از صفحهٔ ورود وب برداشته شد. در استقرار تولیدی، `DEMO_MODE` باید خاموش باشد و رازهای توسعه باعث توقف سرور می‌شوند. محل: `web/js/views/auth.js`, `backend/src/config/env.js`, `backend/src/server.js`, `backend/Dockerfile`. |
+| ۱۳ | **انجام شد.** OpenAPI با routeهای واقعی هم‌تراز است: مسیر اشتباه حذف، مسیر حذف تاریخچه اصلاح و endpointهای مدیریتی، پشتیبانی و ارزیابی اضافه شدند. مقایسهٔ خودکار/دستی: `backend/src/routes/index.js` و `backend/src/docs/openapi.yaml`؛ هر دو ۷۶ مسیر دارند. |
+| ۱۴ | **انجام شد.** راه‌اندازی ارزیابی با `DB_DRIVER=pg`, `DATABASE_URL` و `DEMO_MODE=false` در `README.md`, بخش «اجرای ارزیابی» آمده است. تست بار PostgreSQL حداقل ۶۰ ثانیه برای هر سناریو اجرا می‌شود. |
+| ۱۵ | **تأیید شد.** مقدار مدل نهایی `knn.k` برابر ۵ است؛ در `backend/src/services/fallDetection/model.json` دیده می‌شود. اصلاح مقدار جدول پایان‌نامه باید در متن پایان‌نامه انجام شود. |
+| ۱۶ | **انجام شد.** انتخاب ناظر اصلی با endpoint `PATCH /guardianships/{id}/main-supervisor` و دکمهٔ کاربر اصلی در صفحهٔ سرپرستان فعال است. محل: `backend/src/routes/index.js`, `mobile/lib/features/pairing/presentation/guardians_page.dart`. |
+| ۱۷ | **انجام شد.** عنوان بخش بدون نقشه به «وضعیت محدوده خانواده‌ها» تغییر کرده است. محل: `mobile/lib/features/admin/presentation/admin_home_page.dart`, getter `_title`. |
+| ۱۸ | **انجام شد.** `A11y.tapTarget` در کنترل SOS استفاده شده است. کد OTP در مخزن با HMAC ذخیره می‌شود؛ آداپتور پیامک گیرندهٔ موقت نگه نمی‌دارد. محل: `mobile/lib/features/sos/presentation/sos_button.dart`, `backend/src/services/otpService.js`, `backend/src/services/smsAdapter.js`. |
+| ۱۹ | **انجام شد.** رویداد وب‌سوکت ادمین نسخهٔ هشدار بدون `lat` و `lng` می‌گیرد؛ خانواده و خود کاربر نسخهٔ مجاز خود را می‌بینند. محل: `backend/src/services/alertService.js`, بخش ارسال `adminAlert`. |
+| ۲۰ | **انجام شد.** هنگام ایجاد هشدار سقوط، شناسهٔ هشدار به رویداد سقوط وصل می‌شود؛ watchdog و بازخورد کاربر از همان مسیر استفاده می‌کنند. محل: `backend/src/services/fallService.js`, تابع `raiseFromFall()`؛ repository: `linkAlert()`. |
+| ۲۱ | **انجام شد.** همهٔ خانه‌های ماتریس و میانهٔ زمان پاسخ، رویدادهای `detection_source='simulator'` را حذف می‌کنند. محل: `backend/src/repositories/fallEventRepository.js`, تابع `metrics()`. |
+| ۲۲ | **بخش سرور انجام شد؛ رسیدن روی گوشی هنوز اندازه‌گیری نشده است.** WebSocket فقط گیرندهٔ آنلاین را ارسال‌شده می‌شمارد و FCM پس از پاسخ واقعی API ثبت می‌شود؛ صف شدن دیگر «ارسال موفق» نیست. `latency_ms` زمان ساخت هشدار تا پذیرش/نتیجهٔ کانال است، نه زمان نمایش روی گوشی. FCM و رسید گوشی واقعی هنوز پیکربندی نشده‌اند. محل: `backend/src/services/alertService.js`, `backend/src/services/notificationOutbox.js`, `backend/src/services/notificationAdapter.js`. |
+| ۲۳ | **انجام شد.** watchdog هر ۱۵ ثانیه `checkGpsLostAlerts()` را اجرا می‌کند و برای کاربر واجد شرایط هشدار قطع GPS می‌سازد. محل: `backend/src/services/fallWatchdog.js`, `backend/src/services/locationService.js`. |
+| ۲۴ | **انجام شد.** `getHistoryDays()` همان مجوز اضطراری و وضعیت اشتراک‌گذاری مسیر تاریخچه را بررسی می‌کند. محل: `backend/src/services/locationService.js`, تابع `getHistoryDays()`. |
+| ۲۵ | **انجام شد.** پیش‌غربال روی دستگاه در `FallDetectorService` پیش از ارسال ویژگی‌ها اجرا می‌شود؛ محل آستانه‌ها: `mobile/lib/features/fall/domain/fall_features.dart`. |
+| ۲۶ | **انجام شد.** `refresh()` وضعیت فعال/معلق/حذف‌شدهٔ حساب را قبل از صدور توکن تازه بررسی می‌کند. محل: `backend/src/services/authService.js`; آزمون: `backend/tests/verification.gate.test.js`. |
+| ۲۷ | **محدودیت پروتکل سرویس.** آداپتور قاصدک کلید را در هدر می‌فرستد. endpoint رسمی Kavenegar کلید را در مسیر URL می‌خواهد، بنابراین انتقال آن به هدر، ارسال را می‌شکند؛ در صورت استفاده از آن سرویس باید ثبت URL در پراکسی‌ها خاموش/محو شود یا provider هدرمحور انتخاب شود. کد: `backend/src/services/smsAdapter.js`; قرارداد: [Kavenegar PHP SDK](https://github.com/kavenegar/kavenegar-php/blob/master/src/KavenegarApi.php). |
+| ۲۸ | **انجام شد.** ایجاد، ویرایش و حذف محدوده audit می‌شود؛ پاک‌سازی metadata به‌صورت بازگشتی داخل آرایه‌ها هم انجام می‌شود. محل: `backend/src/controllers/index.js`, `backend/src/services/auditService.js`. |
+| ۲۹ | **انجام شد.** `/sos/active` دسترسی درخواست‌کننده را به مالک SOS بررسی می‌کند و شناسهٔ دلخواه به‌تنهایی کافی نیست. محل: `backend/src/services/sosService.js`; آزمون مجوز: `backend/tests/sos.integration.test.js`. |
+| ۳۰ | **انجام شد.** تولیدکنندهٔ اصلی می‌تواند یک مراقب را ناظر اصلی کند؛ API، repository، نمایش وضعیت و کنترل ایجاد محدوده به هم وصل‌اند. محل: `backend/src/services/guardianshipService.js`, `backend/src/repositories/guardianshipRepository.js`, `mobile/lib/features/pairing/presentation/guardians_page.dart`. |
+| ۳۱ | **انجام شد.** خطای موقعیت از پینگ‌های عادی یا فاصله تا خانه محاسبه نمی‌شود؛ فقط با اقدام صریح در ارزیابی میدانی، کنار نقطهٔ مرجع نقشه‌برداری‌شده ثبت می‌شود. محل: `backend/src/controllers/index.js`, `backend/src/repositories/logRepository.js`, migration `010_location_reference_samples.sql`. |
+| ۳۲ | **انجام شد.** دسته ابتدا با کلیدهای یکتای نمونه درج می‌شود و آخرین نقطه از همان ردیف درج‌شده پردازش می‌شود؛ مسیر قبلی که یک پینگ بدون `clientUuid` را دوباره درج می‌کرد حذف شده است. محل: `backend/src/services/locationService.js`, `backend/src/repositories/locationRepository.js`. |
+| ۳۳ | **انجام شد.** `claimPending()` ردیف را با `locked_at` claim می‌کند و در PostgreSQL از `FOR UPDATE SKIP LOCKED` استفاده می‌کند؛ پس از ارسال، قفل پاک یا وضعیت عوض می‌شود. محل: `backend/src/repositories/outboxRepository.js`, migration `011_notification_claim_and_delivery_keys.sql`. |
+| ۳۴ | **انجام شد.** پینگ‌های seed با `source='simulator'` درج می‌شوند تا دادهٔ نمایشی به‌عنوان گوشی واقعی شمرده نشود. محل: `backend/src/db/seed.js`. |
+| ۳۵ | **انجام شد.** نسبت `fp/(tp+fp)` با نام بی‌ابهام `falseAlarmFraction` ارائه می‌شود، نه نرخ هشدار کاذب آماری. محل: `backend/src/repositories/fallEventRepository.js`. |
+| ۳۶ | **انجام شد.** اپ شناسهٔ پایدار نصب را در `X-Device-Install-Id` می‌فرستد و سرور باتری را فقط به ردیف همان دستگاه می‌نویسد. آزمون دو دستگاه و باتری مستقل: `backend/tests/admin.integration.test.js`; کد: `mobile/lib/core/network/api_client.dart`, `backend/src/repositories/deviceRepository.js`. |
+| ۳۷ | **انجام شد.** وضعیت سلامت هنگام ارسال مدرک رمز می‌شود، فقط پس از تأیید به پروفایل منتقل می‌شود و به کاربر تأییدنشده بازگردانده نمی‌شود. محل: `backend/src/repositories/adminRepository.js`, `backend/src/repositories/mappers.js`; آزمون: `backend/tests/admin.integration.test.js`. |
+| ۳۸ | **انجام شد.** فیلتر صف فقط وضعیت‌های ذخیره‌شدهٔ `pending`, `sent`, `abandoned` را می‌پذیرد؛ گزینهٔ بی‌اثر `failed` حذف شد. محل: `backend/src/routes/index.js`, `backend/src/docs/openapi.yaml`; آزمون: `backend/tests/admin.integration.test.js`. |
+| ۳۹ | **پیاده شد؛ build موبایل تأیید نشده است.** انتخاب تصویر واقعی از فایل/دوربین جای لوگوی برنامه را گرفته است. فایل‌ها: `mobile/lib/core/utils/identity_document_image.dart`, `mobile/lib/features/settings/presentation/settings_page.dart`, `mobile/lib/features/home/presentation/supervisor_zones_page.dart`. `flutter test` به‌دلیل پاسخ «Insufficient permissions» از Pub.dev برای `image_picker` پیش از کامپایل متوقف شد. |
+| ۴۰ | **انجام شد.** وضعیت پیش‌فرض اپ `unverified` است و همراه پروفایل ذخیره می‌شود. محل: `mobile/lib/features/auth/domain/auth_models.dart`. |
+| ۴۱ | **انجام شد.** صحت، بازخوانی و F1 پنل مدیر با دو رقم اعشار نمایش داده می‌شوند. محل: `web/js/views/admin.js`, تابع `fallMetricsCard()`. |
+| ۴۲ | **انجام شد.** نقشهٔ مراقب محدوده‌های مجاز را به `map.setZones()` می‌دهد و مرکز واقعی هر محدوده را می‌خواند. محل: `web/js/views/guardian.js`. |
+| ۴۳ | **انجام شد.** ویرایشگر محدودهٔ امن در وب برای کاربر اصلی نمایش داده نمی‌شود؛ سرپرست اصلی مراقب آن را می‌بیند. محل: `web/js/views/zones.js`. |
+| ۴۴ | **انجام شد.** SOS وب موقعیت جاری مرورگر را می‌گیرد و سرور درخواست پینگ وب را با `source='device'` ثبت می‌کند؛ مقدار `isSimulated` کلاینت ملاک نیست. محل: `web/js/views/dashboard.js`, `backend/src/controllers/index.js`. |
+| ۴۵ | **انجام شد.** اپ نتیجهٔ واقعی مجوز اعلان و فعال بودن اعلان‌های سیستم را بررسی می‌کند و پس از رد مجوز پیام موفقیت نشان نمی‌دهد. محل: `mobile/lib/core/push/push_service.dart`. |
+| ۴۶ | **انجام شد.** وب refresh token را در localStorage نمی‌گذارد؛ cookie امن HttpOnly استفاده می‌شود. محل: `web/js/api.js`, `backend/src/controllers/authController.js`. |
+| ۴۷ | **انجام شد.** بازهٔ روز تاریخچه بر اساس نیمه‌شب تهران محاسبه می‌شود؛ همان بازه برای حذف روز هم استفاده می‌شود. محل: `web/js/views/history.js`, توابع `tehranDayBounds()` و `deleteHistory()`. |
+| ۴۸ | **انجام شد.** مسافت مسیر در وب با فرمول Haversine محاسبه شده تا با موبایل هم‌تعریف باشد. محل: `web/js/views/history.js`, تابع `distanceMeters()`؛ موبایل: `mobile/lib/features/tracking/`. |
+| ۴۹ | **تنظیمات پیاده شد؛ آزمون ۱۰ دقیقه‌ای دستگاه واقعی انجام نشده است.** مجوزهای background/foreground و سرویس مکان در manifest آمده‌اند و خطای شروع سرویس به وضعیت رابط کاربری می‌رسد. محل: `mobile/android/app/src/main/AndroidManifest.xml`, `mobile/lib/features/tracking/presentation/tracking_controller.dart`. گوشی Android متصل در این محیط موجود نبود. |
+| ۵۰ | **بخشی انجام شد؛ APK امضاشده تحویل نشده است.** شناسهٔ برنامه `ir.hamghadam.safestep` شده، ترافیک cleartext در نسخهٔ اصلی بسته است و signing release از `mobile/android/key.properties` خوانده می‌شود. کلید انتشار مالک پروژه در مخزن/محیط نیست و Pub.dev نیز وابستگی موبایل را resolve نکرد؛ بنابراین release APK امضاشده نساختم. |
+| ۵۱ | **انجام شد؛ build اجرا نشد.** Dockerfile از ریشهٔ repository فایل‌های backend و web را کپی می‌کند، روی ۴۰۸۰ گوش می‌دهد و fallback ناامن `npm install` ندارد. Docker CLI در این محیط نصب/در دسترس نبود؛ محل: `backend/Dockerfile`, `.dockerignore`. |
+| ۵۲ | **روش آموزش اصلاح شد؛ عدد تازه به داده نیاز دارد.** مقیاس‌بندی در هر fold فقط از بخش آموزش برازش می‌شود؛ اعتبارسنجی بیرونی پنج‌لایه گروهی بر اساس subject، انتخاب ابرپارامترها در foldهای داخلی و seed ثابت است؛ ماتریس قاعدهٔ ensemble و جاروب `margin`/`agreeRatio` تولید می‌شود. محل: `backend/scripts/falls/train.js`, `backend/scripts/falls/train_sisfall.js`. فایل خام/ویژگی SisFall نیست، پس جدول عددی تازه ساخته نشد. |
+| ۵۳ | **انجام شد؛ محدودیت بافر ثبت شد.** اجرای PostgreSQL 17.11 واقعی و محلی با شش سناریوی ۶۰ثانیه‌ای، ۵۰ توکن/اتصال مستقل، شامل رگبار SOS، در `docs/evaluation/load-test-postgres-2026-11-01.md` ثبت شده است؛ هر شش سناریو صفر خطای HTTP داشتند. بافر تله‌متری ۱٬۹۵۰ رکورد در صف و ۱۶٬۹۳۶ رکورد ازدست‌رفته داشت، پس این اعداد معیار کامل‌بودن ثبت تله‌متری یا رسیدن اعلان به گوشی نیستند. |
+| ۵۴ | **انجام شد و با دادهٔ نمونه آزموده شد.** تبدیل semicolon، واحدهای فیزیکی، کاهش نرخ، انتخاب پنجرهٔ سقوط/فعالیت و حفظ `subject_id`/`recording_id` در `backend/scripts/falls/convert_sisfall.js` و `backend/tests/fall.training.test.js` پوشش دارد. فایل خام SisFall برای بازاجرای کامل موجود نیست. |
+| ۵۵ | **بخش قابل‌بازتولید انجام شد.** در نبود `dataset.csv`، `export-charts.js` با خطای ENOENT متوقف نمی‌شود؛ CSV حصار و LOO را می‌سازد. ROC مصنوعی را به‌دلیل نبود dataset دوباره تولید نمی‌کند. فایل‌های GPS ساختگی و SUS ساختگی حذف شده‌اند. محل: `backend/scripts/evaluation/export-charts.js`, `docs/evaluation/`. |
+| ۵۶ | **منطق و آزمون اضافه شد؛ اجرای Flutter مسدود است.** سرویس پس از کاندیدای ضربه دو ثانیه دادهٔ پس از ضربه جمع می‌کند و پنجرهٔ مرکزدار را می‌فرستد؛ cooldown فقط پس از پاسخ مثبت اعمال می‌شود. آزمون جریان حسگر: `mobile/test/fall_detector_service_test.dart`. اجرای آن به‌علت خطای مجوز Pub.dev انجام نشد. |
+| ۵۷ | **انجام شد و در Chromium گذشت.** smoke test ثبت‌نام/ورود و رندر `main#main.app-main` و محتوای داشبورد را در مرورگر واقعی بررسی می‌کند. محل: `backend/tests/web.browser.smoke.test.js`; اجرای کامل بک‌اند این آزمون را هم اجرا می‌کند. |
+| ۵۸ | **انجام شد.** منوی تاریخچهٔ مراقب، کاربر اصلی اول/ناظر اصلی را انتخاب می‌کند؛ اگر چند کاربر اصلی داشته باشد انتخاب‌گر نشان می‌دهد. محل: `web/js/views/history.js`, توابع `load()` و `renderSubjectPicker()`. |
 
-### خطای موقعیت‌یابی
+## محدودیت‌هایی که به داده یا دسترسی بیرونی نیاز دارند
 
-- **درخواست:** `position-error.csv` نباید به‌عنوان خطای GPS یا پیاده‌روی واقعی ارائه شود.
-- **انجام شد:** فایل ساختگی از خروجی ارزیابی حذف شد. مستند ارزیابی توضیح می‌دهد که خطای موقعیت فقط پس از ثبت نمونه‌های پیاده‌روی در برابر مختصات نقطهٔ مرجع قابل گزارش است.
-- **محل مشاهده در اپ:** از صفحهٔ خانهٔ کاربر اصلی یا مراقب، **ارزیابی میدانی** را باز کنید و زبانهٔ **نقطهٔ مرجع** را انتخاب کنید. مختصات یک نقطهٔ نقشه‌برداری‌شده را ثبت کنید؛ دکمهٔ GPS فقط مختصات تقریبی گوشی را پر می‌کند و مرجع نقشه‌برداری‌شده محسوب نمی‌شود.
-- **فایل‌ها:** `mobile/lib/features/evaluation/presentation/evaluation_page.dart`, `mobile/lib/features/evaluation/data/evaluation_repository.dart`, `docs/evaluation/defense-and-metrics.md`.
-- **دادهٔ باقی‌مانده:** ۲۰ تا ۳۰ نمونهٔ پیاده‌روی واقعی باید در محل و با دستگاه واقعی جمع‌آوری شود. این جمع‌آوری هنوز انجام نشده است.
-
-### پرسشنامهٔ SUS
-
-- **درخواست:** پاسخ‌های ساختگی یا بازبینی ساختاریافته نباید به‌عنوان پاسخ خانواده‌های مستقل گزارش شوند.
-- **انجام شد:** فایل‌های CSV و گزارش پاسخ‌های ساختاریافتهٔ قبلی از ارزیابی حذف شدند. فرم ده‌گویه‌ای SUS در اپ اضافه شده است.
-- **محل مشاهده در اپ:** **ارزیابی میدانی** را باز کنید و زبانهٔ **SUS** را انتخاب کنید. پس از پاسخ به هر ده گویه، فرم پاسخ را به سرور می‌فرستد.
-- **فایل‌ها:** `mobile/lib/features/evaluation/presentation/evaluation_page.dart`, `mobile/lib/features/evaluation/data/evaluation_repository.dart`, `docs/evaluation/defense-and-metrics.md`.
-- **دادهٔ باقی‌مانده:** میانگین SUS تا زمان گردآوری پاسخ‌های واقعی از شرکت‌کنندگان مستقل گزارش نمی‌شود.
-
-## ۲. آزمون‌ها و مسیر محدودهٔ امن
-
-- **درخواست:** آزمون‌های یکپارچه با قفل تأیید مدرک سازگار شوند و مسیر خروج از محدوده دوباره سبز شود.
-- **انجام شد:** fixtureهای کاربر در آزمون‌های یکپارچه وضعیت تأییدشده می‌سازند. نقص مجوز ایجاد محدودهٔ امن نیز اصلاح شد.
-- **محل بررسی:** `backend/tests/safezones.integration.test.js`, `backend/tests/geofence.exit.dwell.test.js`, و `backend/tests/geofence.test.js`.
-- **نتیجهٔ اجرای کامل:** ۱۷ فایل آزمون و ۲۱۹ آزمون موفق شدند.
-
-## ۳. بازتولید آموزش مدل سقوط
-
-- **درخواست:** اسکریپت‌های `train_real.js` و `train_sisfall.js` داخل بسته باشند.
-- **انجام شد:** هر دو اسکریپت اضافه شده و فرمان‌های `train:fall:real` و `train:fall:sisfall` در `backend/package.json` در دسترس‌اند. اسکریپت SisFall از پنجره‌های ویژگیِ برچسب‌دار آموزش می‌گیرد و ارزیابی پنج‌لایه و جاروب آستانهٔ قاعدهٔ ترکیبی را اجرا می‌کند.
-- **محل بررسی:** `backend/scripts/falls/train_real.js`, `backend/scripts/falls/train_sisfall.js`, `backend/package.json`.
-- **محدودیت داده:** دادهٔ خام SisFall یا CSV ویژگی‌های آماده در بسته نیست. برای بازتولید کامل باید `SISFALL_FEATURE_CSV` به CSV آماده اشاره کند. بدون آن، آموزش واقعی از نو اجرا نمی‌شود.
-
-## ۴. اعداد و خروجی‌های ارزیابی
-
-### AUC و SisFall
-
-- **درخواست:** AUC در `defense-and-metrics.md` با مقدار واقعی فایل هماهنگ شود و LOO به‌عنوان برآورد تعمیم معرفی نشود.
-- **انجام شد:** AUC فایل مصنوعی `roc-threshold.csv` برابر **۱٫۰۰۰** ثبت شده است و صریحاً فقط ویژگی داده‌ساز مصنوعی معرفی می‌شود. مستند، LOO را به دلیل انتخاب prototype از کل پنجره‌ها معیار تعمیم نمی‌داند و برای گزارش عملکرد به اعتبارسنجی پنج‌لایهٔ `model.json` ارجاع می‌دهد.
-- **محل بررسی:** `docs/evaluation/defense-and-metrics.md`, `backend/src/services/fallDetection/model.json`.
-
-### Geofence و روش سادهٔ مبنا
-
-- **درخواست:** هر دو ستون CSV با یک `debounceCount` ساخته شوند و روش ساده روی همان دنبالهٔ خروج واقعی هم اجرا شود.
-- **انجام شد:** `geofence-false-alarms.csv` اکنون برای هر دو شمارش مقدار `debounce_count=1` دارد. آزمون geofence روش ساده و موتور پیشنهادی را روی دنبالهٔ `[145, 165, 145, 165, 200, 250, 400, 600]` مقایسه می‌کند.
-- **محل بررسی:** `docs/evaluation/geofence-false-alarms.csv`, `backend/scripts/evaluation/export-charts.js`, `backend/tests/geofence.test.js`.
-- **محدودیت:** این CSV شبیه‌سازی قطعی است، نه برداشت از پیاده‌روی واقعی.
-
-### جاروب آستانهٔ قاعدهٔ ترکیبی
-
-- **درخواست:** آستانه‌های `margin` و `agreeRatio` جاروب شوند.
-- **انجام شد:** کد جاروب stratified پنج‌لایه در اسکریپت آموزش SisFall اضافه شده است.
-- **محدودیت:** جدول عددی تازه‌ای در بسته نیست، چون دادهٔ خام و CSV ویژگی آماده در اختیار اسکریپت نیست. اجرای آموزش با CSV آماده، جدول را تولید می‌کند.
-
-### PostgreSQL و SOS
-
-- **درخواست:** تست بار هشت‌ثانیه‌ای شامل سناریوی SOS باشد.
-- **انجام شد:** اسکریپت PostgreSQL شامل ping، watching، history و رگبار SOS است؛ هر سناریو هشت ثانیه اجرا می‌شود. اجرای محلی تازه روی PostgreSQL 17.11 ثبت شده است. در همهٔ شش سناریو شمار خطای HTTP صفر بود. برای رگبار SOS با ۱۰ اتصال: ۱٬۵۳۷ درخواست، میانگین ۵۱٫۵۷ ms، صدک ۹۵ برابر ۱۱۴ ms و صدک ۹۹ برابر ۱۵۵ ms.
-- **محل بررسی:** `backend/scripts/loadtest-postgres.js`, `docs/evaluation/load-test-postgres-2026-11-01.md`, `docs/evaluation/loadtest-postgres-status.md`.
-- **محدودیت:** این اجرا روی PostgreSQL محلی است و تأخیر سرویس ابری را نشان نمی‌دهد. هنگام اجرا، سرریز بافر تله‌متری هشدار داده شد؛ بنابراین ارقام HTTP به‌تنهایی کامل بودن ثبت تله‌متری یا زمان رسیدن هشدار به گوشی را ثابت نمی‌کنند.
-
-## ۵. اپ موبایل و شمار آزمون‌های موبایل
-
-- **درخواست:** صفحهٔ ثبت نقطهٔ مرجع و فرم SUS به اپ اضافه شود؛ تعداد آزمون‌ها نیز درست گزارش شود.
-- **انجام شد:** مسیر ارزیابی در router اپ ثبت شده و از خانهٔ کاربر اصلی و مراقب قابل دسترسی است. فرم نقطهٔ مرجع و فرم SUS به endpointهای ارزیابی سرور وصل‌اند.
-- **محل مشاهده در اپ:** خانهٔ کاربر اصلی یا مراقب → **ارزیابی میدانی** → زبانهٔ نقطهٔ مرجع یا SUS.
-- **شمار آزمون:** پوشهٔ `mobile/test` یک فایل آزمون دارد که نرمال‌سازی آدرس سرور را بررسی می‌کند؛ در این تحویل تعداد ۲۵ آزمون موبایل ادعا نشده است.
-- **فایل‌های راهنما:** `docs/mobile-client.md`, `mobile/lib/app/router.dart`, `mobile/lib/features/home/presentation/primary_home_page.dart`, `mobile/lib/features/home/presentation/guardian_home_page.dart`.
-
-## ۶. زمان رسیدن هشدار به گوشی مراقب
-
-- **درخواست:** پس از فعال شدن FCM، زمان رسیدن هشدار از داده‌های `alert_deliveries` اندازه‌گیری شود.
-- **وضعیت:** هنوز انجام‌پذیر نیست؛ FCM در build فعلی فعال نشده و رسیدن اعلان روی گوشی واقعی ثبت نشده است. سناریوی SOS بالا زمان پاسخ endpoint سرور را اندازه می‌گیرد، نه زمان دریافت روی گوشی.
-- **اقدام لازم برای تکمیل:** فعال‌سازی FCM، اجرای آزمایش روی گوشی‌های واقعی و استخراج زمان‌های ثبت‌شده در `alert_deliveries`.
-
-## ۷. تفکیک خطای GPS از دقت گزارش‌شده
-
-- **تأیید درخواست قبلی:** `error_m` از `accuracy_m` جدا نگه داشته شده است. `accuracy_m` مقدار دقت اعلام‌شده توسط سیستم مکان‌یابی گوشی است؛ `error_m` فاصلهٔ محاسبه‌شده از مختصات ثبت‌شده تا نقطهٔ مرجع است.
-- **محل بررسی:** `backend/src/services/locationService.js`, `backend/src/repositories/logRepository.js`, `backend/src/db/migrations/007_position_error_and_sus.sql`.
-
-## خلاصهٔ وضعیت
-
-موارد قابل اصلاح در کد، فرم‌های اپ، آزمون‌ها و مستندات انجام شده‌اند. داده‌های تجربیِ وابسته به دسترسی میدانی، پاسخ‌دهندگان مستقل، دادهٔ خام SisFall و گوشی/FCM واقعی هنوز باید گردآوری شوند؛ هیچ‌یک در گزارش به‌عنوان نتیجهٔ جمع‌آوری‌شده معرفی نشده است.
+- نمونه‌های خطای GPS باید در پیاده‌روی واقعی کنار نقطهٔ مرجع نقشه‌برداری‌شده جمع شوند؛ SUS باید از شرکت‌کنندگان مستقل گرفته شود.
+- فایل خام SisFall/CSV گروه‌بندی‌شده در این بسته نیست؛ بنابراین آموزش تازه، جدول threshold sweep تازه و راستی‌آزمایی مجدد شمارش فایل‌های خام انجام نشده است.
+- برای زمان نمایش هشدار روی گوشی به حساب سرویس FCM، گوشی ثبت‌شده و ثبت رسید واقعی نیاز است. `alert_deliveries` فعلی زمان پذیرش/پاسخ کانال سرور را می‌سنجد، نه زمان نمایش روی گوشی.
+- آزمون ۱۰ دقیقه‌ای پس‌زمینه به گوشی واقعی نیاز دارد. APK امضاشده نیز به کلید انتشار متعلق به صاحب برنامه نیاز دارد.
+- اجرای `flutter test` در این محیط با خطای دسترسی Pub.dev برای بستهٔ `image_picker` متوقف شد؛ تست‌های Flutter و build موبایل تأیید نشده‌اند.
+- قرارداد Kavenegar کلید را در مسیر URL می‌گذارد؛ برای هدرمحور بودن باید provider دیگری مثل قاصدک انتخاب شود یا لاگ مسیر در پراکسی پاک‌سازی شود.
+- Dockerfile اصلاح شده ولی Docker CLI در محیط موجود نیست؛ ساخت image اجرا نشده است.

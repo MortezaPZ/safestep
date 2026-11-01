@@ -1,5 +1,15 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
+
+const dispatches = vi.hoisted(() => []);
+vi.mock('../src/services/smsAdapter.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    send: async (dispatch) => { dispatches.push(dispatch); },
+    consumeLastDispatch: () => dispatches.shift() ?? null,
+  };
+});
 
 process.env.PGLITE_DATA_DIR = 'memory';
 process.env.DB_DRIVER = 'pglite';

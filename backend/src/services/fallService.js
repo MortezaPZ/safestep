@@ -79,7 +79,7 @@ async function raiseFromFall(row, feedback) {
     userId: row.userId,
     type: ALERT_TYPES.FALL_DETECTED,
     location: { lat: row.lat, lng: row.lng },
-    context: { confidence: row.confidence },
+    context: { confidence: row.confidence, auto: feedback === FALL_FEEDBACK.NO_RESPONSE },
     metadata: {
       fallEventId: row.id,
       confidence: row.confidence,
@@ -131,19 +131,22 @@ export async function reportMissed(user, body = {}) {
     lat: body.lat,
     lng: body.lng,
     detectionSource: 'manual',
-    classifiedAsFall: true,
+    // «گزارش سقوط ازدست‌رفته» یعنی سامانه خودش سقوط را تشخیص نداده؛ این
+    // رکورد باید در خانه‌ی FN ماتریس قرار بگیرد، نه TP.
+    classifiedAsFall: false,
     userFeedback: FALL_FEEDBACK.CONFIRMED,
     feedbackAt: new Date(),
     respondedWithinSec: 0,
   });
-  await raiseAlert({
+  const result = await raiseAlert({
     userId: user.id,
     type: ALERT_TYPES.FALL_DETECTED,
     location: { lat: body.lat, lng: body.lng },
-    context: { confidence: 1, auto: true },
+    context: { confidence: 1, auto: false, manualReport: true },
     metadata: { fallEventId: row.id, manualReport: true },
   });
-  return { fallEvent: row, reported: true };
+  const linked = await fallEventRepository.linkAlert(row.id, result.alert.id);
+  return { fallEvent: linked, reported: true };
 }
 
 export async function listFalls(viewer, { userId, limit, before }) {

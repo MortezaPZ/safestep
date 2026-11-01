@@ -171,7 +171,10 @@ export async function refresh(refreshToken, { userAgent } = {}) {
   }
 
   const user = await userRepository.findById(payload.sub);
-  if (!user) throw unauthorized('حساب کاربری یافت نشد.');
+  if (!user || user.status !== 'active') {
+    await userRepository.revokeAllRefreshTokens(payload.sub);
+    throw unauthorized(user ? 'حساب کاربری فعال نیست.' : 'حساب کاربری یافت نشد.');
+  }
 
   // چرخش: توکن قبلی باطل و توکن تازه صادر می‌شود
   await userRepository.revokeRefreshToken(payload.jti);

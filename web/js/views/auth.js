@@ -1,24 +1,7 @@
-/**
- * صفحه‌ی ورود و ثبت‌نام.
- *
- * دکمه‌های «حساب‌های آماده‌ی دمو» عمداً اینجاست: در یک جلسه‌ی سه دقیقه‌ای،
- * تایپ کردن شماره و رمز در دو پنجره وقت تلف کردن است. این دکمه‌ها فیلد را
- * پر می‌کنند، نه اینکه احراز هویت را دور بزنند — ورود همچنان واقعی است.
- */
+/** صفحه‌ی ورود و ثبت‌نام. */
 import api from '../api.js';
 import { el, render, toast } from '../ui.js';
 import { toEnDigits } from '../format.js';
-
-const DEMO_ACCOUNTS = [
-  { phone: '09121110001', name: 'مریم رضایی', role: 'کاربر اصلی', icon: '👤' },
-  { phone: '09121110007', name: 'کاربر تأییدنشده', role: 'کاربر اصلی — مدارک تأیید نشده', icon: '📄' },
-  { phone: '09121110002', name: 'علی رضایی', role: 'ناظر اصلی — دسترسی اضطراری', icon: '👨' },
-  { phone: '09121110003', name: 'زهرا رضایی', role: 'ناظر — بدون دسترسی اضطراری', icon: '👩' },
-  { phone: '09121110009', name: 'مدیر سامانه', role: 'پنل مدیریت', icon: '🛡️' },
-  { phone: '09121110008', name: 'ناظر تأییدنشده', role: 'مدارک تأیید نشده — دسترسی محدود', icon: '📄' },
-];
-
-const DEMO_PASSWORD = 'Test@1234';
 
 export function mountAuth(container, { onSuccess }) {
   let mode = 'login';
@@ -199,35 +182,6 @@ export function mountAuth(container, { onSuccess }) {
     submitBtn,
   );
 
-  const demoBlock = el(
-    'div.demo-accounts',
-    {},
-    el('p.text-xs.text-muted.mb-4', {
-      text: 'حساب‌های آماده‌ی دمو — با یک کلیک فیلدها پر می‌شوند:',
-    }),
-    ...DEMO_ACCOUNTS.map((account) =>
-      el(
-        'button.demo-account',
-        {
-          type: 'button',
-          onClick: () => {
-            setMode('login');
-            phoneInput.value = account.phone;
-            passwordInput.value = DEMO_PASSWORD;
-            passwordInput.focus();
-          },
-        },
-        el('span', { text: account.icon, style: { fontSize: '1.3rem' } }),
-        el(
-          'span',
-          { style: { flex: '1' } },
-          el('div.list-row__title', { text: account.name }),
-          el('div.list-row__sub', { text: account.role }),
-        ),
-      ),
-    ),
-  );
-
   const card = el(
     'div.auth-card',
     {},
@@ -244,7 +198,6 @@ export function mountAuth(container, { onSuccess }) {
     ),
     el('div.auth-tabs', { role: 'tablist' }, loginTab, registerTab),
     form,
-    demoBlock,
   );
 
   setMode('login');

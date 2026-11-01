@@ -134,6 +134,27 @@ export async function updatePermissions(id, permissions) {
   return mapGuardianship(rows[0]);
 }
 
+export async function setMainSupervisor(primaryUserId, guardianshipId) {
+  return db.transaction(async (tx) => {
+    const { rows: active } = await tx.query(
+      `SELECT id FROM guardianships
+        WHERE primary_user_id = $1 AND status = 'active'
+        FOR UPDATE`,
+      [primaryUserId],
+    );
+    if (!active.some((row) => row.id === guardianshipId)) return null;
+
+    const { rows } = await tx.query(
+      `UPDATE guardianships
+          SET is_main_supervisor = (id = $2)
+        WHERE primary_user_id = $1 AND status = 'active'
+        RETURNING *`,
+      [primaryUserId, guardianshipId],
+    );
+    return mapGuardianship(rows.find((row) => row.id === guardianshipId));
+  });
+}
+
 export async function revoke(id) {
   const { rows } = await db.query(
     `UPDATE guardianships SET status = 'revoked', revoked_at = now()

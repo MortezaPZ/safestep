@@ -70,6 +70,10 @@ const env = {
     accessTtl: str('JWT_ACCESS_TTL', '15m'),
     refreshTtl: str('JWT_REFRESH_TTL', '30d'),
     invitePepper: str('INVITE_CODE_PEPPER', 'dev-only-invite-pepper-change-me-in-production'),
+    identityDataEncryptionKey: str(
+      'IDENTITY_DATA_ENCRYPTION_KEY',
+      'dev-only-identity-data-encryption-key-change-me',
+    ),
     bcryptRounds: num('BCRYPT_ROUNDS', 10),
     phoneVerificationRequired: bool('PHONE_VERIFICATION_REQUIRED', false),
   },
@@ -121,11 +125,20 @@ const env = {
 /** در محیط تولید اجازه نمی‌دهیم رازهای پیش‌فرض توسعه باقی بماند. */
 export function assertProductionSecrets() {
   if (!env.isProduction) return;
+  if (env.demo.enabled) {
+    throw new Error('در حالت production باید DEMO_MODE=false باشد تا شبیه‌ساز موقعیت فعال نشود.');
+  }
   const weak = [
     ['JWT_ACCESS_SECRET', env.auth.accessSecret],
     ['JWT_REFRESH_SECRET', env.auth.refreshSecret],
     ['INVITE_CODE_PEPPER', env.auth.invitePepper],
+    ['IDENTITY_DATA_ENCRYPTION_KEY', env.auth.identityDataEncryptionKey],
   ].filter(([, value]) => value.startsWith('dev-only-'));
+
+  if (env.auth.identityDataEncryptionKey.length < 32 &&
+      !weak.some(([name]) => name === 'IDENTITY_DATA_ENCRYPTION_KEY')) {
+    weak.push(['IDENTITY_DATA_ENCRYPTION_KEY', env.auth.identityDataEncryptionKey]);
+  }
 
   if (weak.length > 0) {
     throw new Error(

@@ -1,0 +1,10 @@
+.git
+**/node_modules
+**/.pglite
+**/coverage
+**/.dart_tool
+**/build
+mobile
+docs
+*.apk
+*.zip

@@ -27,19 +27,27 @@ const FORBIDDEN_KEYS = new Set([
  * این تابع، اجرایی‌کننده‌ی قاعده‌ی «هیچ مختصات و هیچ رازی در لاگ» است —
  * تکیه بر یادآوریِ برنامه‌نویس کافی نیست، چون یک بار فراموشی یعنی نشت دائمی.
  */
-function sanitize(metadata) {
-  if (!metadata || typeof metadata !== 'object') return {};
+function sanitizeValue(value, depth = 0) {
+  if (value === null || value === undefined) return undefined;
+  if (depth >= 6) return '[truncated]';
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((item) => sanitizeValue(item, depth + 1));
+  }
+  if (typeof value !== 'object') {
+    return typeof value === 'string' ? value.slice(0, 500) : value;
+  }
   const out = {};
-  for (const [key, value] of Object.entries(metadata)) {
+  for (const [key, nested] of Object.entries(value)) {
     if (FORBIDDEN_KEYS.has(key)) continue;
-    if (value === null || value === undefined) continue;
-    if (typeof value === 'object') {
-      out[key] = Array.isArray(value) ? value.slice(0, 20) : sanitize(value);
-    } else {
-      out[key] = typeof value === 'string' ? value.slice(0, 500) : value;
-    }
+    const sanitized = sanitizeValue(nested, depth + 1);
+    if (sanitized !== undefined) out[key] = sanitized;
   }
   return out;
+}
+
+function sanitize(metadata) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {};
+  return sanitizeValue(metadata) ?? {};
 }
 
 /**

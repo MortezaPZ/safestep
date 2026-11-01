@@ -9,7 +9,7 @@
  *
  * اجرا:
  *   DATABASE_URL=postgres://safestep:***@localhost:5432/safestep \
- *   LOADTEST_DURATION=8 node scripts/loadtest-postgres.js
+ *   LOADTEST_DURATION=60 node scripts/loadtest-postgres.js
  *
  * رد کردن در صورتی که Postgres نباشد:
  *   EXIT_CODE=4 و پیام روشن.
@@ -28,7 +28,7 @@ const PASSWORD = 'Load@1234';
 // درست محاسبه شود. به همین دلیل همه‌ی importهای پروژه بعد از این خط می‌آیند.
 process.env.LOADTEST = '1';
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
-process.env.DEMO_MODE = 'true';
+process.env.DEMO_MODE = 'false';
 
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const DB_DRIVER = (process.env.DB_DRIVER || '').toLowerCase();
@@ -98,7 +98,8 @@ const { runMigrations } = await import('../src/db/migrate.js');
 const { hashPassword } = await import('../src/utils/crypto.js');
 const telemetryService = (await import('../src/services/telemetryService.js')).default;
 
-const DURATION = Number(process.env.LOADTEST_DURATION || 8);
+const DURATION = Number(process.env.LOADTEST_DURATION || 60);
+const SOS_RATE = Number(process.env.LOADTEST_SOS_RATE || 50);
 let nextLoadPhone = Number(String(Date.now()).slice(-7));
 
 async function listen(app) {
@@ -159,24 +160,51 @@ async function login(port, phone) {
   return data.accessToken;
 }
 
-function summarize(result) {
-  const lat = result.latency;
+function percentile(values, fraction) {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil(fraction * sorted.length) - 1)];
+}
+
+function summarize(result, responseLatencies) {
   return {
     requests: result.requests.total,
     throughput: result.throughput.mean,
     errors: result.errors + result.non2xx,
-    p50: lat.p50,
-    p95: lat.p95 ?? lat.p97_5 ?? lat.p90,
-    p99: lat.p99,
-    mean: lat.mean,
+    p50: percentile(responseLatencies, 0.50),
+    p95: percentile(responseLatencies, 0.95),
+    p99: percentile(responseLatencies, 0.99),
+    mean: responseLatencies.length
+      ? responseLatencies.reduce((sum, value) => sum + value, 0) / responseLatencies.length
+      : null,
   };
 }
 
-async function runCannon(url, { method, headers, body, connections, duration, title }) {
+async function runCannon(url, { method, headers, body, connections, duration, title, tokens, overallRate }) {
+  let nextToken = 0;
+  const responseLatencies = [];
+  const parsedUrl = new URL(url);
   const result = await autocannon({
-    url, method, headers, body, connections, duration, pipelining: 1, title,
+    url, method, headers, body, connections, duration, overallRate, pipelining: 1, title,
+    setupClient(client) {
+      if (!tokens?.length) return;
+      const token = tokens[nextToken % tokens.length];
+      nextToken += 1;
+      client.setHeaders({ ...(headers ?? {}), Authorization: 'Bearer ' + token });
+    },
+    requests: [{
+      path: parsedUrl.pathname + parsedUrl.search,
+      setupRequest(request, context) {
+        context.__requestStartedAt = process.hrtime.bigint();
+        return request;
+      },
+      onResponse(_status, _body, context) {
+        const startedAt = context.__requestStartedAt;
+        if (startedAt) responseLatencies.push(Number(process.hrtime.bigint() - startedAt) / 1e6);
+      },
+    }],
   });
-  return summarize(result);
+  return summarize(result, responseLatencies);
 }
 
 /**
@@ -210,7 +238,7 @@ function toMd(rows, { probe, poolBefore, poolAfter, telemetry, duration }) {
     '',
     `سرور پایگاه داده: PostgreSQL ${probe.version ?? 'نامعلوم'} ` +
       `(حداکثر اتصال پیکربندی‌شده: ${probe.maxConnections ?? 'نامعلوم'})`,
-    `مدت هر سناریو: ${duration} ثانیه. درایور: pg.`,
+    `مدت هر سناریو: ${duration} ثانیه. درایور: pg. پنجاه کاربر اصلی با توکن مستقل استفاده شدند.`,
     '',
     '| سناریو | درخواست | میانگین ms | p50 | p95 | p99 | خطا |',
     '| --- | --- | --- | --- | --- | --- | --- |',
@@ -246,13 +274,24 @@ async function main() {
     process.stderr.write('دستور اجرای صحیح:\n');
     process.stderr.write(
       '  DATABASE_URL=postgres://safestep:***@localhost:5432/safestep ' +
-        'LOADTEST_DURATION=8 node scripts/loadtest-postgres.js\n\n',
+        'LOADTEST_DURATION=60 node scripts/loadtest-postgres.js\n\n',
     );
     process.exitCode = 4;
     return;
   }
 
   process.env.DB_DRIVER = 'pg';
+
+  if (!Number.isFinite(DURATION) || DURATION < 60) {
+    process.stderr.write('LOADTEST_DURATION باید حداقل ۶۰ ثانیه باشد.\n');
+    process.exitCode = 4;
+    return;
+  }
+  if (!Number.isFinite(SOS_RATE) || SOS_RATE < 1) {
+    process.stderr.write('LOADTEST_SOS_RATE باید عددی مثبت باشد.\n');
+    process.exitCode = 4;
+    return;
+  }
 
   let probe;
   try {
@@ -269,11 +308,11 @@ async function main() {
   telemetryService.setEnabled(true);
 
   const primaries = await seedLoad(50);
-  await seedEmergencyContact(primaries[0].id);
+  for (const primary of primaries) await seedEmergencyContact(primary.id);
   const app = createApp();
   const { server, port } = await listen(app);
-  const token = await login(port, primaries[0].phone);
-  const auth = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+  const tokens = await Promise.all(primaries.map((primary) => login(port, primary.phone)));
+  const auth = { 'Content-Type': 'application/json' };
   const pingBody = JSON.stringify({ lat: 35.72, lng: 51.33, accuracyM: 8, batteryLevel: 80 });
   const sosBody = JSON.stringify({ lat: 35.72, lng: 51.33, accuracyM: 8, batteryLevel: 80, note: 'load-test burst' });
 
@@ -281,38 +320,39 @@ async function main() {
   const poolBefore = await poolStats();
 
   for (const rate of [50, 100, 200]) {
-    const connections = Math.min(50, Math.max(10, Math.round(rate / 4)));
+    const connections = primaries.length;
     const s = await runCannon(`http://127.0.0.1:${port}/api/v1/locations/ping`, {
       method: 'POST', headers: auth, body: pingBody, connections,
-      duration: DURATION, title: `ping ~${rate}`,
+      duration: DURATION, title: `ping ~${rate}`, tokens, overallRate: rate,
     });
     rows.push({
-      title: `POST /locations/ping (هدف ${rate}/s، ${connections} اتصال)`,
+      title: `POST /locations/ping (هدف ${rate} درخواست/ثانیه، ${connections} کاربر/اتصال)`,
       ...s,
     });
   }
 
 
   rows.push({
-    title: 'GET /locations/watching',
+    title: 'GET /locations/watching (هدف 50 درخواست/ثانیه، 50 کاربر/اتصال)',
     ...(await runCannon(`http://127.0.0.1:${port}/api/v1/locations/watching`, {
-      method: 'GET', headers: auth, connections: 20, duration: DURATION, title: 'watching',
+      method: 'GET', headers: auth, connections: primaries.length, duration: DURATION, title: 'watching',
+      tokens, overallRate: 50,
     })),
   });
 
   rows.push({
-    title: 'GET /locations/history',
+    title: 'GET /locations/history (هدف 50 درخواست/ثانیه، 50 کاربر/اتصال)',
     ...(await runCannon(
       `http://127.0.0.1:${port}/api/v1/locations/history?limit=500&from=2026-01-01T00:00:00Z&to=2026-12-31T00:00:00Z`,
-      { method: 'GET', headers: auth, connections: 20, duration: DURATION, title: 'history' },
+      { method: 'GET', headers: auth, connections: primaries.length, duration: DURATION, title: 'history', tokens, overallRate: 50 },
     )),
   });
 
   rows.push({
-    title: 'POST /sos burst (10 connections)',
+    title: 'POST /sos burst (هدف ' + SOS_RATE + ' درخواست/ثانیه، 50 کاربر/اتصال)',
     ...(await runCannon(`http://127.0.0.1:${port}/api/v1/sos`, {
-      method: 'POST', headers: auth, body: sosBody, connections: 10,
-      duration: DURATION, title: 'sos-burst',
+      method: 'POST', headers: auth, body: sosBody, connections: primaries.length,
+      duration: DURATION, title: 'sos-burst', tokens, overallRate: SOS_RATE,
     })),
   });
 

@@ -14,6 +14,8 @@ import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/main_nav.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../auth/domain/auth_models.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../domain/pairing_models.dart';
 import 'pairing_controller.dart';
 
@@ -155,10 +157,20 @@ class _GuardiansPageState extends ConsumerState<GuardiansPage> {
     }
   }
 
+  Future<void> _setMainSupervisor(Guardianship link) async {
+    final bool saved = await ref
+        .read(pairingControllerProvider.notifier)
+        .setMainSupervisor(link.id);
+    if (mounted && saved) {
+      AppSnackBar.show(context, 'ناظر اصلی تغییر کرد.', kind: AppSnackKind.success);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final PairingState state = ref.watch(pairingControllerProvider);
+    final bool iAmPrimary = ref.watch(currentUserProvider)?.role == UserRole.primary;
 
     ref.listen<PairingState>(pairingControllerProvider, (PairingState? _, PairingState next) {
       final String? message = next.error?.message;
@@ -217,6 +229,10 @@ class _GuardiansPageState extends ConsumerState<GuardiansPage> {
                       child: _PersonCard(
                         person: guardians[i].guardianUser,
                         permissions: guardians[i].permissions,
+                        isMainSupervisor: guardians[i].isMainSupervisor,
+                        onSetMainSupervisor: iAmPrimary && !guardians[i].isMainSupervisor
+                            ? () => _setMainSupervisor(guardians[i])
+                            : null,
                         onEdit: () => _editPermissions(guardians[i]),
                         onRevoke: () =>
                             _confirmRevoke(guardians[i], iAmPrimary: true),
@@ -276,12 +292,16 @@ class _PersonCard extends StatelessWidget {
     required this.permissions,
     required this.onEdit,
     required this.onRevoke,
+    this.isMainSupervisor = false,
+    this.onSetMainSupervisor,
   });
 
   final RelatedPerson? person;
   final List<SharePermission> permissions;
   final VoidCallback? onEdit;
   final VoidCallback onRevoke;
+  final bool isMainSupervisor;
+  final VoidCallback? onSetMainSupervisor;
 
   @override
   Widget build(BuildContext context) {
@@ -339,10 +359,24 @@ class _PersonCard extends StatelessWidget {
             ],
           ),
 
+          if (isMainSupervisor)
+            const Padding(
+              padding: EdgeInsets.only(top: AppSpacing.xs),
+              child: Chip(label: Text('ناظر اصلی'), visualDensity: VisualDensity.compact),
+            ),
+
           const Divider(height: AppSpacing.lg),
 
           Row(
             children: <Widget>[
+              if (onSetMainSupervisor != null)
+                Expanded(
+                  child: AppButton(
+                    label: 'انتخاب ناظر اصلی',
+                    variant: AppButtonVariant.text,
+                    onPressed: onSetMainSupervisor,
+                  ),
+                ),
               if (onEdit != null)
                 Expanded(
                   child: AppButton(

@@ -114,6 +114,16 @@ class PairingRepository {
     );
   }
 
+  Future<Guardianship> setMainSupervisor(String guardianshipId) {
+    return _api.patch<Guardianship>(
+      ApiEndpoints.mainSupervisor(guardianshipId),
+      (dynamic data) => Guardianship.fromJson(
+        Json.mapOrNull(_asMap(data)['guardianship']) ?? <String, dynamic>{},
+      ),
+      body: <String, dynamic>{},
+    );
+  }
+
   /// قطع رابطه.
   ///
   /// هر دو طرف می‌توانند قطع کنند — کاربر اصلی حق دارد دسترسی را پس بگیرد،

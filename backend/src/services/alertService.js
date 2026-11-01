@@ -88,6 +88,12 @@ export function composeAlertMessage(type, context = {}) {
 
     case ALERT_TYPES.FALL_DETECTED: {
       const pct = Math.round((context.confidence ?? 0) * 100);
+      if (context.manualReport) {
+        return {
+          title: 'سقوط گزارش‌شده',
+          body: `${name} سقوطی را که سامانه تشخیص نداده بود گزارش کرد. لطفاً با او تماس بگیرید.`,
+        };
+      }
       if (context.auto) {
         return {
           title: 'فراخوان اضطراری',
@@ -143,15 +149,17 @@ export async function raiseAlert({ userId, type, location, zoneId, context = {},
     userId,
     requiredPermission,
   );
-  const recipientIds = recipients.map((r) => r.id);
+  let familyRecipientIds = recipients.map((r) => r.id);
+  let adminRecipientIds = [];
   if (type === ALERT_TYPES.FALL_DETECTED) {
     const { rows: admins } = await db.query(
       `SELECT id FROM users WHERE role = 'admin' AND status = 'active'`,
     );
-    for (const row of admins) {
-      if (!recipientIds.includes(row.id)) recipientIds.push(row.id);
-    }
+    adminRecipientIds = admins.map((row) => row.id);
+    const adminIds = new Set(adminRecipientIds);
+    familyRecipientIds = familyRecipientIds.filter((id) => !adminIds.has(id));
   }
+  const recipientIds = [...familyRecipientIds, ...adminRecipientIds];
 
   const enriched = {
     ...alert,
@@ -165,7 +173,12 @@ export async function raiseAlert({ userId, type, location, zoneId, context = {},
 
   // کاربر اصلی هم نسخه‌ی خودش را می‌بیند — او باید بداند چه چیزی
   // درباره‌اش به خانواده گزارش شده است. شفافیت، شرط استقلال است.
-  hub.emitToUsers([...recipientIds, userId], WS_EVENTS.ALERT_NEW, enriched);
+  hub.emitToUsers([...familyRecipientIds, userId], WS_EVENTS.ALERT_NEW, enriched);
+  if (adminRecipientIds.length > 0) {
+    // مدیر برای بررسی رخداد به نوع و زمان هشدار نیاز دارد، نه مختصات فرد.
+    const adminAlert = { ...enriched, lat: null, lng: null, location: null };
+    hub.emitToUsers(adminRecipientIds, WS_EVENTS.ALERT_NEW, adminAlert);
+  }
 
   const pushPayload = {
     title,
@@ -184,37 +197,34 @@ export async function raiseAlert({ userId, type, location, zoneId, context = {},
     delivery = await notificationAdapter.notify(recipientIds, pushPayload);
   } else {
     notificationAdapter.emitInApp(recipientIds, pushPayload, 'fcm');
-    await notificationOutbox.enqueueForRecipients(recipientIds, {
+    const queued = await notificationOutbox.enqueueForRecipients(recipientIds, {
       alertId: alert.id,
       ...pushPayload,
     });
-    delivery = { driver: 'fcm', sent: 0, failed: 0, fellBack: false };
+    delivery = { driver: 'fcm', queued: queued.length, sent: 0, failed: 0, fellBack: false };
   }
 
-  // ── ثبت سنجه‌ی تحویل ──────────────────────────────────────────────
-  // تأخیر از لحظه‌ی ساخته شدن هشدار در دیتابیس تا لحظه‌ی واگذاری آن به کانال
-  // اندازه گرفته می‌شود. این عدد، همان «تأخیر سیستم» در فصل ارزیابی است.
-  // نام کانال به واژگان دیتابیس ترجمه می‌شود: آداپتور «local» می‌گوید، ولی
-  // آنچه واقعاً اتفاق افتاده تحویل روی WebSocket است.
-  const channel = delivery.driver === 'fcm' ? 'fcm' : 'websocket';
+  // ثبت WebSocket فقط وقتی گیرنده آنلاین است. نتیجه‌ی FCM بعد از تلاش واقعی
+  // worker در outbox ثبت می‌شود؛ enqueue را به‌عنوان ارسال موفق نمی‌شماریم.
   const deliveryLatencyMs = Math.max(
     0,
     Math.round(Date.now() - new Date(alert.createdAt).getTime()),
   );
 
+  let websocketSent = 0;
   if (recipientIds.length > 0) {
     for (const recipientUserId of recipientIds) {
+      if (!hub.isUserOnline(recipientUserId)) continue;
       telemetryService.recordDelivery({
         alertId: alert.id,
         recipientUserId,
-        channel,
-        status: delivery.failed > 0 ? 'failed' : 'sent',
+        channel: 'websocket',
+        status: 'sent',
         latencyMs: deliveryLatencyMs,
-        errorCode: delivery.fellBack ? 'FELL_BACK_TO_LOCAL' : null,
+        errorCode: null,
       });
+      websocketSent += 1;
     }
-    // تخلیهٔ فوری تا ردیف alert_deliveries منتظر تایمر ۵ثانیه‌ای نماند
-    await telemetryService.flush();
   }
 
   log.info('هشدار ثبت و توزیع شد', {
@@ -223,6 +233,8 @@ export async function raiseAlert({ userId, type, location, zoneId, context = {},
     severity,
     recipients: recipientIds.length,
     deliveredVia: delivery.driver,
+    websocketSent,
+    fcmQueued: delivery.queued ?? 0,
     deliveryLatencyMs,
   });
 

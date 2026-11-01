@@ -1,6 +1,7 @@
 import env from '../config/env.js';
 import logger from '../utils/logger.js';
 import { expireUnanswered } from './fallService.js';
+import locationService from './locationService.js';
 
 const log = logger.child({ module: 'fall-watchdog' });
 
@@ -12,7 +13,9 @@ export function setClock(fn) {
 }
 
 export async function processOnce() {
-  return expireUnanswered(nowFn());
+  const falls = await expireUnanswered(nowFn());
+  const gpsAlerts = await locationService.checkGpsLostAlerts(nowFn().getTime());
+  return { falls, gpsAlerts };
 }
 
 export function start() {

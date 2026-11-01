@@ -60,7 +60,7 @@ Open **Field evaluation** from the primary or guardian home page to register a r
 
 ## Mobile test coverage
 
-`mobile/test/widget_test.dart` currently contains one test, which checks server-address normalization. The source package does not contain 25 mobile tests.
+`mobile/test/` contains two tests: server-address normalization and centered fall-window timing. The source package does not contain 25 mobile tests. Flutter test execution requires Pub.dev access for `image_picker`.
 
 ## Video
 

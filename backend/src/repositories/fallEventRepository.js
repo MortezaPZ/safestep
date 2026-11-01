@@ -154,9 +154,12 @@ export async function metrics() {
       COUNT(*) FILTER (WHERE NOT classified_as_fall AND detection_source = 'manual' AND user_feedback = 'confirmed')::int AS fn,
       COUNT(*) FILTER (WHERE NOT classified_as_fall AND detection_source <> 'manual' AND (user_feedback IS NULL OR user_feedback <> 'confirmed'))::int AS tn
     FROM fall_events
+    WHERE detection_source <> 'simulator'
   `);
   const med = await db.query(
-    'SELECT responded_within_sec AS v FROM fall_events WHERE responded_within_sec IS NOT NULL ORDER BY v',
+    `SELECT responded_within_sec AS v FROM fall_events
+      WHERE responded_within_sec IS NOT NULL AND detection_source <> 'simulator'
+      ORDER BY v`,
   );
   const vals = med.rows.map((x) => Number(x.v)).sort((a, b) => a - b);
   let medianResponseSec = null;
@@ -172,7 +175,7 @@ export async function metrics() {
   const precision = tp + fp === 0 ? 0 : tp / (tp + fp);
   const recall = tp + fn === 0 ? 0 : tp / (tp + fn);
   const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
-  const falseAlarmRate = tp + fp === 0 ? 0 : fp / (tp + fp);
+  const falseAlarmFraction = tp + fp === 0 ? 0 : fp / (tp + fp);
   return {
     total: Number(r.total ?? 0),
     positives: Number(r.positives ?? 0),
@@ -186,7 +189,7 @@ export async function metrics() {
     precision,
     recall,
     f1,
-    falseAlarmRate,
+    falseAlarmFraction,
     medianResponseSec,
   };
 }

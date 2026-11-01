@@ -25,6 +25,20 @@ class FallFeatures {
     return math.sqrt(v);
   }
 
+  static int peakIndex(List<List<double>> acc) {
+    if (acc.isEmpty) return 0;
+    int peak = 0;
+    double peakMagnitude = _mag(acc[0][0], acc[0][1], acc[0][2]);
+    for (int i = 1; i < acc.length; i++) {
+      final double magnitude = _mag(acc[i][0], acc[i][1], acc[i][2]);
+      if (magnitude > peakMagnitude) {
+        peak = i;
+        peakMagnitude = magnitude;
+      }
+    }
+    return peak;
+  }
+
   static int _clip(int i, int n) {
     if (i < 0) return 0;
     if (i > n - 1) return n - 1;
@@ -43,10 +57,7 @@ class FallFeatures {
         .map((List<double> s) => _mag(s[0], s[1], s[2]) / g)
         .toList(growable: false);
 
-    int peak = 0;
-    for (int i = 1; i < smv.length; i++) {
-      if (smv[i] > smv[peak]) peak = i;
-    }
+    final int peak = peakIndex(a);
 
     final double smvMax = smv.isEmpty ? 0 : smv[peak];
     final double smvMin = smv.isEmpty ? 0 : smv.reduce(math.min);

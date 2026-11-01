@@ -227,6 +227,14 @@ class _TrackingCardState extends ConsumerState<TrackingCard>
             ],
           ),
 
+          if (!state.foregroundServiceAvailable && state.isActive) ...<Widget>[
+            const Divider(height: AppSpacing.lg),
+            Text(
+              'سرویس پس‌زمینه روشن نشد؛ با بسته شدن اپ، ارسال موقعیت ممکن است قطع شود.',
+              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.warning),
+            ),
+          ],
+
           // صف آفلاین: کاربر باید بداند داده‌اش گم نشده، فقط منتظر است
           if (state.queuedCount > 0) ...<Widget>[
             const Divider(height: AppSpacing.lg),

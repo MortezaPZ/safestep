@@ -108,14 +108,20 @@ export async function pushTokensFor(userIds) {
 }
 
 /** به‌روزرسانی باتری و آخرین بازدید — همراه هر پینگ موقعیت صدا زده می‌شود. */
-export async function touch(userId, { batteryLevel, isPing = true } = {}) {
+export async function touch(userId, { batteryLevel, isPing = true, installId = null } = {}) {
   await db.query(
     `UPDATE devices SET
        last_seen_at  = now(),
        last_ping_at  = CASE WHEN $3 THEN now() ELSE last_ping_at END,
        battery_level = COALESCE($2, battery_level)
-     WHERE user_id = $1 AND revoked_at IS NULL`,
-    [userId, batteryLevel ?? null, Boolean(isPing)],
+     WHERE id = (
+       SELECT id FROM devices
+        WHERE user_id = $1 AND revoked_at IS NULL
+          AND ($4::uuid IS NULL OR install_id = $4::uuid)
+        ORDER BY last_seen_at DESC
+        LIMIT 1
+     )`,
+    [userId, batteryLevel ?? null, Boolean(isPing), installId],
   );
 }
 

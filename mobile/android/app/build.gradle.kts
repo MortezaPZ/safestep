@@ -4,6 +4,22 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val releaseProperties = java.util.Properties()
+val releasePropertiesFile = rootProject.file("key.properties")
+if (releasePropertiesFile.exists()) {
+    releasePropertiesFile.inputStream().use(releaseProperties::load)
+}
+val releaseStorePath = releaseProperties.getProperty("storeFile")
+val releaseKeyAlias = releaseProperties.getProperty("keyAlias")
+val releaseStorePassword = releaseProperties.getProperty("storePassword")
+val releaseKeyPassword = releaseProperties.getProperty("keyPassword")
+val releaseSigningConfigured = listOf(
+    releaseStorePath,
+    releaseKeyAlias,
+    releaseStorePassword,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.example.safestep"
     compileSdk = flutter.compileSdkVersion
@@ -16,10 +32,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.safestep"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = providers.gradleProperty("appApplicationId")
+            .getOrElse("ir.hamghadam.safestep")
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
@@ -32,9 +46,16 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.create("release").apply {
+                    storeFile = rootProject.file(releaseStorePath!!)
+                    storePassword = releaseStorePassword
+                    keyAlias = releaseKeyAlias
+                    keyPassword = releaseKeyPassword
+                }
+            } else {
+                logger.lifecycle("Release APK will be unsigned; configure android/key.properties before distribution.")
+            }
         }
     }
 }

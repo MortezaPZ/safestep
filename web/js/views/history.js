@@ -15,9 +15,60 @@ import {
   faDate, faTime, faDayLabel, faDistance, faDuration, faNumber, faSpeed, faPercent,
 } from '../format.js';
 
+function tehranMidnight(dayValue) {
+  const match = String(dayValue).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) throw new Error('تاریخ روز معتبر نیست.');
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const targetLocalAsUtc = Date.UTC(year, month - 1, day);
+  let utc = targetLocalAsUtc;
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+  for (let i = 0; i < 2; i += 1) {
+    const parts = Object.fromEntries(formatter.formatToParts(new Date(utc))
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, Number(part.value)]));
+    const observedLocalAsUtc = Date.UTC(
+      parts.year, parts.month - 1, parts.day,
+      parts.hour, parts.minute, parts.second,
+    );
+    utc += targetLocalAsUtc - observedLocalAsUtc;
+  }
+  return new Date(utc);
+}
+
+function tehranDayBounds(dayValue) {
+  const start = tehranMidnight(dayValue);
+  const nextCalendarDay = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const nextParts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(nextCalendarDay)
+    .filter((part) => part.type !== 'literal')
+    .map((part) => [part.type, part.value]));
+  const nextStart = tehranMidnight(nextParts.year + '-' + nextParts.month + '-' + nextParts.day);
+  return { from: start, to: new Date(nextStart.getTime() - 1) };
+}
+
+function distanceMeters(a, b) {
+  const radians = (degrees) => (degrees * Math.PI) / 180;
+  const dLat = radians(b.lat - a.lat);
+  const dLng = radians(b.lng - a.lng);
+  const lat1 = radians(a.lat);
+  const lat2 = radians(b.lat);
+  const haversine = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(haversine)));
+}
+
 export function mountHistory(container, ctx, params = {}) {
-  const subjectId = params.userId ?? ctx.user.id;
-  const isOwn = subjectId === ctx.user.id;
+  let subjectId = params.userId ?? ctx.user.id;
+  let isOwn = subjectId === ctx.user.id;
+  let watchedPrimaries = [];
 
   let days = [];
   let selectedDay = null;
@@ -48,6 +99,36 @@ export function mountHistory(container, ctx, params = {}) {
     );
   }
 
+  function renderSubjectPicker() {
+    if (ctx.user.role !== 'guardian' || watchedPrimaries.length < 2) return null;
+    const options = watchedPrimaries.map((item) => {
+      const user = item.primaryUser ?? {};
+      const id = item.primaryUserId ?? user.id;
+      return el('option', {
+        value: id,
+        selected: String(id) === String(subjectId),
+        text: user.fullName ?? item.primaryName ?? item.nickname ?? 'کاربر اصلی',
+      });
+    });
+    return el('label.field.mb-4', {},
+      el('span.field__label', { text: 'تاریخچهٔ کاربر اصلی' }),
+      el('select.input', {
+        value: subjectId,
+        ariaLabel: 'انتخاب کاربر برای نمایش تاریخچه',
+        onChange: (event) => {
+          subjectId = event.target.value;
+          isOwn = subjectId === ctx.user.id;
+          days = [];
+          selectedDay = null;
+          points = [];
+          stats = null;
+          hidden = false;
+          load();
+        },
+      }, ...options),
+    );
+  }
+
   /* ─────────────────────── آمار روز ─────────────────────── */
 
   function renderStats() {
@@ -58,9 +139,7 @@ export function mountHistory(container, ctx, params = {}) {
     for (let i = 1; i < points.length; i += 1) {
       const a = points[i - 1];
       const b = points[i];
-      const dLat = (b.lat - a.lat) * 111_320;
-      const dLng = (b.lng - a.lng) * 111_320 * Math.cos((a.lat * Math.PI) / 180);
-      totalMeters += Math.hypot(dLat, dLng);
+      totalMeters += distanceMeters(a, b);
     }
 
     const durationMinutes =
@@ -149,9 +228,7 @@ export function mountHistory(container, ctx, params = {}) {
     if (!confirmed) return;
 
     try {
-      const from = new Date(selectedDay);
-      const to = new Date(from);
-      to.setHours(23, 59, 59, 999);
+      const { from, to } = tehranDayBounds(selectedDay);
 
       const result = await api.deleteHistory(from, to);
       toast('حذف شد', `${faNumber(result.deleted)} نقطه پاک شد.`);
@@ -211,6 +288,7 @@ export function mountHistory(container, ctx, params = {}) {
             : null,
         ),
         el('div.card__body', {},
+          renderSubjectPicker(),
           renderDayPicker(),
           renderStats(),
           points.length > 0
@@ -230,9 +308,7 @@ export function mountHistory(container, ctx, params = {}) {
   async function loadDay() {
     if (!selectedDay) return;
 
-    const from = new Date(selectedDay);
-    const to = new Date(from);
-    to.setHours(23, 59, 59, 999);
+    const { from, to } = tehranDayBounds(selectedDay);
 
     try {
       const result = await api.history(subjectId, from, to, 3000);
@@ -257,6 +333,31 @@ export function mountHistory(container, ctx, params = {}) {
     }
 
     try {
+      if (ctx.user.role === 'guardian') {
+        const links = await api.guardianships();
+        watchedPrimaries = (links.primaries ?? links.watching ?? []).filter((item) =>
+          item.primaryUserId ?? item.primaryUser?.id,
+        );
+        const requestedId = params.userId && watchedPrimaries.some((item) =>
+          String(item.primaryUserId ?? item.primaryUser?.id) === String(params.userId),
+        ) ? params.userId : null;
+        const selectedStillValid = watchedPrimaries.some((item) =>
+          String(item.primaryUserId ?? item.primaryUser?.id) === String(subjectId),
+        );
+        const mainSupervisorLink = watchedPrimaries.find((item) => item.isMainSupervisor);
+        const defaultPrimary = mainSupervisorLink ?? watchedPrimaries[0];
+        const firstId = defaultPrimary?.primaryUserId ?? defaultPrimary?.primaryUser?.id;
+        subjectId = requestedId ?? (selectedStillValid ? subjectId : firstId) ?? null;
+        isOwn = false;
+        if (!subjectId) {
+          render(container, emptyState({
+            icon: '🗺️',
+            title: 'کاربر اصلی‌ای برای نمایش تاریخچه نیست',
+            text: 'پس از پیوند با کاربر اصلی، تاریخچهٔ مجاز او از این صفحه در دسترس است.',
+          }));
+          return;
+        }
+      }
       const result = await api.historyDays(subjectId);
       days = result.days ?? [];
 

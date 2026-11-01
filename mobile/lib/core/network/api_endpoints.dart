@@ -28,6 +28,7 @@ class ApiEndpoints {
   static const String redeem = '/guardianships/redeem';
   static const String guardianships = '/guardianships';
   static String guardianship(String id) => '/guardianships/$id';
+  static String mainSupervisor(String id) => '/guardianships/$id/main-supervisor';
 
   /* ─────────────────────── موقعیت ─────────────────────── */
 
@@ -59,6 +60,7 @@ class ApiEndpoints {
   /* ─────────────────────── ارزیابی میدانی ─────────────────────── */
 
   static const String evaluationReference = '/evaluation/reference';
+  static const String evaluationReferenceSample = '/evaluation/reference/sample';
   static const String evaluationSus = '/evaluation/sus';
 
   /* ─────────────────────── تنظیمات و دستگاه ─────────────────────── */

@@ -234,7 +234,7 @@ class _AdminSectionPageState extends ConsumerState<AdminSectionPage> {
   String get _title {
     switch (widget.section) {
       case AdminSection.map:
-        return 'نقشه خانواده‌ها';
+        return 'وضعیت محدوده خانواده‌ها';
       case AdminSection.alerts:
         return 'هشدارها';
       case AdminSection.families:

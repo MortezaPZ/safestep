@@ -10,6 +10,8 @@ import '../core/constants/app_config.dart';
 import '../core/push/push_service.dart';
 import '../core/theme/app_theme.dart';
 import '../features/realtime/realtime_controller.dart';
+import '../features/fall/data/fall_repository.dart';
+import '../features/tracking/presentation/tracking_controller.dart';
 import 'router.dart';
 
 class SafeStepApp extends ConsumerStatefulWidget {
@@ -47,6 +49,16 @@ class _SafeStepAppState extends ConsumerState<SafeStepApp> {
     // لایه‌ی اتصال زنده باید در تمام عمر اپ زنده بماند، نه فقط وقتی صفحه‌ی
     // نقشه باز است: هشدار اضطراری باید در هر صفحه‌ای دریافت شود.
     ref.watch(realtimeControllerProvider);
+    ref.listen<FallDetectResult?>(
+      trackingControllerProvider.select((TrackingState state) => state.pendingFall),
+      (FallDetectResult? previous, FallDetectResult? result) {
+        if (result?.isFall == true) {
+          router.go(
+            '${AppRoutes.fallCheck}?id=${Uri.encodeComponent(result!.fallEventId)}&sec=${result.countdownSec}',
+          );
+        }
+      },
+    );
 
     return MaterialApp.router(
       title: AppConfig.appName,

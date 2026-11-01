@@ -96,6 +96,18 @@ describe('نقش ادمین و پنل مدیریت', () => {
     admin = { token: res.body.accessToken, id: res.body.user.id };
   });
 
+  it('فیلتر صف اعلان فقط وضعیت‌هایی را می‌پذیرد که در صف ذخیره می‌شوند', async () => {
+    const abandoned = await request(app)
+      .get('/api/v1/admin/notifications/outbox?status=abandoned')
+      .set(auth(admin.token));
+    const failed = await request(app)
+      .get('/api/v1/admin/notifications/outbox?status=failed')
+      .set(auth(admin.token));
+
+    expect(abandoned.status).toBe(200);
+    expect(failed.status).toBe(400);
+  });
+
   it('کاربران عادی ثبت‌نام می‌کنند', async () => {
     sara = await signUp('09131110010', 'سارا محمدی', 'primary');
     reza = await signUp('09131110011', 'رضا محمدی', 'guardian');
@@ -343,6 +355,52 @@ describe('نقش ادمین و پنل مدیریت', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('مدرک هویتی و مشکل سلامت تا زمان تأیید رمزگذاری و نگه‌داری می‌شوند', async () => {
+    const imageUrl = 'data:image/png;base64,iVBORw0KGgo=';
+    const submitted = await request(app)
+      .post('/api/v1/documents')
+      .set(auth(sara.token))
+      .send({ documentType: 'identity', imageUrl, healthCondition: 'آسم' });
+
+    expect(submitted.status).toBe(201);
+    expect(submitted.body.document.status).toBe('pending');
+    expect(submitted.body.document.healthCondition).toBeNull();
+
+    const { rows: pendingRows } = await db.query(
+      `SELECT d.image_url, d.health_condition_encrypted, u.health_condition
+         FROM identity_documents d JOIN users u ON u.id = d.user_id
+        WHERE d.id = $1`,
+      [submitted.body.document.id],
+    );
+    expect(pendingRows[0].image_url.startsWith('enc:v1:')).toBe(true);
+    expect(pendingRows[0].health_condition_encrypted.startsWith('enc:v1:')).toBe(true);
+    expect(pendingRows[0].health_condition).toBeNull();
+
+    const approved = await request(app)
+      .post(`/api/v1/admin/documents/${submitted.body.document.id}/approve`)
+      .set(auth(admin.token))
+      .send({ healthCondition: 'مقدار دست‌کاری‌شده' });
+
+    expect(approved.status).toBe(200);
+    expect(approved.body.document.healthCondition).toBe('آسم');
+    const { rows: approvedRows } = await db.query(
+      `SELECT d.image_url, d.health_condition_encrypted, u.health_condition
+         FROM identity_documents d JOIN users u ON u.id = d.user_id
+        WHERE d.id = $1`,
+      [submitted.body.document.id],
+    );
+    expect(approvedRows[0].image_url.startsWith('enc:v1:')).toBe(true);
+    expect(approvedRows[0].health_condition_encrypted).toBeNull();
+    expect(approvedRows[0].health_condition.startsWith('enc:v1:')).toBe(true);
+
+    const listed = await request(app)
+      .get('/api/v1/admin/documents?status=approved')
+      .set(auth(admin.token));
+    const document = listed.body.documents.find((item) => item.id === submitted.body.document.id);
+    expect(document.imageUrl).toBe(imageUrl);
+    expect(document.healthCondition).toBe('آسم');
+  });
 });
 
 /* ═══════════════════════════════════════════════════════════════════ */
@@ -430,6 +488,32 @@ describe('لایه‌ی سنجش: لاگ درخواست و تله‌متری م�
     expect(second.status).toBe(201);
     // پاسخ موفق است تا کلاینت صفش را خالی کند، ولی همان ردیف قبلی برمی‌گردد
     expect(second.body.ping.id).toBe(first.body.ping.id);
+  });
+
+  it('باتری را فقط روی دستگاهی به‌روزرسانی می‌کند که install id فرستاده است', async () => {
+    const firstInstallId = 'aaaaaaaa-1111-4111-8111-111111111111';
+    const secondInstallId = 'bbbbbbbb-2222-4222-8222-222222222222';
+    for (const [installId, batteryLevel] of [[firstInstallId, 20], [secondInstallId, 80]]) {
+      const registered = await request(app)
+        .post('/api/v1/devices')
+        .set(auth(user.token))
+        .send({ platform: 'android', installId, batteryLevel });
+      expect(registered.status).toBe(201);
+    }
+
+    const ping = await request(app)
+      .post('/api/v1/locations/ping')
+      .set(auth(user.token))
+      .set('X-Device-Install-Id', firstInstallId)
+      .send({ ...HOME, accuracyM: 10, batteryLevel: 55 });
+    expect(ping.status).toBe(201);
+
+    const { rows } = await db.query(
+      'SELECT install_id, battery_level FROM devices WHERE user_id = $1',
+      [user.id],
+    );
+    expect(rows.find((row) => row.install_id === firstInstallId).battery_level).toBe(55);
+    expect(rows.find((row) => row.install_id === secondInstallId).battery_level).toBe(80);
   });
 
   it('ارسال دسته‌ای صف آفلاین، همه را ذخیره و تکراری‌ها را رد می‌کند', async () => {

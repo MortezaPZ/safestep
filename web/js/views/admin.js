@@ -295,11 +295,11 @@ export function mountAdmin(container) {
     }
   }
 
-  function metricCard(label, value) {
+  function metricCard(label, value, decimals = 0, suffix = '') {
     return el('div.card', {},
       el('div.card__body', {},
         el('div.muted', { text: label }),
-        el('div.stat', { text: faNumber(value ?? 0) }),
+        el('div.stat', { text: `${faNumber(value ?? 0, { decimals })}${suffix}` }),
       ),
     );
   }
@@ -331,9 +331,9 @@ export function mountAdmin(container) {
           ],
         ),
         el('div.row.row--wrap.gap-3.mt-4', {},
-          metricCard('صحت', fd?.precision),
-          metricCard('بازخوانی', fd?.recall),
-          metricCard('F1', fd?.f1),
+          metricCard('صحت', fd?.precision == null ? null : fd.precision * 100, 2, '%'),
+          metricCard('بازخوانی', fd?.recall == null ? null : fd.recall * 100, 2, '%'),
+          metricCard('F1', fd?.f1 == null ? null : fd.f1 * 100, 2, '%'),
         ),
       ),
     );

@@ -18,6 +18,13 @@ class SusForm {
   final List<int> choices;
 }
 
+class ReferenceSample {
+  const ReferenceSample({required this.errorM, required this.accuracyM, required this.valid});
+  final double errorM;
+  final double accuracyM;
+  final bool valid;
+}
+
 class EvaluationRepository {
   EvaluationRepository(this._api);
 
@@ -55,6 +62,27 @@ class EvaluationRepository {
         'lng': lng,
         if (label != null && label.trim().isNotEmpty) 'label': label.trim(),
       },
+    );
+  }
+
+  Future<ReferenceSample> recordReferenceSample({
+    required double lat,
+    required double lng,
+    required double accuracyM,
+  }) {
+    return _api.post<ReferenceSample>(
+      ApiEndpoints.evaluationReferenceSample,
+      (dynamic data) {
+        final Map<String, dynamic> row = data is Map<String, dynamic>
+            ? data
+            : <String, dynamic>{};
+        return ReferenceSample(
+          errorM: (row['errorM'] as num?)?.toDouble() ?? 0,
+          accuracyM: (row['accuracyM'] as num?)?.toDouble() ?? accuracyM,
+          valid: row['valid'] == true,
+        );
+      },
+      body: <String, dynamic>{'lat': lat, 'lng': lng, 'accuracyM': accuracyM},
     );
   }
 

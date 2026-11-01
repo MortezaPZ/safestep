@@ -159,7 +159,6 @@ export async function create(userId, data) {
 
 async function editableOwnerId(actorId, zone) {
   if (!zone) throw notFound('محدوده‌ی امن یافت نشد.');
-  if (zone.userId === actorId) return zone.userId;
   const main = await guardianshipRepository.isMainSupervisor(actorId, zone.userId);
   if (!main) throw forbidden('فقط ناظر اصلی می‌تواند این محدوده را تغییر دهد.');
   return zone.userId;

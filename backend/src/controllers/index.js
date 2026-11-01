@@ -21,7 +21,9 @@ import * as deviceRepository from '../repositories/deviceRepository.js';
 import { asyncHandler } from '../middleware/error.js';
 import { randomUUID } from 'node:crypto';
 import env from '../config/env.js';
-import { WS_EVENTS, ALL_ALERT_TYPES } from '../config/constants.js';
+import { WS_EVENTS, ALL_ALERT_TYPES, AUDIT_ACTIONS } from '../config/constants.js';
+import auditService from '../services/auditService.js';
+import { haversineMeters } from '../utils/geo.js';
 
 /** ساخت پاسخ پیکربندی کلاینت از روی تنظیمات کاربر و محیط سرور. */
 function buildClientConfig(settingsRow) {
@@ -102,6 +104,10 @@ export const guardianship = {
     res.json(result);
   }),
 
+  setMainSupervisor: asyncHandler(async (req, res) => {
+    res.json(await guardianshipService.setMainSupervisor(req.params.id, req.user.id, req));
+  }),
+
   revoke: asyncHandler(async (req, res) => {
     res.json(await guardianshipService.revoke(req.params.id, req.user.id));
   }),
@@ -111,7 +117,12 @@ export const guardianship = {
 
 export const location = {
   ping: asyncHandler(async (req, res) => {
-    const result = await locationService.ingestPing(req.user.id, req.body);
+    const result = await locationService.ingestPing(req.user.id, {
+      ...req.body,
+      isSimulated: false,
+      source: 'device',
+      deviceInstallId: req.get('X-Device-Install-Id'),
+    });
     res.status(201).json(result);
   }),
 
@@ -145,7 +156,11 @@ export const location = {
   }),
 
   batch: asyncHandler(async (req, res) => {
-    const result = await locationService.ingestBatch(req.user.id, { pings: req.body.pings });
+    const pings = req.body.pings.map((ping) => ({ ...ping, isSimulated: false, source: 'device' }));
+    const result = await locationService.ingestBatch(req.user.id, {
+      pings,
+      deviceInstallId: req.get('X-Device-Install-Id'),
+    });
     res.status(201).json(result);
   }),
 
@@ -173,31 +188,58 @@ export const safeZone = {
 
   create: asyncHandler(async (req, res) => {
     const subjectId = req.body.subjectUserId;
-    if (req.user.role === 'primary') {
-      if (subjectId && subjectId !== req.user.id) {
-        throw forbidden('کاربر اصلی فقط می‌تواند محدوده‌ی خودش را تعریف کند.');
-      }
-      res.status(201).json(await safeZoneService.create(req.user.id, req.body));
-      return;
+    if (req.user.role !== 'guardian') {
+      throw forbidden('فقط ناظر اصلی می‌تواند محدوده امن تعریف کند.');
     }
     if (!subjectId) {
       throw badRequest('کاربر اصلی این محدوده را مشخص کنید.');
     }
     const allowed = await guardianshipRepository.isMainSupervisor(req.user.id, subjectId);
     if (!allowed) throw forbidden('فقط ناظر اصلی می‌تواند محدوده امن تعریف کند.');
-    res.status(201).json(await safeZoneService.create(subjectId, req.body));
+    const zone = await safeZoneService.create(subjectId, req.body);
+    await auditService.record({
+      action: AUDIT_ACTIONS.SAFE_ZONE_CREATE,
+      actor: req.user,
+      entityType: 'safe_zone',
+      entityId: zone.id,
+      metadata: { ownerId: subjectId, shape: zone.shape },
+      req,
+    });
+    res.status(201).json(zone);
   }),
 
   update: asyncHandler(async (req, res) => {
-    res.json(await safeZoneService.update(req.params.id, req.user.id, req.body));
+    const zone = await safeZoneService.update(req.params.id, req.user.id, req.body);
+    await auditService.record({
+      action: AUDIT_ACTIONS.SAFE_ZONE_UPDATE,
+      actor: req.user,
+      entityType: 'safe_zone',
+      entityId: zone.id,
+      metadata: { fields: Object.keys(req.body) },
+      req,
+    });
+    res.json(zone);
   }),
 
   remove: asyncHandler(async (req, res) => {
-    res.json(await safeZoneService.remove(req.params.id, req.user.id));
+    const result = await safeZoneService.remove(req.params.id, req.user.id);
+    await auditService.record({
+      action: AUDIT_ACTIONS.SAFE_ZONE_DELETE,
+      actor: req.user,
+      entityType: 'safe_zone',
+      entityId: req.params.id,
+      req,
+    });
+    res.json(result);
   }),
 
   preview: asyncHandler(async (req, res) => {
-    res.json(await safeZoneService.preview(req.user.id, req.body));
+    const subjectId = req.body.subjectUserId ?? req.user.id;
+    if (subjectId !== req.user.id) {
+      const allowed = await guardianshipRepository.isMainSupervisor(req.user.id, subjectId);
+      if (!allowed) throw forbidden('فقط ناظر اصلی می‌تواند پیش‌نمایش محدوده‌ی کاربر را ببیند.');
+    }
+    res.json(await safeZoneService.preview(subjectId, req.body));
   }),
 };
 
@@ -248,7 +290,7 @@ export const sos = {
 
   active: asyncHandler(async (req, res) => {
     const subjectId = req.query.userId ?? req.user.id;
-    res.json({ alert: await sosService.activeSos(subjectId) });
+    res.json({ alert: await sosService.activeSos(req.user, subjectId) });
   }),
 };
 
@@ -362,6 +404,18 @@ export const evaluation = {
   }),
   currentReference: asyncHandler(async (req, res) => {
     res.json({ reference: await logRepository.getLocationReference(req.user.id) });
+  }),
+  sampleReference: asyncHandler(async (req, res) => {
+    const reference = await logRepository.getLocationReference(req.user.id);
+    if (!reference) throw badRequest('ابتدا مختصات نقطه‌ی نقشه‌برداری‌شده را ذخیره کنید.');
+    const errorM = Math.round(
+      haversineMeters(reference.lat, reference.lng, req.body.lat, req.body.lng) * 10,
+    ) / 10;
+    const sample = await logRepository.insertLocationReferenceSample(req.user.id, {
+      errorM,
+      accuracyM: req.body.accuracyM,
+    });
+    res.status(201).json(sample);
   }),
   susForm: asyncHandler(async (_req, res) => {
     res.json({

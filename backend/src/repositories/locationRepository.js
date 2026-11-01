@@ -100,6 +100,21 @@ export async function findLatest(userId) {
   return mapPing(rows[0]);
 }
 
+export async function gpsWatchTargets() {
+  const { rows } = await db.query(
+    `SELECT DISTINCT ON (p.user_id) p.user_id, p.recorded_at
+       FROM location_pings p
+       JOIN user_settings s ON s.user_id = p.user_id
+       JOIN users u ON u.id = p.user_id
+      WHERE u.status = 'active'
+        AND s.location_sharing_enabled = TRUE
+        AND 'gps_lost' = ANY(s.alert_types)
+        AND p.source <> 'simulator'
+      ORDER BY p.user_id, p.recorded_at DESC`,
+  );
+  return rows.map((row) => ({ userId: row.user_id, recordedAt: row.recorded_at }));
+}
+
 /** آخرین موقعیت چند کاربر با یک کوئری — داشبورد عضو خانواده از این استفاده می‌کند. */
 export async function findLatestForUsers(userIds) {
   if (!Array.isArray(userIds) || userIds.length === 0) return [];
@@ -149,20 +164,20 @@ export async function findRecentWindow(userId, windowMinutes) {
 /** روزهایی که برای کاربر داده‌ی مسیر وجود دارد — برای انتخابگر روز در تاریخچه. */
 export async function listHistoryDays(userId, limit = 30) {
   const { rows } = await db.query(
-    `SELECT date_trunc('day', recorded_at) AS day,
+    `SELECT to_char(recorded_at AT TIME ZONE 'Asia/Tehran', 'YYYY-MM-DD') AS day,
             COUNT(*)::int                  AS ping_count,
             MIN(recorded_at)               AS first_at,
             MAX(recorded_at)               AS last_at,
             BOOL_OR(is_simulated)          AS has_simulated
      FROM location_pings
      WHERE user_id = $1
-     GROUP BY 1
-     ORDER BY 1 DESC
+     GROUP BY to_char(recorded_at AT TIME ZONE 'Asia/Tehran', 'YYYY-MM-DD')
+     ORDER BY day DESC
      LIMIT $2`,
     [userId, limit],
   );
   return rows.map((r) => ({
-    day: new Date(r.day).toISOString(),
+    day: r.day,
     pingCount: r.ping_count,
     firstAt: new Date(r.first_at).toISOString(),
     lastAt: new Date(r.last_at).toISOString(),

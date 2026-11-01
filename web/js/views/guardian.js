@@ -282,20 +282,12 @@ export function mountGuardian(container, ctx) {
         label: entry.user.fullName,
       });
 
-      // محدوده‌های امن از وضعیت هر کاربر استخراج می‌شوند
-      for (const zoneState of entry.zones ?? []) {
-        if (zoneState.zoneName) {
-          allZones.push({
-            id: zoneState.zoneId,
-            name: zoneState.zoneName,
-            centerLat: entry.location.lat,
-            centerLng: entry.location.lng,
-            radiusM: zoneState.radiusM,
-          });
-        }
+      for (const zone of entry.mapZones ?? []) {
+        allZones.push({ ...zone, id: entry.user.id + ':' + zone.id });
       }
     }
 
+    map.setZones(allZones, { showThresholds: true });
     map.fitAll();
     map.invalidate();
   }
@@ -436,6 +428,18 @@ export function mountGuardian(container, ctx) {
       ]);
 
       watching = watchResult.watching ?? [];
+      await Promise.all(watching.map(async (entry) => {
+        if (entry.hidden || !entry.user?.id) {
+          entry.mapZones = [];
+          return;
+        }
+        try {
+          const result = await api.safeZones(entry.user.id);
+          entry.mapZones = result.zones ?? [];
+        } catch {
+          entry.mapZones = [];
+        }
+      }));
       const links = await api.guardianships().catch(() => ({ primaries: [] }));
       const main = (links.primaries ?? []).find((item) => item.isMainSupervisor);
       mainSubjectId = main?.primaryUserId ?? null;

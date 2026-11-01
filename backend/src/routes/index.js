@@ -71,7 +71,7 @@ router.post(
 
 router.post(
   '/auth/refresh',
-  validate({ body: z.object({ refreshToken: z.string().min(10, 'توکن معتبر نیست.') }) }),
+  validate({ body: z.object({ refreshToken: z.string().min(10, 'توکن معتبر نیست.').optional() }) }),
   authController.refresh,
 );
 
@@ -154,6 +154,13 @@ router.patch(
   guardianship.updatePermissions,
 );
 
+router.patch(
+  '/guardianships/:id/main-supervisor',
+  requireAuth,
+  validate({ params: z.object({ id: schemas.uuid }) }),
+  guardianship.setMainSupervisor,
+);
+
 router.delete(
   '/guardianships/:id',
   requireAuth,
@@ -176,7 +183,6 @@ router.post(
       speedMps: z.number().min(0).max(200).optional(),
       headingDeg: z.number().min(0).max(360).optional(),
       batteryLevel: z.number().int().min(0).max(100).optional(),
-      isSimulated: z.boolean().default(false),
       // شناسه‌ی یکتای سمت کلاینت — پایه‌ی بی‌اثرسازی تکرار در صف آفلاین
       clientUuid: schemas.uuid.optional(),
       provider: z.enum(LOCATION_PROVIDERS).optional(),
@@ -209,7 +215,6 @@ router.post(
             speedMps: z.number().min(0).max(200).optional(),
             headingDeg: z.number().min(0).max(360).optional(),
             batteryLevel: z.number().int().min(0).max(100).optional(),
-            isSimulated: z.boolean().default(false),
             clientUuid: schemas.uuid.optional(),
             provider: z.enum(LOCATION_PROVIDERS).optional(),
             isQueuedReplay: z.boolean().optional(),
@@ -328,8 +333,10 @@ router.post(
 router.post(
   '/safe-zones/preview',
   requireAuth,
+  requireVerified,
   validate({
     body: z.object({
+      subjectUserId: schemas.uuid.optional(),
       shape: z.enum(ALL_ZONE_SHAPES).optional(),
       centerLat: schemas.lat.optional(),
       centerLng: schemas.lng.optional(),
@@ -426,7 +433,6 @@ router.post(
       lng: schemas.lng.optional(),
       accuracyM: z.number().min(0).max(10_000).optional(),
       batteryLevel: z.number().int().min(0).max(100).optional(),
-      isSimulated: z.boolean().default(false),
       note: z.string().max(280, 'یادداشت بیش از حد طولانی است.').optional(),
     }),
   }),
@@ -439,6 +445,7 @@ router.get('/sos/config', requireAuth, sos.config);
 router.get(
   '/sos/active',
   requireAuth,
+  requireVerified,
   validate({ query: z.object({ userId: schemas.uuid.optional() }) }),
   sos.active,
 );
@@ -544,6 +551,18 @@ router.post(
 );
 
 router.get('/evaluation/reference', requireAuth, evaluation.currentReference);
+router.post(
+  '/evaluation/reference/sample',
+  requireAuth,
+  validate({
+    body: z.object({
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+      accuracyM: z.number().min(0).max(10_000),
+    }),
+  }),
+  evaluation.sampleReference,
+);
 router.get('/evaluation/sus', requireAuth, evaluation.susForm);
 
 router.post(
@@ -682,9 +701,6 @@ router.post(
   requireAdmin,
   validate({
     params: z.object({ id: schemas.uuid }),
-    body: z.object({
-      healthCondition: z.string().trim().min(2).max(80).optional(),
-    }).optional(),
   }),
   admin.approveIdentityDocument,
 );
@@ -876,7 +892,7 @@ router.get(
   requireAdmin,
   validate({
     query: z.object({
-      status: z.enum(['pending', 'sent', 'failed', 'abandoned']).optional(),
+      status: z.enum(['pending', 'sent', 'abandoned']).optional(),
       limit: z.coerce.number().int().min(1).max(200).optional(),
       offset: z.coerce.number().int().min(0).optional(),
     }),

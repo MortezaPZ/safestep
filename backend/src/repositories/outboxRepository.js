@@ -35,11 +35,18 @@ export async function claimPending(limit = 50) {
   const capped = Math.min(Math.max(Number(limit) || 50, 1), 200);
   const locking = env.db.driver === 'pg' ? 'FOR UPDATE SKIP LOCKED' : '';
   const { rows } = await db.query(
-    `SELECT * FROM notification_outbox
-      WHERE status = 'pending' AND next_attempt_at <= now()
-      ORDER BY next_attempt_at ASC
-      LIMIT $1
-      ${locking}`,
+    `WITH picked AS (
+       SELECT id FROM notification_outbox
+        WHERE status = 'pending' AND next_attempt_at <= now()
+          AND (locked_at IS NULL OR locked_at < now() - interval '15 minutes')
+        ORDER BY next_attempt_at ASC
+        LIMIT $1 ${locking}
+     )
+     UPDATE notification_outbox o
+        SET locked_at = now()
+       FROM picked
+      WHERE o.id = picked.id AND o.status = 'pending'
+      RETURNING o.*`,
     [capped],
   );
   return rows.map(mapRow);
@@ -48,7 +55,7 @@ export async function claimPending(limit = 50) {
 export async function markSent(id) {
   await db.query(
     `UPDATE notification_outbox
-        SET status = 'sent', sent_at = now(), last_error = NULL
+        SET status = 'sent', sent_at = now(), last_error = NULL, locked_at = NULL
       WHERE id = $1`,
     [id],
   );
@@ -62,7 +69,8 @@ export async function markFailure(id, { attempts, lastError, abandon }) {
         SET status = $2,
             attempts = $3,
             last_error = $4,
-            next_attempt_at = $5::timestamptz
+            next_attempt_at = $5::timestamptz,
+            locked_at = NULL
       WHERE id = $1`,
     [id, abandon ? 'abandoned' : 'pending', attempts, lastError ?? null, nextAt],
   );
@@ -71,7 +79,7 @@ export async function markFailure(id, { attempts, lastError, abandon }) {
 export async function retry(id) {
   const { rows } = await db.query(
     `UPDATE notification_outbox
-        SET status = 'pending', next_attempt_at = now(), last_error = NULL
+        SET status = 'pending', next_attempt_at = now(), last_error = NULL, locked_at = NULL
       WHERE id = $1
       RETURNING *`,
     [id],

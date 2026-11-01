@@ -13,6 +13,7 @@ const { runMigrations } = await import('../src/db/migrate.js');
 const { generateDataset } = await import('../scripts/falls/generate_synthetic.js');
 const { cannedPositiveFeatures } = await import('../src/services/fallDetection/classifier.js');
 const fallWatchdog = await import('../src/services/fallWatchdog.js');
+const fallEventRepository = await import('../src/repositories/fallEventRepository.js');
 const { invalidateAccountState } = await import('../src/middleware/auth.js');
 
 const PASSWORD = 'Test@1234';
@@ -199,6 +200,10 @@ describe('API تشخیص سقوط', () => {
       .send({ lat: 35.7, lng: 51.4 });
     expect(res.status).toBe(201);
     expect(res.body.fallEvent.detectionSource).toBe('manual');
+    expect(res.body.fallEvent.classifiedAsFall).toBe(false);
+    expect(res.body.fallEvent.alertId).toBeTruthy();
+    const metrics = await fallEventRepository.metrics();
+    expect(metrics.confusion.fn).toBeGreaterThan(0);
   });
 
   it('مراقب اضطراری فهرست را می‌بیند', async () => {
@@ -242,7 +247,7 @@ describe('API تشخیص سقوط', () => {
       [created.body.fallEventId],
     );
     const out = await fallWatchdog.processOnce();
-    expect(out.raised).toBeGreaterThanOrEqual(1);
+    expect(out.falls.raised).toBeGreaterThanOrEqual(1);
   });
 
   it('سنجه‌ها ماتریس درهم‌ریختگی دارند', async () => {

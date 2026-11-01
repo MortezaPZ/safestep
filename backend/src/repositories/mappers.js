@@ -5,6 +5,7 @@
  * این نگاشت‌ها همزمان نقش «مستندِ شکل داده‌ای که به کلاینت می‌رود» را هم دارند
  * و جلوی نشت تصادفی ستون‌های حساس (مثل password_hash) را می‌گیرند.
  */
+import { decryptSensitiveValue } from '../utils/sensitiveData.js';
 
 /** تبدیل امن مقدار عددی — Postgres گاهی DOUBLE PRECISION را رشته برمی‌گرداند. */
 const n = (value) => (value === null || value === undefined ? null : Number(value));
@@ -26,7 +27,9 @@ export function mapUser(row) {
     lastLoginAt: d(row.last_login_at),
     phoneVerifiedAt: d(row.phone_verified_at),
     verificationStatus: row.verification_status ?? 'unverified',
-    healthCondition: row.verification_status === 'verified' ? (row.health_condition ?? null) : null,
+    healthCondition: row.verification_status === 'verified'
+      ? (decryptSensitiveValue(row.health_condition) ?? null)
+      : null,
   };
 }
 
@@ -96,7 +99,9 @@ export function mapGuardianship(row) {
             fullName: row.primary_name,
             phone: row.primary_phone,
             avatarColor: row.primary_avatar_color,
-            healthCondition: row.primary_verification === 'verified' ? (row.primary_health ?? null) : null,
+            healthCondition: row.primary_verification === 'verified'
+              ? (decryptSensitiveValue(row.primary_health) ?? null)
+              : null,
           },
         }
       : {}),

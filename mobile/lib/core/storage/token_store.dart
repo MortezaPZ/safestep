@@ -34,6 +34,7 @@ class TokenStore {
 
   Future<String?> readAccessToken() => _read(_kAccess);
   Future<String?> readRefreshToken() => _read(_kRefresh);
+  Future<String?> readInstallId() => _read(_kInstallId);
 
   Future<void> saveTokens({
     required String accessToken,

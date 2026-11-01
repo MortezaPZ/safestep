@@ -13,6 +13,7 @@ import {
   PERMISSIONS,
   PERMISSION_LABELS,
   WS_EVENTS,
+  AUDIT_ACTIONS,
 } from '../config/constants.js';
 import * as guardianshipRepository from '../repositories/guardianshipRepository.js';
 import * as userRepository from '../repositories/userRepository.js';
@@ -20,6 +21,7 @@ import { generateInviteCode, hashInviteCode } from '../utils/crypto.js';
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js';
 import hub from '../realtime/hub.js';
 import logger from '../utils/logger.js';
+import auditService from './auditService.js';
 
 const log = logger.child({ module: 'guardianship' });
 
@@ -218,6 +220,29 @@ export async function updatePermissions(guardianshipId, primaryUserId, permissio
   };
 }
 
+export async function setMainSupervisor(guardianshipId, primaryUserId, req) {
+  const existing = await guardianshipRepository.findById(guardianshipId);
+  if (!existing || existing.status !== 'active') throw notFound('رابطه‌ی فعال یافت نشد.');
+  if (existing.primaryUserId !== primaryUserId) {
+    throw forbidden('فقط کاربر اصلی می‌تواند ناظر اصلی را انتخاب کند.');
+  }
+  const updated = await guardianshipRepository.setMainSupervisor(primaryUserId, guardianshipId);
+  if (!updated) throw notFound('رابطه‌ی فعال یافت نشد.');
+  await auditService.record({
+    action: AUDIT_ACTIONS.GUARDIANSHIP_MAIN_SUPERVISOR,
+    actor: { id: primaryUserId, role: 'primary' },
+    entityType: 'guardianship',
+    entityId: guardianshipId,
+    req,
+  });
+  hub.emitToUsers([primaryUserId, existing.guardianUserId], WS_EVENTS.PRESENCE, {
+    type: 'main_supervisor_changed',
+    guardianshipId,
+    at: new Date().toISOString(),
+  });
+  return { guardianship: updated };
+}
+
 /**
  * قطع دسترسی.
  * هر دو طرف می‌توانند رابطه را قطع کنند: کاربر اصلی برای پس گرفتن دسترسی،
@@ -255,6 +280,7 @@ export default {
   listMyPrimaries,
   listAll,
   updatePermissions,
+  setMainSupervisor,
   revoke,
   INVITE_TTL_MINUTES,
 };

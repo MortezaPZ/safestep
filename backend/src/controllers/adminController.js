@@ -55,7 +55,7 @@ export const approveIdentityDocument = asyncHandler(async (req, res) => {
   res.json(await adminService.reviewIdentityDocument(
     req.params.id,
     'approved',
-    { ...actorOf(req), healthCondition: req.body?.healthCondition },
+    actorOf(req),
   ));
 });
 

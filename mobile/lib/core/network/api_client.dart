@@ -106,6 +106,11 @@ class ApiClient {
     options.headers['X-Request-Id'] = _uuid.v4();
     options.headers[AppConfig.clientHeader] = _clientKind;
 
+    final String? installId = await _tokenStore.readInstallId();
+    if (installId != null && installId.isNotEmpty) {
+      options.headers['X-Device-Install-Id'] = installId;
+    }
+
     // مسیرهای عمومی نباید هدر Authorization بگیرند
     if (!_isPublic(options.path)) {
       final String? token = await _tokenStore.readAccessToken();

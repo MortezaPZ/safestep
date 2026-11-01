@@ -129,11 +129,11 @@ export async function insertAuditLog(entry) {
 export async function insertAlertDeliveries(entries) {
   if (!Array.isArray(entries) || entries.length === 0) return 0;
 
-  const columns = 6;
+  const columns = 7;
   const values = [];
   const placeholders = entries.map((_, i) => {
     const b = i * columns;
-    return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6})`;
+    return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7})`;
   });
 
   for (const e of entries) {
@@ -144,13 +144,23 @@ export async function insertAlertDeliveries(entries) {
       e.status ?? 'sent',
       e.latencyMs ?? null,
       e.errorCode ?? null,
+      e.attempts ?? 1,
     );
   }
 
   const { rowCount } = await db.query(
     `INSERT INTO alert_deliveries
-       (alert_id, recipient_user_id, channel, status, latency_ms, error_code)
-     VALUES ${placeholders.join(',')}`,
+       (alert_id, recipient_user_id, channel, status, latency_ms, error_code, attempts)
+     VALUES ${placeholders.join(',')}
+     ON CONFLICT (alert_id, recipient_user_id, channel) DO UPDATE SET
+       status = EXCLUDED.status,
+       latency_ms = COALESCE(EXCLUDED.latency_ms, alert_deliveries.latency_ms),
+       attempts = EXCLUDED.attempts,
+       error_code = EXCLUDED.error_code,
+       delivered_at = CASE
+         WHEN EXCLUDED.status IN ('sent', 'delivered') THEN now()
+         ELSE alert_deliveries.delivered_at
+       END`,
     values,
   );
   return rowCount;
@@ -361,33 +371,39 @@ export async function slowestRoutes({ from = null, to = null, limit = 10 } = {})
 export async function locationMetrics({ from = null, to = null } = {}) {
   const { rows } = await db.query(
     `SELECT
-       COUNT(*)::int                                     AS total,
-       COUNT(*) FILTER (WHERE is_queued_replay)::int     AS queued_replays,
+       COUNT(*) FILTER (WHERE source <> 'simulator')::int AS total,
+       COUNT(*) FILTER (WHERE source <> 'simulator' AND is_queued_replay)::int AS queued_replays,
        COUNT(*) FILTER (WHERE source = 'simulator')::int AS simulated,
-       AVG(accuracy_m)                                   AS avg_accuracy_m,
-       COUNT(*) FILTER (WHERE error_m IS NOT NULL AND NOT is_queued_replay AND (accuracy_m IS NULL OR accuracy_m <= 30))::int AS error_samples,
-       AVG(error_m) FILTER (WHERE error_m IS NOT NULL AND NOT is_queued_replay AND (accuracy_m IS NULL OR accuracy_m <= 30)) AS avg_error_m,
-       percentile_cont(0.50) WITHIN GROUP (ORDER BY error_m) FILTER (WHERE error_m IS NOT NULL AND NOT is_queued_replay AND (accuracy_m IS NULL OR accuracy_m <= 30)) AS p50_error_m,
-       percentile_cont(0.50) WITHIN GROUP (ORDER BY accuracy_m) AS p50_accuracy_m,
-       percentile_cont(0.95) WITHIN GROUP (ORDER BY accuracy_m) AS p95_accuracy_m,
-       AVG(e2e_latency_ms)     FILTER (WHERE NOT is_queued_replay) AS avg_e2e_ms,
-       AVG(process_ms)                                             AS avg_process_ms,
-       COUNT(DISTINCT user_id)::int                                AS users
+       AVG(accuracy_m) FILTER (WHERE source <> 'simulator') AS avg_accuracy_m,
+       percentile_cont(0.50) WITHIN GROUP (ORDER BY accuracy_m) FILTER (WHERE source <> 'simulator') AS p50_accuracy_m,
+       percentile_cont(0.95) WITHIN GROUP (ORDER BY accuracy_m) FILTER (WHERE source <> 'simulator') AS p95_accuracy_m,
+       AVG(e2e_latency_ms) FILTER (WHERE source <> 'simulator' AND NOT is_queued_replay) AS avg_e2e_ms,
+       AVG(process_ms) FILTER (WHERE source <> 'simulator') AS avg_process_ms,
+       COUNT(DISTINCT user_id) FILTER (WHERE source <> 'simulator')::int AS users
      FROM location_telemetry
      WHERE ($1::timestamptz IS NULL OR created_at >= $1)
        AND ($2::timestamptz IS NULL OR created_at <= $2)`,
     [from, to],
   );
 
-  // صدک تأخیر جداگانه محاسبه می‌شود چون percentile_cont با FILTER ترکیب نمی‌شود
+  // صدک‌ها فقط از نمونه‌های واقعی و زنده محاسبه می‌شوند.
   const { rows: pct } = await db.query(
     `SELECT
        percentile_cont(0.50) WITHIN GROUP (ORDER BY e2e_latency_ms) AS p50_e2e_ms,
        percentile_cont(0.95) WITHIN GROUP (ORDER BY e2e_latency_ms) AS p95_e2e_ms
      FROM location_telemetry
-     WHERE is_queued_replay = FALSE
+     WHERE source <> 'simulator' AND is_queued_replay = FALSE
        AND ($1::timestamptz IS NULL OR created_at >= $1)
        AND ($2::timestamptz IS NULL OR created_at <= $2)`,
+    [from, to],
+  );
+  const { rows: errors } = await db.query(
+    `SELECT COUNT(*)::int AS samples, AVG(error_m) AS avg_error_m,
+            percentile_cont(0.50) WITHIN GROUP (ORDER BY error_m) AS p50_error_m
+       FROM location_reference_samples
+      WHERE valid = TRUE
+        AND ($1::timestamptz IS NULL OR sampled_at >= $1)
+        AND ($2::timestamptz IS NULL OR sampled_at <= $2)`,
     [from, to],
   );
 
@@ -405,12 +421,12 @@ export async function locationMetrics({ from = null, to = null } = {}) {
       note: 'دقت اعلامی خود GPS؛ معیار پروپوزال نیست',
     },
     positionError: {
-      samples: r.error_samples ?? 0,
-      avgM: num(r.avg_error_m),
-      p50M: num(r.p50_error_m),
+      samples: errors[0]?.samples ?? 0,
+      avgM: num(errors[0]?.avg_error_m),
+      p50M: num(errors[0]?.p50_error_m),
       unit: 'meter',
-      definition: 'فاصله نقطه مرجع واقعی تا مختصات ثبت‌شده',
-      rule: 'نمونه معتبر: نقطه مرجع دارد، بازپخش آفلاین نیست، و دقت اعلامی GPS حداکثر ۳۰ متر است',
+      definition: 'فاصله‌ی نمونه‌ی GPS میدانی تا مختصات مرجع نقشه‌برداری‌شده',
+      rule: 'نمونه فقط با اقدام صریح در صفحه‌ی ارزیابی ثبت می‌شود و دقت اعلامی باید حداکثر ۳۰ متر باشد',
     },
     latency: {
       avgE2eMs: num(r.avg_e2e_ms),
@@ -517,6 +533,23 @@ export async function upsertLocationReference(userId, { lat, lng, label }) {
   };
 }
 
+export async function insertLocationReferenceSample(userId, { errorM, accuracyM }) {
+  const { rows } = await db.query(
+    `INSERT INTO location_reference_samples (user_id, error_m, accuracy_m, valid)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, error_m, accuracy_m, valid, sampled_at`,
+    [userId, errorM, accuracyM, accuracyM <= 30],
+  );
+  const row = rows[0];
+  return {
+    id: row.id,
+    errorM: Number(row.error_m),
+    accuracyM: Number(row.accuracy_m),
+    valid: row.valid,
+    sampledAt: row.sampled_at,
+  };
+}
+
 /** نمرهٔ SUS از ده پاسخ ۱ تا ۵. گویه‌های فرد: امتیاز−۱، زوج: ۵−امتیاز، جمع × ۲٫۵ */
 export function scoreSus(answers) {
   if (!Array.isArray(answers) || answers.length !== 10) {
@@ -556,6 +589,7 @@ export default {
   insertLocationTelemetry,
   getLocationReference,
   upsertLocationReference,
+  insertLocationReferenceSample,
   scoreSus,
   insertSusResponse,
   susMetrics,

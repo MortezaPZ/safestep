@@ -52,9 +52,9 @@ info:
     url: https://github.com/MortezaPZ/safestep-demo
 
 servers:
-  - url: http://localhost:4000/api/v1
+  - url: http://localhost:4080/api/v1
     description: اجرای محلی
-  - url: http://10.0.2.2:4000/api/v1
+  - url: http://10.0.2.2:4080/api/v1
     description: شبیه‌ساز اندروید (میزبان از دید شبیه‌ساز)
 
 tags:
@@ -70,6 +70,9 @@ tags:
   - name: تنظیمات و دستگاه
   - name: مدیریت
     description: فقط برای نقش `admin`
+  - name: پشتیبانی
+  - name: ارزیابی میدانی
+    description: ثبت نقطه‌ی مرجع، نمونه‌های GPS و پاسخ‌های واقعی SUS
   - name: شبیه‌ساز
     description: حالت نمایش — با `DEMO_MODE=false` غیرفعال می‌شود
 
@@ -472,6 +475,12 @@ paths:
         **بی‌اثرسازی تکرار:** اگر `clientUuid` بدهید و همان مقدار قبلاً ثبت
         شده باشد، ردیف تکراری ساخته نمی‌شود و همان ردیف قبلی برمی‌گردد —
         با کد ۲۰۱، تا کلاینت صف آفلاینش را خالی کند.
+      parameters:
+        - name: X-Device-Install-Id
+          in: header
+          required: false
+          description: شناسهٔ نصب ثبت‌شده؛ برای به‌روزرسانی باتری همان دستگاه
+          schema: { type: string, format: uuid }
       requestBody:
         required: true
         content:
@@ -508,6 +517,12 @@ paths:
         تک‌تکشان اجرا شود، کاربری که نیم‌ساعت پیش بیرون رفته و برگشته،
         همین حالا چند هشدارِ منقضی تولید می‌کند. تاریخچه کامل ذخیره
         می‌شود، اما وضعیت لحظه‌ای فقط از آخرین نقطه می‌آید.
+      parameters:
+        - name: X-Device-Install-Id
+          in: header
+          required: false
+          description: شناسهٔ نصب ثبت‌شده؛ برای به‌روزرسانی باتری همان دستگاه
+          schema: { type: string, format: uuid }
       requestBody:
         required: true
         content:
@@ -634,6 +649,27 @@ paths:
                       minBattery: { type: integer, nullable: true }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+    delete:
+      tags: [موقعیت]
+      summary: حذف تاریخچه‌ی موقعیت خود
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: تعداد ردیف‌های حذف‌شده
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /locations/history/days:
     get:
       tags: [موقعیت]
@@ -692,31 +728,6 @@ paths:
                 type: object
                 properties:
                   settings: { $ref: '#/components/schemas/Settings' }
-
-  /locations/history/delete:
-    delete:
-      tags: [موقعیت]
-      summary: حذف تاریخچه‌ی موقعیت خود
-      description: |
-        مسیر واقعی این endpoint در سرور `DELETE /locations/history` است.
-        ردیف‌ها **واقعاً حذف می‌شوند**، نه اینکه پرچم «حذف‌شده» بخورند —
-        یکی از تعهدهای صریح محصول.
-      parameters:
-        - name: from
-          in: query
-          schema: { type: string, format: date-time }
-        - name: to
-          in: query
-          schema: { type: string, format: date-time }
-      responses:
-        '200':
-          description: تعداد ردیف‌های حذف‌شده
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  deleted: { type: integer }
 
   # ═══════════════════════════ محدوده‌های امن ═══════════════════════════
 
@@ -1502,7 +1513,7 @@ paths:
       parameters:
         - name: status
           in: query
-          schema: { type: string, enum: [pending, sent, failed, abandoned] }
+          schema: { type: string, enum: [pending, sent, abandoned] }
         - name: limit
           in: query
           schema: { type: integer }
@@ -1658,6 +1669,281 @@ paths:
                 respondedWithinSec: { type: integer }
       responses:
         '200': { description: ذخیره شد }
+
+  /guardianships/{id}/main-supervisor:
+    patch:
+      tags: [سرپرستی]
+      summary: انتخاب این مراقب به‌عنوان ناظر اصلی
+      description: کاربر اصلی فقط یکی از مراقبان پیوندخورده را ناظر اصلی می‌کند.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200': { description: ناظر اصلی به‌روزرسانی شد }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /safe-zones/preview:
+    post:
+      tags: [محدوده‌های امن]
+      summary: پیش‌نمایش آستانه‌های محدوده‌ی امن
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subjectUserId: { type: string, format: uuid }
+                shape: { type: string, enum: [circle, polygon] }
+                centerLat: { type: number, minimum: -90, maximum: 90 }
+                centerLng: { type: number, minimum: -180, maximum: 180 }
+                radiusM: { type: integer, minimum: 50, maximum: 5000 }
+                polygon:
+                  type: array
+                  minItems: 3
+                  maxItems: 60
+                  items:
+                    type: array
+                    minItems: 2
+                    maxItems: 2
+                    items: { type: number }
+      responses:
+        '200': { description: آستانه‌های پیش‌نمایش }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /sos/config:
+    get:
+      tags: [SOS]
+      summary: تنظیمات و گیرندگان SOS
+      responses:
+        '200': { description: تنظیمات هشدار اضطراری }
+
+  /simulator/status:
+    get:
+      tags: [شبیه‌ساز]
+      summary: وضعیت شبیه‌ساز موقعیت
+      responses:
+        '200': { description: وضعیت اجرا و حالت نمایش }
+
+  /documents:
+    post:
+      tags: [مدیریت]
+      summary: ارسال تصویر مدرک هویتی
+      description: تصویر data URL با نوع و اندازه‌ی مجاز پذیرفته و در پایگاه داده رمزگذاری می‌شود.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [documentType, imageUrl]
+              properties:
+                documentType: { type: string, maxLength: 40 }
+                imageUrl: { type: string, maxLength: 8000000, description: data URL تصویر JPEG، PNG یا WebP تا ۵ مگابایت }
+                healthCondition: { type: string, minLength: 2, maxLength: 80 }
+                subjectUserId: { type: string, format: uuid }
+      responses:
+        '201': { description: مدرک برای بررسی ثبت شد }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /documents/mine:
+    get:
+      tags: [مدیریت]
+      summary: فهرست مدارک خود
+      responses:
+        '200': { description: مدارک هویتی حساب کاربر }
+
+  /admin/alerts:
+    get:
+      tags: [مدیریت]
+      summary: هشدارهای مدیریتی بدون مختصات
+      responses:
+        '200': { description: فهرست هشدارهای قابل مشاهده برای مدیر }
+
+  /admin/documents:
+    get:
+      tags: [مدیریت]
+      summary: فهرست مدارک برای بررسی
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, approved, rejected, all], default: pending }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200': { description: فهرست مدارک و وضعیت بررسی }
+
+  /admin/documents/{id}/approve:
+    post:
+      tags: [مدیریت]
+      summary: تأیید مدرک
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200': { description: مدرک تأیید و وضعیت سلامت کاربر آزاد شد }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/documents/{id}/reject:
+    post:
+      tags: [مدیریت]
+      summary: رد مدرک
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 300 }
+      responses:
+        '200': { description: مدرک رد شد }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/falls:
+    get:
+      tags: [مدیریت]
+      summary: فهرست رخدادهای سقوط برای مدیر
+      responses:
+        '200': { description: فهرست رخدادها بدون مختصات کاربر }
+
+  /admin/families:
+    get:
+      tags: [مدیریت]
+      summary: فهرست خانواده‌ها
+      responses:
+        '200': { description: خانواده‌ها و وضعیت تأیید مدارک }
+
+  /admin/support:
+    get:
+      tags: [پشتیبانی]
+      summary: فهرست پیام‌های پشتیبانی برای مدیر
+      responses:
+        '200': { description: گفتگوهای پشتیبانی }
+
+  /admin/support/{userId}/reply:
+    post:
+      tags: [پشتیبانی]
+      summary: پاسخ مدیر به کاربر
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 2, maxLength: 2000 }
+      responses:
+        '201': { description: پاسخ ثبت شد }
+
+  /support/messages:
+    get:
+      tags: [پشتیبانی]
+      summary: فهرست پیام‌های پشتیبانی خود
+      responses:
+        '200': { description: پیام‌های پشتیبانی کاربر }
+    post:
+      tags: [پشتیبانی]
+      summary: ارسال پیام به پشتیبانی
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 2, maxLength: 2000 }
+      responses:
+        '201': { description: پیام ثبت شد }
+
+  /evaluation/reference:
+    get:
+      tags: [ارزیابی میدانی]
+      summary: خواندن نقطه‌ی مرجع نقشه‌برداری‌شده‌ی خود
+      responses:
+        '200': { description: نقطه‌ی مرجع یا مقدار null }
+    post:
+      tags: [ارزیابی میدانی]
+      summary: ثبت نقطه‌ی مرجع نقشه‌برداری‌شده
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat: { type: number, minimum: -90, maximum: 90 }
+                lng: { type: number, minimum: -180, maximum: 180 }
+                label: { type: string, maxLength: 120 }
+      responses:
+        '201': { description: نقطه‌ی مرجع ذخیره شد }
+
+  /evaluation/reference/sample:
+    post:
+      tags: [ارزیابی میدانی]
+      summary: ثبت نمونه‌ی GPS برای مقایسه با نقطه‌ی مرجع
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng, accuracyM]
+              properties:
+                lat: { type: number, minimum: -90, maximum: 90 }
+                lng: { type: number, minimum: -180, maximum: 180 }
+                accuracyM: { type: number, minimum: 0, maximum: 10000 }
+      responses:
+        '201': { description: خطای GPS و دقت اعلامی ذخیره شد }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /evaluation/sus:
+    get:
+      tags: [ارزیابی میدانی]
+      summary: دریافت ده گویه‌ی استاندارد SUS
+      responses:
+        '200': { description: پرسش‌ها و گزینه‌های پاسخ }
+    post:
+      tags: [ارزیابی میدانی]
+      summary: ثبت پاسخ SUS شرکت‌کننده
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answers]
+              properties:
+                answers:
+                  type: array
+                  minItems: 10
+                  maxItems: 10
+                  items: { type: integer, minimum: 1, maximum: 5 }
+      responses:
+        '201': { description: پاسخ و نمره ذخیره شد }
+
+  /evaluation/summary:
+    get:
+      tags: [ارزیابی میدانی]
+      summary: خلاصه‌ی ارزیابی برای مدیر
+      description: شامل سنجه‌های GPS، تحویل اعلان و پاسخ‌های SUS.
+      responses:
+        '200': { description: خلاصه‌ی سنجه‌های ارزیابی }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
 components:
   securitySchemes:

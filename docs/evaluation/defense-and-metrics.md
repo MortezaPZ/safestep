@@ -11,7 +11,9 @@ The current `backend/src/services/fallDetection/model.json` is labeled `sisfall-
 
 The model metadata reports 7,212 SisFall windows: 1,798 fall windows and 5,414 activity windows. The raw SisFall recordings are not included in this source package.
 
-`backend/scripts/falls/train_sisfall.js` includes a stratified five-fold out-of-fold sweep over the combined rule's SVM margin and KNN agree-ratio thresholds. No new sweep table is included here because neither the raw recordings nor a prepared feature CSV is bundled. Set `SISFALL_FEATURE_CSV` to a prepared 15-column CSV and run `npm run train:fall:sisfall` to regenerate it; that run will also retrain and replace the deployed model.
+The checked-in model contains five-fold metrics for KNN and SVM, but it does not contain a cross-validated confusion matrix for the deployed ensemble rule. The updated training script now calculates the ensemble matrix and threshold sweep; do not quote new ensemble numbers until the grouped SisFall training input is available and the script has been run.
+
+`backend/scripts/falls/train_sisfall.js` includes a subject-grouped, nested five-fold out-of-fold sweep over the combined rule's SVM margin and KNN agree-ratio thresholds. No new sweep table is included here because neither the raw recordings nor a prepared feature CSV is bundled. Set `SISFALL_FEATURE_CSV` to a prepared 17-column CSV (`subject_id`, `recording_id`, `label`, and fourteen features) and run `npm run train:fall:sisfall` to regenerate it; that run will also retrain and replace the deployed model.
 
 `roc-sisfall-loo.csv` is not held-out validation. Its leave-one-out loop uses 1,443 prototypes selected from the full 7,212-window set, so each held-out prototype has already participated in the full-data selection. Do not cite its 0.9889 sensitivity as a generalization estimate; use the five-fold metrics stored in `model.json`.
 
@@ -37,4 +39,4 @@ FCM is not active in the current build, and there is no measured phone-receipt l
 
 ## PostgreSQL load test
 
-`load-test-postgres-2026-11-01.md` is a fresh local run against PostgreSQL 17.11. Each scenario lasted 8 seconds and included an SOS burst. All HTTP scenarios reported zero request errors. The run emitted telemetry-buffer overflow warnings, so its HTTP latency and error figures do not establish complete telemetry capture or phone-delivery latency. `load-test-postgres-2026-09-24.md` remains the historical run without SOS. Both runs used local PostgreSQL; neither is a cloud-vendor latency measurement.
+`load-test-postgres-2026-11-01.md` is a fresh local run against PostgreSQL 17.11. Each of six scenarios lasted 60 seconds and used 50 independent user tokens/connections, including an SOS burst. All HTTP scenarios reported zero request errors. The final telemetry buffer had 1,950 queued and 16,936 dropped records, so its HTTP latency and error figures do not establish complete telemetry capture or phone-delivery latency. `load-test-postgres-2026-09-24.md` remains the historical run without SOS. Both runs used local PostgreSQL; neither is a cloud-vendor latency measurement.

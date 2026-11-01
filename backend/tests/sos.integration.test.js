@@ -80,10 +80,29 @@ describe('مسیر کامل: ثبت‌نام تا هشدار اضطراری', ()
   });
 
   it('کاربر اصلی یک محدوده‌ی امن می‌سازد', async () => {
+    const invite = await request(app)
+      .post('/api/v1/guardianships/invites')
+      .set(auth(maryam.token))
+      .send({ permissions: ['view_location', 'receive_alerts'] });
+    expect(invite.status).toBe(201);
+    const redeemed = await request(app)
+      .post('/api/v1/guardianships/redeem')
+      .set(auth(zahra.token))
+      .send({ code: invite.body.code });
+    expect(redeemed.status).toBe(201);
+    const selected = await request(app)
+      .patch(`/api/v1/guardianships/${redeemed.body.guardianship.id}/main-supervisor`)
+      .set(auth(maryam.token))
+      .send({});
+    expect(selected.status).toBe(200);
+
     const res = await request(app)
       .post('/api/v1/safe-zones')
-      .set(auth(maryam.token))
-      .send({ name: 'خانه', centerLat: HOME.lat, centerLng: HOME.lng, radiusM: 150 });
+      .set(auth(zahra.token))
+      .send({
+        name: 'خانه', centerLat: HOME.lat, centerLng: HOME.lng, radiusM: 150,
+        subjectUserId: maryam.id,
+      });
 
     expect(res.status).toBe(201);
     expect(res.body.thresholds.exitThresholdM).toBe(175);
@@ -119,6 +138,7 @@ describe('مسیر کامل: ثبت‌نام تا هشدار اضطراری', ()
   });
 
   it('همان کد دعوت بار دوم پذیرفته نمی‌شود', async () => {
+    const guest = await signUp('09121110999', 'مهمان آزمون', 'guardian');
     const invite = await request(app)
       .post('/api/v1/guardianships/invites')
       .set(auth(maryam.token))
@@ -126,14 +146,14 @@ describe('مسیر کامل: ثبت‌نام تا هشدار اضطراری', ()
 
     const first = await request(app)
       .post('/api/v1/guardianships/redeem')
-      .set(auth(zahra.token))
+      .set(auth(guest.token))
       .send({ code: invite.body.code });
     expect(first.status).toBe(201);
 
     // تلاش دوباره با همان کد — این بار باید رد شود
     const second = await request(app)
       .post('/api/v1/guardianships/redeem')
-      .set(auth(zahra.token))
+      .set(auth(guest.token))
       .send({ code: invite.body.code });
 
     expect(second.status).toBeGreaterThanOrEqual(400);
@@ -240,6 +260,27 @@ describe('مسیر کامل: ثبت‌نام تا هشدار اضطراری', ()
     expect(res.body.recipients[0].fullName).toBe('علی رضایی');
 
     sosAlertId = res.body.alert.id;
+  });
+
+  it('هشدار فعال SOS فقط برای خود کاربر یا مراقب دارای دسترسی اضطراری دیده می‌شود', async () => {
+    const self = await request(app)
+      .get('/api/v1/sos/active')
+      .set(auth(maryam.token));
+    expect(self.status).toBe(200);
+    expect(self.body.alert.id).toBe(sosAlertId);
+
+    const emergencyGuardian = await request(app)
+      .get('/api/v1/sos/active')
+      .query({ userId: maryam.id })
+      .set(auth(ali.token));
+    expect(emergencyGuardian.status).toBe(200);
+    expect(emergencyGuardian.body.alert.id).toBe(sosAlertId);
+
+    const limitedGuardian = await request(app)
+      .get('/api/v1/sos/active')
+      .query({ userId: maryam.id })
+      .set(auth(zahra.token));
+    expect(limitedGuardian.status).toBe(403);
   });
 
   it('علی هشدار SOS را می‌بیند', async () => {

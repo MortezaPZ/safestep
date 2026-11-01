@@ -1,0 +1,4 @@
+storeFile=/absolute/path/to/hamghadam-release.jks
+storePassword=SET_LOCALLY
+keyAlias=hamghadam
+keyPassword=SET_LOCALLY

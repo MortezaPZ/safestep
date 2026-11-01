@@ -12,6 +12,8 @@ import '../../../core/constants/app_config.dart';
 import '../../../core/utils/app_exception.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../auth/domain/auth_models.dart';
+import '../../fall/data/fall_detector_service.dart';
+import '../../fall/data/fall_repository.dart';
 import '../data/location_queue.dart';
 import '../data/location_repository.dart';
 import '../data/permission_service.dart';
@@ -30,6 +32,8 @@ class TrackingState {
     this.batteryLevel,
     this.error,
     this.powerSave = false,
+    this.pendingFall,
+    this.foregroundServiceAvailable = true,
   });
 
   final TrackingStatus status;
@@ -48,6 +52,8 @@ class TrackingState {
   final int? batteryLevel;
   final AppException? error;
   final bool powerSave;
+  final FallDetectResult? pendingFall;
+  final bool foregroundServiceAvailable;
 
   bool get isActive =>
       status == TrackingStatus.live || status == TrackingStatus.offline;
@@ -62,6 +68,8 @@ class TrackingState {
     int? batteryLevel,
     AppException? error,
     bool? powerSave,
+    FallDetectResult? pendingFall,
+    bool? foregroundServiceAvailable,
     bool clearError = false,
   }) {
     return TrackingState(
@@ -74,6 +82,9 @@ class TrackingState {
       batteryLevel: batteryLevel ?? this.batteryLevel,
       error: clearError ? null : (error ?? this.error),
       powerSave: powerSave ?? this.powerSave,
+      pendingFall: pendingFall ?? this.pendingFall,
+      foregroundServiceAvailable:
+          foregroundServiceAvailable ?? this.foregroundServiceAvailable,
     );
   }
 }
@@ -104,6 +115,7 @@ class TrackingController extends StateNotifier<TrackingState> {
   StreamSubscription<Position>? _positionSub;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _flushTimer;
+  FallDetectorService? _fallDetector;
 
   final Battery _battery = Battery();
 
@@ -164,7 +176,16 @@ class TrackingController extends StateNotifier<TrackingState> {
       return false;
     }
 
-    await _startForegroundService();
+    final bool foregroundServiceAvailable = await _startForegroundService();
+    _fallDetector ??= FallDetectorService(_ref.read(fallRepositoryProvider));
+    _fallDetector!.onPositive = (FallDetectResult result) {
+      state = state.copyWith(pendingFall: result);
+    };
+    try {
+      await _fallDetector!.start();
+    } catch (error) {
+      debugPrint('حسگر سقوط راه‌اندازی نشد: $error');
+    }
     await _listenConnectivity();
     await _startPositionStream();
 
@@ -176,7 +197,10 @@ class TrackingController extends StateNotifier<TrackingState> {
       (_) => unawaited(_flushQueue()),
     );
 
-    state = state.copyWith(status: TrackingStatus.live);
+    state = state.copyWith(
+      status: TrackingStatus.live,
+      foregroundServiceAvailable: foregroundServiceAvailable,
+    );
     await _updateQueueCount();
     return true;
   }
@@ -194,6 +218,8 @@ class TrackingController extends StateNotifier<TrackingState> {
 
     _flushTimer?.cancel();
     _flushTimer = null;
+
+    await _fallDetector?.stop();
 
     await _stopForegroundService();
 
@@ -227,8 +253,8 @@ class TrackingController extends StateNotifier<TrackingState> {
   /// **اعلان دائمی، ویژگی است نه دردسر:** کاربر باید همیشه ببیند که
   /// موقعیتش در حال ارسال است. ردیابی نامرئی، دقیقاً همان چیزی است که این
   /// محصول نباید باشد.
-  Future<void> _startForegroundService() async {
-    if (!defaultTargetPlatform.isAndroidLike) return;
+  Future<bool> _startForegroundService() async {
+    if (!defaultTargetPlatform.isAndroidLike) return true;
 
     try {
       FlutterForegroundTask.init(
@@ -252,16 +278,18 @@ class TrackingController extends StateNotifier<TrackingState> {
         ),
       );
 
-      if (await FlutterForegroundTask.isRunningService) return;
+      if (await FlutterForegroundTask.isRunningService) return true;
 
       await FlutterForegroundTask.startService(
         notificationTitle: 'هم‌قدم فعال است',
         notificationText: 'موقعیت شما با مراقبانتان به اشتراک گذاشته می‌شود',
       );
+      return true;
     } catch (error) {
       // نبود سرویس پیش‌زمینه، ردیابی هنگام باز بودن اپ را از کار
       // نمی‌اندازد؛ فقط پس‌زمینه را نامطمئن می‌کند
       debugPrint('سرویس پیش‌زمینه راه‌اندازی نشد: $error');
+      return false;
     }
   }
 

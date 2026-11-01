@@ -177,13 +177,14 @@ export function emitInApp(userIds, { title, body, data, severity }, deliveredVia
 }
 
 function sendViaLocal(userIds, payload) {
-  emitInApp(userIds, payload, 'local');
+  const online = userIds.filter((userId) => hub.isUserOnline(userId));
+  emitInApp(online, payload, 'local');
   log.info('نوتیفیکیشن از مسیر محلی تحویل شد', {
-    recipients: userIds.length,
+    recipients: online.length,
     title: payload.title,
     severity: payload.severity,
   });
-  return { sent: userIds.length, failed: 0, invalidTokens: [] };
+  return { sent: online.length, failed: userIds.length - online.length, invalidTokens: [] };
 }
 
 /**
@@ -204,18 +205,19 @@ export async function notify(userIds, message) {
     severity: message.severity ?? 'info',
   };
 
-  emitInApp(targets, payload, driver);
-
   if (driver === 'local') {
-    log.info('نوتیفیکیشن ثبت شد', { recipients: targets.length, title: payload.title });
-    return { driver: 'local', sent: targets.length, failed: 0, fellBack: false };
+    const result = sendViaLocal(targets, payload);
+    return { driver: 'local', ...result, fellBack: false };
   }
+
+  const online = targets.filter((userId) => hub.isUserOnline(userId));
+  emitInApp(online, payload, driver);
 
   try {
     const devices = await deviceRepository.pushTokensFor(targets);
     const tokens = devices.map((d) => d.token).filter(Boolean);
     if (tokens.length === 0) {
-      return { driver: 'local', sent: targets.length, failed: 0, fellBack: true };
+      return { driver: 'local', sent: online.length, failed: targets.length - online.length, fellBack: true };
     }
 
     let sent = 0;
@@ -237,7 +239,13 @@ export async function notify(userIds, message) {
     return { driver: 'fcm', sent, failed, fellBack: false };
   } catch (error) {
     log.error('ارسال FCM شکست خورد؛ بازگشت به مسیر محلی', { error: error.message });
-    return { ...sendViaLocal(targets, payload), driver: 'local', fellBack: true };
+    return {
+      driver: 'local',
+      sent: online.length,
+      failed: targets.length - online.length,
+      invalidTokens: [],
+      fellBack: true,
+    };
   }
 }
 

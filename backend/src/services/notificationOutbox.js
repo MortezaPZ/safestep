@@ -39,7 +39,7 @@ export async function enqueueForRecipients(recipientIds, { alertId, title, body,
   return rows;
 }
 
-async function recordFcmDelivery(row, { status, errorCode }) {
+async function recordFcmDelivery(row, { status, errorCode, attempts }) {
   if (!row.alertId) return;
   let createdAt = row.createdAt;
   try {
@@ -55,7 +55,8 @@ async function recordFcmDelivery(row, { status, errorCode }) {
     channel: 'fcm',
     status,
     latencyMs,
-    errorCode: errorCode ?? null,
+    errorCode: errorCode ? String(errorCode).slice(0, 64) : null,
+    attempts,
   });
 }
 
@@ -65,60 +66,48 @@ export async function processOnce() {
   let failed = 0;
 
   for (const row of batch) {
-    const devices = await deviceRepository.pushTokensFor([row.userId]);
-    const tokens = devices.map((d) => d.token).filter(Boolean);
-    const payload = row.payload ?? {};
+    const attempts = row.attempts + 1;
+    try {
+      const devices = await deviceRepository.pushTokensFor([row.userId]);
+      const tokens = devices.map((d) => d.token).filter(Boolean);
+      const payload = row.payload ?? {};
+      let allOk = tokens.length > 0;
+      let lastError = tokens.length ? null : 'No push token registered';
+      for (const token of tokens) {
+        const result = await sendFcmToToken(token, payload);
+        if (result.invalidToken) await deviceRepository.clearPushToken(token);
+        if (!result.ok) {
+          allOk = false;
+          lastError = result.error ?? `HTTP ${result.status}`;
+        }
+      }
 
-    if (tokens.length === 0) {
-      const attempts = row.attempts + 1;
+      if (allOk) {
+        await outboxRepository.markSent(row.id);
+        await recordFcmDelivery(row, { status: 'sent', attempts });
+        sent += 1;
+      } else {
+        await outboxRepository.markFailure(row.id, {
+          attempts,
+          lastError,
+          abandon: attempts >= MAX_ATTEMPTS,
+        });
+        await recordFcmDelivery(row, { status: 'failed', errorCode: lastError, attempts });
+        failed += 1;
+      }
+    } catch (error) {
       await outboxRepository.markFailure(row.id, {
         attempts,
-        lastError: 'هیچ توکن Push ثبت نشده',
+        lastError: error.message,
         abandon: attempts >= MAX_ATTEMPTS,
       });
-      failed += 1;
-      continue;
-    }
-
-    let allOk = true;
-    let lastError = null;
-    for (const token of tokens) {
-      const result = await sendFcmToToken(token, {
-        title: payload.title,
-        body: payload.body,
-        data: payload.data,
-        severity: payload.severity,
-      });
-      if (result.invalidToken) {
-        await deviceRepository.clearPushToken(token);
-      }
-      if (!result.ok) {
-        allOk = false;
-        lastError = result.error ?? `HTTP ${result.status}`;
-      }
-    }
-
-    if (allOk) {
-      await outboxRepository.markSent(row.id);
-      await recordFcmDelivery(row, { status: 'sent' });
-      sent += 1;
-    } else {
-      const attempts = row.attempts + 1;
-      const abandon = attempts >= MAX_ATTEMPTS;
-      await outboxRepository.markFailure(row.id, {
-        attempts,
-        lastError,
-        abandon,
-      });
-      await recordFcmDelivery(row, {
-        status: abandon ? 'failed' : 'failed',
-        errorCode: lastError,
-      });
+      await recordFcmDelivery(row, { status: 'failed', errorCode: error.message, attempts });
       failed += 1;
     }
   }
 
   if (batch.length > 0) {
+    await telemetryService.flush();
     log.info('دور صف نوتیفیکیشن', { claimed: batch.length, sent, failed });
   }
   return { claimed: batch.length, sent, failed };

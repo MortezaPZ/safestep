@@ -335,8 +335,8 @@ async function startApp() {
       el('a.skip-link', { href: '#view', text: 'پرش به محتوای اصلی' }),
       header,
       el(
-        'main#main.app-main',
-        {},
+        'main.app-main',
+        { id: 'main' },
         verifyBanner,
         el('div.mb-4', {}, tabsContainer),
         viewContainer,

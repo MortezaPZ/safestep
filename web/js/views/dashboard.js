@@ -244,12 +244,21 @@ export function mountDashboard(container, ctx) {
     haptic([60, 40, 60, 40, 120]);
 
     try {
-      const location = status?.location;
+      const location = await new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(
+          (position) => resolve(position.coords),
+          () => resolve(null),
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 4000 },
+        );
+      });
       const result = await api.triggerSos({
-        lat: location?.lat,
-        lng: location?.lng,
+        ...(location ? {
+          lat: location.latitude,
+          lng: location.longitude,
+          accuracyM: location.accuracy,
+        } : {}),
         batteryLevel: status?.batteryLevel ?? undefined,
-        isSimulated: Boolean(location?.isSimulated),
       });
 
       const count = result.recipients.length;

@@ -10,6 +10,11 @@
  * دسترسی به این مخزن فقط از مسیر `requireRole('admin')` ممکن است.
  */
 import db from '../db/index.js';
+import {
+  decryptSensitiveValue,
+  encryptSensitiveValue,
+  validateIdentityImageDataUrl,
+} from '../utils/sensitiveData.js';
 
 const d = (v) => (v ? new Date(v).toISOString() : null);
 
@@ -24,7 +29,7 @@ const mapAdminUser = (row) => ({
   createdAt: d(row.created_at),
   lastLoginAt: d(row.last_login_at),
   deletedAt: d(row.deleted_at),
-  healthCondition: row.health_condition ?? null,
+  healthCondition: decryptSensitiveValue(row.health_condition) ?? null,
   verificationStatus: row.verification_status ?? null,
   // شمارنده‌ها فقط وقتی هستند که کوئری فهرست، آن‌ها را حساب کرده باشد
   ...(row.device_count !== undefined ? { deviceCount: Number(row.device_count) } : {}),
@@ -39,9 +44,11 @@ const mapIdentityDocument = (row) => ({
   userName: row.user_name,
   userPhone: row.user_phone,
   type: row.document_type,
-  imageUrl: row.image_url,
+  imageUrl: decryptSensitiveValue(row.image_url),
   status: row.status,
-  healthCondition: row.health_condition ?? null,
+  healthCondition: row.status === 'approved'
+    ? (decryptSensitiveValue(row.health_condition) ?? null)
+    : null,
   rejectionReason: row.rejection_reason ?? null,
   createdAt: d(row.created_at),
   reviewedAt: d(row.reviewed_at),
@@ -73,25 +80,63 @@ export async function listIdentityDocuments({ status = 'pending', limit = 50, of
   return rows.map(mapIdentityDocument);
 }
 
-export async function createIdentityDocument(userId, documentType, imageUrl) {
+export async function createIdentityDocument(userId, documentType, imageUrl, healthCondition = null) {
+  const checkedImageUrl = validateIdentityImageDataUrl(imageUrl);
   const { rows } = await db.query(
-    `INSERT INTO identity_documents (user_id, document_type, image_url)
-     VALUES ($1, $2, $3)
+    `INSERT INTO identity_documents (user_id, document_type, image_url, health_condition_encrypted)
+     VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [userId, documentType, imageUrl],
+    [
+      userId,
+      documentType,
+      encryptSensitiveValue(checkedImageUrl),
+      healthCondition ? encryptSensitiveValue(healthCondition) : null,
+    ],
   );
   return mapIdentityDocument(rows[0]);
 }
 
 export async function reviewIdentityDocument(id, status, reviewerId, rejectionReason = null) {
-  const { rows } = await db.query(
-    `UPDATE identity_documents
-        SET status = $2, reviewed_by = $3, reviewed_at = now(), rejection_reason = $4
-      WHERE id = $1
-      RETURNING *`,
-    [id, status, reviewerId, rejectionReason],
-  );
-  return rows[0] ? mapIdentityDocument(rows[0]) : null;
+  return db.transaction(async (tx) => {
+    const { rows: documents } = await tx.query(
+      `SELECT id, user_id, health_condition_encrypted
+         FROM identity_documents WHERE id = $1 FOR UPDATE`,
+      [id],
+    );
+    const pending = documents[0];
+    if (!pending) return null;
+
+    const healthCondition = status === 'approved' && pending.health_condition_encrypted
+      ? decryptSensitiveValue(pending.health_condition_encrypted)
+      : null;
+    await tx.query(
+      `UPDATE users
+          SET verification_status = $2,
+              health_condition = CASE WHEN $3::text IS NOT NULL
+                                      THEN $3 ELSE health_condition END
+        WHERE id = $1`,
+      [
+        pending.user_id,
+        status === 'approved' ? 'verified' : 'rejected',
+        healthCondition ? encryptSensitiveValue(healthCondition) : null,
+      ],
+    );
+    await tx.query(
+      `UPDATE identity_documents
+          SET status = $2, reviewed_by = $3, reviewed_at = now(),
+              rejection_reason = $4, health_condition_encrypted = NULL
+        WHERE id = $1`,
+      [id, status, reviewerId, rejectionReason],
+    );
+
+    const { rows } = await tx.query(
+      `SELECT d.*, u.full_name AS user_name, u.phone AS user_phone, u.health_condition
+         FROM identity_documents d JOIN users u ON u.id = d.user_id
+        WHERE d.id = $1`,
+      [id],
+    );
+    return mapIdentityDocument(rows[0]);
+  });
 }
 
 /* ═══════════════════════════ کاربران ═══════════════════════════ */
@@ -374,7 +419,9 @@ export async function listFamilies() {
         primaryId: row.primary_id,
         primaryName: row.primary_name,
         primaryPhone: row.primary_phone,
-        healthCondition: row.verification_status === 'verified' ? row.health_condition : null,
+        healthCondition: row.verification_status === 'verified'
+          ? decryptSensitiveValue(row.health_condition)
+          : null,
         verificationStatus: row.verification_status,
         guardians: [],
         zoneLabel: null,
@@ -433,7 +480,10 @@ export async function listAlertsWithoutLocation(limit = 80) {
 }
 
 export async function setHealthCondition(userId, condition) {
-  await db.query('UPDATE users SET health_condition = $2 WHERE id = $1', [userId, condition]);
+  await db.query('UPDATE users SET health_condition = $2 WHERE id = $1', [
+    userId,
+    condition ? encryptSensitiveValue(condition) : null,
+  ]);
 }
 
 export async function listSupportMessages(userId) {

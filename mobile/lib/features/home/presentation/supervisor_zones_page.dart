@@ -1,12 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/utils/identity_document_image.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_scaffold.dart';
@@ -196,11 +196,23 @@ class _PrimaryDocumentsFormState extends ConsumerState<_PrimaryDocumentsForm> {
   final TextEditingController _condition = TextEditingController();
   String _status = '';
   bool _busy = false;
+  IdentityDocumentImage? _image;
 
   @override
   void dispose() {
     _condition.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final image = await pickIdentityDocumentImage();
+      if (mounted && image != null) setState(() => _image = image);
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _status = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _status = 'انتخاب تصویر ناموفق بود: $error');
+    }
   }
 
   Future<void> _send() async {
@@ -210,14 +222,15 @@ class _PrimaryDocumentsFormState extends ConsumerState<_PrimaryDocumentsForm> {
         .where((WatchedPerson person) => person.isMainSupervisor)
         .toList();
     if (mains.isEmpty) return;
+    if (_image == null) {
+      setState(() => _status = 'ابتدا تصویر مدرک را از گالری انتخاب کنید.');
+      return;
+    }
     setState(() => _busy = true);
     try {
-      final ByteData bytes = await rootBundle.load('assets/images/logo-hamghadam.jpg');
-      final String imageUrl =
-          'data:image/jpeg;base64,${base64Encode(bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes))}';
       final Map<String, dynamic> body = <String, dynamic>{
         'documentType': 'identity',
-        'imageUrl': imageUrl,
+        'imageUrl': _image!.dataUrl,
         'subjectUserId': mains.first.userId,
       };
       final String condition = _condition.text.trim();
@@ -229,7 +242,10 @@ class _PrimaryDocumentsFormState extends ConsumerState<_PrimaryDocumentsForm> {
       );
       _condition.clear();
       if (mounted) {
-        setState(() => _status = 'مدرک برای تأیید مدیر ارسال شد. مشکل کنار اسم، بعد از تأیید دیده می‌شود.');
+        setState(() {
+          _image = null;
+          _status = 'مدرک برای تأیید مدیر ارسال شد. مشکل کنار اسم، بعد از تأیید دیده می‌شود.';
+        });
       }
     } catch (error) {
       if (mounted) setState(() => _status = 'ارسال مدرک نشد: $error');
@@ -252,6 +268,19 @@ class _PrimaryDocumentsFormState extends ConsumerState<_PrimaryDocumentsForm> {
             controller: _condition,
             decoration: const InputDecoration(hintText: 'مشکل شخص، مثلاً مشکل قلب'),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _pickImage,
+            icon: const Icon(Icons.photo_library_outlined),
+            label: Text(_image == null ? 'انتخاب تصویر مدرک' : 'تغییر تصویر مدرک'),
+          ),
+          if (_image != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(_image!.bytes, height: 160, fit: BoxFit.contain),
+            ),
+          ],
           const SizedBox(height: AppSpacing.sm),
           AppButton(
             label: _busy ? 'در حال ارسال…' : 'ارسال مدرک',

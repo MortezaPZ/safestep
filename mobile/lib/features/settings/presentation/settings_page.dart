@@ -1,9 +1,5 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:safestep/l10n/app_localizations.dart';
@@ -19,6 +15,7 @@ import '../../../core/widgets/main_nav.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/accessibility/accessibility_settings.dart';
 import '../../../core/utils/fa.dart';
+import '../../../core/utils/identity_document_image.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../fall/data/fall_repository.dart';
@@ -339,7 +336,10 @@ class _DocumentsCard extends ConsumerStatefulWidget {
 class _DocumentsCardState extends ConsumerState<_DocumentsCard> {
   final TextEditingController _condition = TextEditingController();
   String _list = '';
+  String _uploadStatus = '';
   String? _subjectUserId;
+  IdentityDocumentImage? _image;
+  bool _busy = false;
 
   @override
   void initState() {
@@ -394,13 +394,30 @@ class _DocumentsCardState extends ConsumerState<_DocumentsCard> {
     }
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final image = await pickIdentityDocumentImage();
+      if (mounted && image != null) setState(() => _image = image);
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _uploadStatus = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _uploadStatus = 'انتخاب تصویر ناموفق بود: $error');
+    }
+  }
+
   Future<void> _send() async {
-    final ByteData bytes = await rootBundle.load('assets/images/logo-hamghadam.jpg');
-    final String imageUrl =
-        'data:image/jpeg;base64,${base64Encode(bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes))}';
+    if (_image == null) {
+      setState(() => _uploadStatus = 'ابتدا تصویر مدرک را از گالری انتخاب کنید.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _uploadStatus = '';
+    });
+    try {
     final Map<String, dynamic> body = <String, dynamic>{
       'documentType': 'identity',
-      'imageUrl': imageUrl,
+      'imageUrl': _image!.dataUrl,
     };
     final String condition = _condition.text.trim();
     if (condition.length >= 2) body['healthCondition'] = condition;
@@ -411,7 +428,18 @@ class _DocumentsCardState extends ConsumerState<_DocumentsCard> {
       body: body,
     );
     _condition.clear();
+      if (mounted) {
+        setState(() {
+          _image = null;
+          _uploadStatus = 'تصویر مدرک برای بررسی ارسال شد.';
+        });
+      }
     await _load();
+    } catch (error) {
+      if (mounted) setState(() => _uploadStatus = 'ارسال مدرک ناموفق بود: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -430,7 +458,24 @@ class _DocumentsCardState extends ConsumerState<_DocumentsCard> {
             decoration: const InputDecoration(hintText: 'مشکل شخص، مثلاً بیماری قلبی'),
           ),
           const SizedBox(height: AppSpacing.sm),
-          AppButton(label: 'ارسال مدرک', onPressed: _send),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _pickImage,
+            icon: const Icon(Icons.photo_library_outlined),
+            label: Text(_image == null ? 'انتخاب تصویر مدرک' : 'تغییر تصویر مدرک'),
+          ),
+          if (_image != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(_image!.bytes, height: 160, fit: BoxFit.contain),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(label: _busy ? 'در حال ارسال…' : 'ارسال مدرک', onPressed: _busy ? null : _send),
+          if (_uploadStatus.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            Text(_uploadStatus),
+          ],
           if (_list.isNotEmpty) ...<Widget>[
             const SizedBox(height: AppSpacing.sm),
             Text(_list),

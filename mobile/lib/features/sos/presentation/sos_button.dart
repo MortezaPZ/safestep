@@ -247,11 +247,13 @@ class _SosButtonState extends ConsumerState<SosButton>
           // صفحه‌خوان به‌جای نگه داشتن، از همین کنش استفاده می‌کند
           onTap: state.phase == SosPhase.idle ? _onSemanticActivate : null,
           excludeSemantics: true,
-          child: GestureDetector(
-            onTapDown: (_) => _onPressStart(),
-            onTapUp: (_) => _onPressEnd(),
-            onTapCancel: _onPressEnd,
-            child: circle,
+          child: A11y.tapTarget(
+            child: GestureDetector(
+              onTapDown: (_) => _onPressStart(),
+              onTapUp: (_) => _onPressEnd(),
+              onTapCancel: _onPressEnd,
+              child: circle,
+            ),
           ),
         ),
 

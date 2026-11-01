@@ -49,6 +49,18 @@ npm start
 
 The Flutter project is in `mobile/`. An iOS archive needs Xcode on macOS. This Windows tree cannot produce an IPA. The Info.plist permission keys required by location, motion, and background alerts are documented in `docs/ios-build-status.md`.
 
+## Running an evaluation
+
+Use a networked PostgreSQL database and disable the simulator before collecting or reporting measurements:
+
+```env
+DB_DRIVER=pg
+DATABASE_URL=postgres://<user>:<password>@<host>:5432/<database>
+DEMO_MODE=false
+```
+
+The PostgreSQL load test rejects PGlite and runs each scenario for at least 60 seconds by default. See `docs/evaluation/defense-and-metrics.md` for which outputs are synthetic and which still need real participants, walks, or phones.
+
 ## Usage
 
 Seed and run the API, then open the web console. Guardian accounts, zones, and alerts are part of the backend. The demo-oriented walkthrough with seeded phone numbers lives in the separate `safestep-demo` repository. This repository is the full product tree, including the Flutter app.
@@ -60,7 +72,7 @@ cd backend
 npm test
 ```
 
-The backend suite includes unit and integration tests. The mobile test directory currently contains one test in `mobile/test/widget_test.dart`, for server-address normalization; there are not 25 mobile tests in this package.
+The backend suite includes unit and integration tests. The mobile test directory contains two tests: server-address normalization and the centered fall-detection window; this package does not contain 25 mobile tests. Flutter execution currently needs Pub.dev access for `image_picker`.
 
 ## Limitations
 

@@ -52,13 +52,12 @@ describe('وب‌اپ ایستا', () => {
     expect(appJs.text).toContain('forPrimary: true');
   });
 
-  it('حساب دموی ناظر و مدیر سامانه در صفحه ورود هست', async () => {
+  it('اعتبارنامه‌های دمو در جاوااسکریپت عمومی نیستند', async () => {
     const res = await request(app).get('/js/views/auth.js');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('09121110002');
-    expect(res.text).toContain('ناظر');
-    expect(res.text).toContain('09121110009');
-    expect(res.text).toContain('مدیر سامانه');
+    expect(res.text).not.toContain('09121110002');
+    expect(res.text).not.toContain('09121110009');
+    expect(res.text).not.toContain('Test@1234');
   });
 
   it('اسکریپت پنل ادمین را سرو می‌کند', async () => {

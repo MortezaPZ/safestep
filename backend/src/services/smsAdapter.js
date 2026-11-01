@@ -6,8 +6,6 @@ import logger from '../utils/logger.js';
 
 const log = logger.child({ module: 'sms' });
 
-let lastDispatch = null;
-
 function maskPhone(phone) {
   const d = String(phone).replace(/\D/g, '');
   if (d.length < 8) return '****';
@@ -20,12 +18,6 @@ export function status() {
     hasApiKey: Boolean(env.sms.apiKey),
     template: env.sms.template || null,
   };
-}
-
-export function consumeLastDispatch() {
-  const value = lastDispatch;
-  lastDispatch = null;
-  return value;
 }
 
 async function sendKavenegar({ phone, code }) {
@@ -54,7 +46,6 @@ async function sendGhasedak({ phone, code }) {
 }
 
 export async function send({ phone, code, purpose }) {
-  lastDispatch = { phone, code, purpose, at: new Date().toISOString() };
   const masked = maskPhone(phone);
 
   if (env.sms.driver === 'kavenegar') {
@@ -72,4 +63,4 @@ export async function send({ phone, code, purpose }) {
   return { driver: 'console' };
 }
 
-export default { send, status, consumeLastDispatch };
+export default { send, status };

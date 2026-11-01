@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
 
 import '../device/device_registrar.dart';
 
@@ -57,7 +58,13 @@ class PushService {
             AndroidFlutterLocalNotificationsPlugin>();
     await android?.createNotificationChannel(sos);
     await android?.createNotificationChannel(alerts);
-    await android?.requestNotificationsPermission();
+    final bool? androidPermission = android == null
+        ? null
+        : await android.requestNotificationsPermission();
+    final bool? androidEnabled = await android?.areNotificationsEnabled();
+    final ph.PermissionStatus? otherPlatformPermission = android == null
+        ? await ph.Permission.notification.request()
+        : null;
 
     try {
       await _registrar.registerCurrentDevice();
@@ -65,13 +72,19 @@ class PushService {
       debugPrint('ثبت دستگاه: $error');
     }
 
-    _available = true;
+    _available = androidEnabled ??
+        androidPermission ??
+        ((otherPlatformPermission?.isGranted ?? false) ||
+            (otherPlatformPermission?.isProvisional ?? false));
     _ready = true;
-    _reason = 'اعلان محلی فعال است';
+    _reason = _available
+        ? 'اعلان محلی فعال است'
+        : 'مجوز نمایش اعلان داده نشده است';
   }
 
   Future<String> enableAndConfirm() async {
     await initialize();
+    if (!_available) return _reason;
     const AndroidNotificationDetails android = AndroidNotificationDetails(
       'safestep_alerts',
       'هشدارها',

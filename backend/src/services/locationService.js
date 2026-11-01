@@ -36,7 +36,6 @@ import { detectStop, shouldAlertStop, detectGpsLost } from './stopDetector.js';
 import { raiseAlert } from './alertService.js';
 import telemetryService from './telemetryService.js';
 import logRepository from '../repositories/logRepository.js';
-import { haversineMeters } from '../utils/geo.js';
 import hub from '../realtime/hub.js';
 import logger from '../utils/logger.js';
 import { forbidden, notFound } from '../utils/errors.js';
@@ -82,28 +81,14 @@ function gapSecondsFor(userId, recordedAt) {
 
 /**
  * ثبت سنجه‌های یک پینگ.
- * accuracy_m دقت اعلامی GPS است.
- * error_m فاصلهٔ نقطهٔ مرجع واقعی تا مختصات ثبت‌شده است (تعریف پروپوزال).
+ * accuracy_m دقت اعلامی GPS است. خطای نقطه‌ی مرجع فقط در ارزیابی میدانیِ
+ * صریح ثبت می‌شود؛ حرکت عادی کاربر نمونه‌ی مرجع نیست.
  */
 async function recordPingTelemetry(userId, ping, { processMs, batchSize }) {
   const recordedMs = new Date(ping.recordedAt).getTime();
   const receivedMs = ping.receivedAt ? new Date(ping.receivedAt).getTime() : Date.now();
 
   const e2eLatencyMs = Math.max(0, Math.round(receivedMs - recordedMs));
-
-  let referenceLat = null;
-  let referenceLng = null;
-  let errorM = null;
-  try {
-    const reference = await logRepository.getLocationReference(userId);
-    if (reference && ping.lat != null && ping.lng != null) {
-      referenceLat = reference.lat;
-      referenceLng = reference.lng;
-      errorM = Math.round(haversineMeters(reference.lat, reference.lng, ping.lat, ping.lng) * 10) / 10;
-    }
-  } catch {
-    // نبودن جدول در دیتابیس قدیمی نباید ثبت موقعیت را متوقف کند
-  }
 
   telemetryService.recordLocation({
     userId,
@@ -117,21 +102,21 @@ async function recordPingTelemetry(userId, ping, { processMs, batchSize }) {
     batchSize,
     isQueuedReplay: ping.isQueuedReplay,
     gapSec: gapSecondsFor(userId, ping.recordedAt),
-    referenceLat,
-    referenceLng,
-    errorM,
   });
 }
 
-export async function ingestPing(userId, data) {
+async function processPing(userId, data, insertedPing = null) {
   const startedAt = process.hrtime.bigint();
   const settings = await userRepository.getSettings(userId);
   if (!settings) throw notFound('کاربر یافت نشد.');
 
-  const ping = await locationRepository.insertPing({ userId, ...data });
+  const ping = insertedPing ?? await locationRepository.insertPing({ userId, ...data });
 
   if (data.batteryLevel !== undefined && data.batteryLevel !== null) {
-    await deviceRepository.touch(userId, { batteryLevel: data.batteryLevel });
+    await deviceRepository.touch(userId, {
+      batteryLevel: data.batteryLevel,
+      installId: data.deviceInstallId,
+    });
   }
 
   const sharingEnabled = settings.locationSharingEnabled;
@@ -205,6 +190,10 @@ export async function ingestPing(userId, data) {
   };
 }
 
+export async function ingestPing(userId, data) {
+  return processPing(userId, data);
+}
+
 /**
  * تخلیه‌ی صف آفلاین اپ — درج دسته‌ای پینگ‌ها.
  *
@@ -218,7 +207,7 @@ export async function ingestPing(userId, data) {
  * @param {string} userId
  * @param {{pings: object[]}} payload
  */
-export async function ingestBatch(userId, { pings }) {
+export async function ingestBatch(userId, { pings, deviceInstallId }) {
   const startedAt = process.hrtime.bigint();
 
   const settings = await userRepository.getSettings(userId);
@@ -245,7 +234,7 @@ export async function ingestBatch(userId, { pings }) {
 
   // آخرین نقطه از مسیر عادی عبور می‌کند: پخش زنده، Geofence، توقف و باتری.
   // چون خودش قبلاً درج شده، با client_uuid همان ردیف برمی‌گردد و ردیف تکراری ساخته نمی‌شود.
-  const result = await ingestPing(userId, {
+  const result = await processPing(userId, {
     lat: latest.lat,
     lng: latest.lng,
     accuracyM: latest.accuracyM,
@@ -256,10 +245,10 @@ export async function ingestBatch(userId, { pings }) {
     source: latest.source,
     provider: latest.provider,
     isQueuedReplay: latest.isQueuedReplay,
-    clientUuid: latest.clientUuid,
     recordedAt: latest.recordedAt,
     batchSize: pings.length,
-  });
+    deviceInstallId,
+  }, latest);
 
   log.info('دسته‌ی پینگ آفلاین دریافت شد', {
     userId,
@@ -567,7 +556,18 @@ export async function getHistory(viewerId, subjectId, { from, to, limit }) {
 }
 
 export async function getHistoryDays(viewerId, subjectId) {
-  await assertCanViewLocation(viewerId, subjectId);
+  const access = await assertCanViewLocation(viewerId, subjectId);
+  if (!access.isSelf) {
+    const emergency = await guardianshipRepository.hasPermission(
+      subjectId,
+      viewerId,
+      PERMISSIONS.EMERGENCY,
+    );
+    if (!emergency) throw forbidden('تاریخچه مسیر فقط برای ناظر با دسترسی اضطراری است.');
+    if (!access.sharingEnabled && !(await guardianshipRepository.isMainSupervisor(viewerId, subjectId))) {
+      return [];
+    }
+  }
   return locationRepository.listHistoryDays(subjectId);
 }
 
@@ -643,6 +643,26 @@ export async function getOwnStatus(userId) {
   };
 }
 
+/** Raise one GPS-lost alert per stale-ping period for opted-in, shared users. */
+export async function checkGpsLostAlerts(now = Date.now()) {
+  const targets = await locationRepository.gpsWatchTargets();
+  let raised = 0;
+  for (const target of targets) {
+    const gps = detectGpsLost(target.recordedAt, env.gpsLostAfterSec, now);
+    if (!gps.isLost) continue;
+    const last = await alertRepository.findLastOfType(target.userId, ALERT_TYPES.GPS_LOST);
+    if (last && new Date(last.createdAt).getTime() >= new Date(target.recordedAt).getTime()) continue;
+    await raiseAlert({
+      userId: target.userId,
+      type: ALERT_TYPES.GPS_LOST,
+      context: { silentSeconds: gps.silentSeconds },
+      metadata: { silentSeconds: gps.silentSeconds },
+    });
+    raised += 1;
+  }
+  return raised;
+}
+
 export default {
   ingestPing,
   ingestBatch,
@@ -653,5 +673,6 @@ export default {
   deleteHistory,
   setLocationSharing,
   getOwnStatus,
+  checkGpsLostAlerts,
   assertCanViewLocation,
 };

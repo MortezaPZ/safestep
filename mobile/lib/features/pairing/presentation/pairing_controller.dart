@@ -163,6 +163,19 @@ class PairingController extends StateNotifier<PairingState> {
     }
   }
 
+  Future<bool> setMainSupervisor(String guardianshipId) async {
+    state = state.copyWith(busy: true, clearError: true);
+    try {
+      await _repository.setMainSupervisor(guardianshipId);
+      await load();
+      state = state.copyWith(busy: false);
+      return true;
+    } on AppException catch (error) {
+      state = state.copyWith(busy: false, error: error);
+      return false;
+    }
+  }
+
   Future<bool> revoke(String guardianshipId) async {
     state = state.copyWith(busy: true, clearError: true);
 

@@ -33,7 +33,13 @@ let refreshPromise = null;
 export function loadSession() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    session = raw ? JSON.parse(raw) : null;
+    const saved = raw ? JSON.parse(raw) : null;
+    session = saved ? {
+      accessToken: saved.accessToken,
+      user: saved.user,
+      settings: saved.settings ?? null,
+    } : null;
+    if (saved?.refreshToken) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   } catch {
     session = null;
   }
@@ -43,7 +49,6 @@ export function loadSession() {
 export function saveSession(data) {
   session = {
     accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
     user: data.user,
     settings: data.settings ?? session?.settings ?? null,
   };
@@ -92,6 +97,7 @@ async function doFetch(path, { method = 'GET', body, query, auth = true } = {}) 
   }
 
   const headers = {};
+  headers['X-Client-Kind'] = 'web';
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (auth && session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
 
@@ -100,6 +106,7 @@ async function doFetch(path, { method = 'GET', body, query, auth = true } = {}) 
     response = await fetch(url, {
       method,
       headers,
+      credentials: 'same-origin',
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -132,12 +139,11 @@ function sleep(ms) {
 
 /** تازه‌سازی توکن — تنها یک درخواست همزمان مجاز است. */
 async function refreshAccessToken() {
-  if (!session?.refreshToken) throw new ApiError(401, 'UNAUTHORIZED', 'نشست شما منقضی شده است.');
+  if (!session?.accessToken) throw new ApiError(401, 'UNAUTHORIZED', 'نشست شما منقضی شده است.');
 
   if (!refreshPromise) {
     refreshPromise = doFetch('/auth/refresh', {
       method: 'POST',
-      body: { refreshToken: session.refreshToken },
       auth: false,
     })
       .then((data) => {
@@ -160,7 +166,7 @@ async function requestOnce(path, options = {}) {
   try {
     return await doFetch(path, options);
   } catch (error) {
-    const canRetry = error.status === 401 && options.auth !== false && session?.refreshToken;
+    const canRetry = error.status === 401 && options.auth !== false && session?.accessToken;
     if (!canRetry) throw error;
 
     try {
@@ -223,7 +229,7 @@ export const api = {
     try {
       await request('/auth/logout', {
         method: 'POST',
-        body: { refreshToken: session?.refreshToken },
+        body: {},
       });
     } finally {
       clearSession();

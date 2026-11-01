@@ -111,6 +111,7 @@ class Guardianship {
     required this.id,
     required this.permissions,
     required this.status,
+    this.isMainSupervisor = false,
     this.primaryUser,
     this.guardianUser,
     this.nickname,
@@ -120,6 +121,7 @@ class Guardianship {
   final String id;
   final List<SharePermission> permissions;
   final String status;
+  final bool isMainSupervisor;
 
   /// یکی از این دو پر است، بسته به اینکه از کدام سمت نگاه می‌کنیم.
   final RelatedPerson? primaryUser;
@@ -137,6 +139,7 @@ class Guardianship {
       id: Json.str(json, 'id'),
       permissions: SharePermission.parseList(Json.strList(json, 'permissions')),
       status: Json.str(json, 'status', 'active'),
+      isMainSupervisor: Json.boolOf(json, 'isMainSupervisor'),
       primaryUser: RelatedPerson.tryFrom(Json.mapOrNull(json['primaryUser'])),
       guardianUser: RelatedPerson.tryFrom(Json.mapOrNull(json['guardianUser'])),
       nickname: Json.strOrNull(json, 'nickname'),

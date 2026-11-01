@@ -23,6 +23,7 @@ import { raiseAlert } from './alertService.js';
 import { detectGpsLost } from './stopDetector.js';
 import env from '../config/env.js';
 import logger from '../utils/logger.js';
+import { forbidden } from '../utils/errors.js';
 
 const log = logger.child({ module: 'sos' });
 
@@ -58,7 +59,8 @@ export async function triggerSos(userId, payload = {}) {
       lng: payload.lng,
       accuracyM: payload.accuracyM ?? null,
       batteryLevel: payload.batteryLevel ?? null,
-      isSimulated: Boolean(payload.isSimulated),
+      isSimulated: false,
+      source: 'device',
       recordedAt: new Date(),
     });
   } else {
@@ -129,8 +131,17 @@ export async function emergencyContacts(userId) {
 }
 
 /** آخرین هشدار اضطراری باز — برای نمایش نوار قرمز پایدار در داشبورد خانواده. */
-export async function activeSos(userId) {
-  const last = await alertRepository.findLastOfType(userId, ALERT_TYPES.SOS);
+export async function activeSos(viewer, subjectId = viewer.id) {
+  if (subjectId !== viewer.id) {
+    const allowed = await guardianshipRepository.hasPermission(
+      subjectId,
+      viewer.id,
+      PERMISSIONS.EMERGENCY,
+    );
+    if (!allowed) throw forbidden('برای دیدن هشدار اضطراری این کاربر دسترسی ندارید.');
+  }
+
+  const last = await alertRepository.findLastOfType(subjectId, ALERT_TYPES.SOS);
   if (!last || last.resolvedAt) return null;
 
   // هشدار اضطراری قدیمی‌تر از ۶ ساعت دیگر «فعال» تلقی نمی‌شود

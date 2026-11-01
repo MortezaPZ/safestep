@@ -127,7 +127,7 @@ class AppUser {
     this.avatarColor = '#2F6FED',
     this.status = 'active',
     this.createdAt,
-    this.verificationStatus = 'verified',
+    this.verificationStatus = 'unverified',
     this.healthCondition,
   });
 
@@ -152,7 +152,7 @@ class AppUser {
       avatarColor: Json.str(json, 'avatarColor', '#2F6FED'),
       status: Json.str(json, 'status', 'active'),
       createdAt: Json.date(json, 'createdAt'),
-      verificationStatus: Json.str(json, 'verificationStatus', 'verified'),
+      verificationStatus: Json.str(json, 'verificationStatus', 'unverified'),
       healthCondition: Json.strOrNull(json, 'healthCondition'),
     );
   }
@@ -164,6 +164,7 @@ class AppUser {
         'role': role.wire,
         'avatarColor': avatarColor,
         'status': status,
+        'verificationStatus': verificationStatus,
         if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
       };
 

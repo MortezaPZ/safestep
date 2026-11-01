@@ -21,7 +21,7 @@ export function mountZones(container, ctx) {
   let currentLocation = null;
   let map = null;
   let subjectUserId = null;
-  let canEdit = ctx.user?.role !== 'guardian';
+  let canEdit = false;
   let destroyed = false;
 
   /* ─────────────────────── ساخت / ویرایش ─────────────────────── */
@@ -87,6 +87,7 @@ export function mountZones(container, ctx) {
 
       try {
         const preview = await api.previewZone({
+          ...(subjectUserId ? { subjectUserId } : {}),
           centerLat: center.lat,
           centerLng: center.lng,
           radiusM: radius,
@@ -449,13 +450,16 @@ export function mountZones(container, ctx) {
         subjectUserId = first?.primaryUserId ?? first?.primaryUser?.id ?? null;
         canEdit = Boolean(first?.isMainSupervisor);
       }
-      const [zoneResult, status] = await Promise.all([
+      const [zoneResult, locationStatus] = await Promise.all([
         api.safeZones(subjectUserId),
-        api.ownStatus().catch(() => null),
+        ctx.user?.role === 'guardian' && subjectUserId
+          ? api.watchList().then((result) =>
+              (result.watching ?? []).find((entry) => entry.user?.id === subjectUserId) ?? null)
+          : api.ownStatus().catch(() => null),
       ]);
 
       zones = zoneResult.zones ?? [];
-      currentLocation = status?.location ?? null;
+      currentLocation = locationStatus?.location ?? null;
 
       renderAll();
     } catch (error) {

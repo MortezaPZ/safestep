@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import db from './index.js';
 import logger from '../utils/logger.js';
+import sensitiveDataRepository from '../repositories/sensitiveDataRepository.js';
 
 const log = logger.child({ module: 'migrate' });
 const MIGRATIONS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'migrations');
@@ -59,6 +60,7 @@ export async function runMigrations() {
   const pending = files.filter((f) => !applied.has(f));
 
   if (pending.length === 0) {
+    await sensitiveDataRepository.encryptLegacySensitiveData();
     log.info('دیتابیس به‌روز است؛ مهاجرت جدیدی وجود ندارد', { total: files.length });
     return [];
   }
@@ -74,6 +76,8 @@ export async function runMigrations() {
 
     log.info('مهاجرت اعمال شد', { file, ms: Date.now() - started });
   }
+
+  await sensitiveDataRepository.encryptLegacySensitiveData();
 
   return pending;
 }
