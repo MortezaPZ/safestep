@@ -66,3 +66,10 @@ Run the backend suite from the backend directory with npm test.
 - A signed iOS distribution archive has not been verified; see docs/ios-build.md.
 - Map tiles need a network. The API can run without them
 - Production secrets must be long random values. The examples in `.env` files are for local use
+
+## Folder guides
+
+- [`backend/`](<backend/README.md>)
+- [`docs/`](<docs/README.md>)
+- [`mobile/`](<mobile/README.md>)
+- [`web/`](<web/README.md>)
