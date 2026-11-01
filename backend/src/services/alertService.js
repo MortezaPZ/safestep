@@ -27,6 +27,48 @@ import db from '../db/index.js';
 
 const log = logger.child({ module: 'alert' });
 
+const ADMIN_FALL_ALERT_FIELDS = Object.freeze([
+  'id',
+  'userId',
+  'type',
+  'severity',
+  'title',
+  'body',
+  'zoneId',
+  'createdAt',
+]);
+const ADMIN_FALL_METADATA_FIELDS = Object.freeze([
+  'fallEventId',
+  'confidence',
+  'feedback',
+  'manualReport',
+]);
+
+function adminFallAlertPayload(alert) {
+  const payload = Object.fromEntries(
+    ADMIN_FALL_ALERT_FIELDS
+      .filter((field) => Object.hasOwn(alert, field))
+      .map((field) => [field, alert[field]]),
+  );
+  if (alert.subject) {
+    payload.subject = {
+      id: alert.subject.id,
+      fullName: alert.subject.fullName,
+      avatarColor: alert.subject.avatarColor,
+    };
+  }
+  if (Object.hasOwn(alert, 'zoneName')) payload.zoneName = alert.zoneName;
+  payload.metadata = Object.fromEntries(
+    ADMIN_FALL_METADATA_FIELDS
+      .filter((field) => Object.hasOwn(alert.metadata ?? {}, field))
+      .map((field) => [field, alert.metadata[field]]),
+  );
+  payload.lat = null;
+  payload.lng = null;
+  payload.location = null;
+  return payload;
+}
+
 /* ──────────────────────── متن‌سازی هشدارها ──────────────────────── */
 
 /**
@@ -175,8 +217,9 @@ export async function raiseAlert({ userId, type, location, zoneId, context = {},
   // درباره‌اش به خانواده گزارش شده است. شفافیت، شرط استقلال است.
   hub.emitToUsers([...familyRecipientIds, userId], WS_EVENTS.ALERT_NEW, enriched);
   if (adminRecipientIds.length > 0) {
-    // مدیر برای بررسی رخداد به نوع و زمان هشدار نیاز دارد، نه مختصات فرد.
-    const adminAlert = { ...enriched, lat: null, lng: null, location: null };
+    // ادمین فقط داده‌های لازم برای فهم رویداد را می‌گیرد. payload و metadata
+    // هر دو allowlist هستند تا مختصات با افزودن فیلدی تازه نشت نکنند.
+    const adminAlert = adminFallAlertPayload(enriched);
     hub.emitToUsers(adminRecipientIds, WS_EVENTS.ALERT_NEW, adminAlert);
   }
 
