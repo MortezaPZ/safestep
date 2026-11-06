@@ -74,7 +74,7 @@ async function evaluate(cdp, sessionId, expression) {
     awaitPromise: true,
   }, sessionId);
   if (response.exceptionDetails) {
-    throw new Error(response.exceptionDetails.text ?? 'Browser evaluation failed');
+    throw new Error(response.exceptionDetails.exception?.description ?? response.exceptionDetails.text ?? 'Browser evaluation failed');
   }
   return response.result?.value;
 }
@@ -180,6 +180,63 @@ describe('وب‌اپ در مرورگر واقعی', () => {
 
         expect(pageState?.main, pageState?.pageText).toBe(true);
         expect(pageState?.viewText.trim().length, pageState?.pageText).toBeGreaterThan(0);
+
+        const ui = await evaluate(cdp, sessionId, `(async () => {
+          const { default: api } = await import('/js/api.js');
+          const { mountHistory } = await import('/js/views/history.js');
+          const { mountZones } = await import('/js/views/zones.js');
+          const names = ['guardianships', 'historyDays', 'safeZones', 'watchList'];
+          const original = Object.fromEntries(names.map((name) => [name, api[name]]));
+          const links = [
+            { primaryUserId: 'a', primaryUser: { id: 'a', fullName: 'A' }, permissions: ['view_location'], isMainSupervisor: false },
+            { primaryUserId: 'b', primaryUser: { id: 'b', fullName: 'B' }, permissions: ['view_location', 'emergency'], isMainSupervisor: true },
+            { primaryUserId: 'c', primaryUser: { id: 'c', fullName: 'C' }, permissions: ['view_location', 'emergency'], isMainSupervisor: false },
+          ];
+          const historyCalls = [], zoneCalls = [];
+          const wait = async (predicate, stage) => {
+            for (let i = 0; i < 100; i++) { if (predicate()) return; await new Promise((r) => setTimeout(r, 20)); }
+            throw new Error('UI did not reach ' + stage + ': ' + container.textContent);
+          };
+          const container = document.createElement('div'); document.body.append(container);
+          let cleanup = () => {};
+          try {
+            api.guardianships = async () => ({ primaries: links });
+            api.historyDays = async (id) => { historyCalls.push(id); return { days: [] }; };
+            api.safeZones = async (id) => { zoneCalls.push(id); return { zones: [] }; };
+            api.watchList = async () => ({ watching: [] });
+            const ctx = { user: { id: 'guardian', role: 'guardian' } };
+            cleanup = mountHistory(container, ctx, { userId: 'b' });
+            await wait(() => container.querySelector('select[aria-label="انتخاب کاربر برای نمایش تاریخچه"]'), 'history picker');
+            const historySelect = container.querySelector('select');
+            const historyOptions = [...historySelect.options].map((option) => option.value);
+            historySelect.value = 'c'; historySelect.dispatchEvent(new Event('change', { bubbles: true }));
+            await wait(() => historyCalls.includes('c'), 'history selection');
+            cleanup(); container.replaceChildren();
+            api.guardianships = async () => ({ primaries: [links[0]] });
+            cleanup = mountHistory(container, ctx);
+            await wait(() => container.textContent.includes('دسترسی اضطراری برای تاریخچه وجود ندارد'), 'no permission');
+            const noPermissionMessage = container.textContent.includes('دسترسی اضطراری برای تاریخچه وجود ندارد');
+            cleanup(); container.replaceChildren();
+            api.guardianships = async () => ({ primaries: links });
+            cleanup = mountZones(container, ctx);
+            await wait(() => container.querySelector('select[aria-label="انتخاب کاربر برای محدوده‌ها"]'), 'zones picker');
+            const zoneSelect = container.querySelector('select');
+            const zoneInitial = zoneSelect.value;
+            const editInitially = container.textContent.includes('محدوده‌ی جدید');
+            zoneSelect.value = 'a'; zoneSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            await wait(() => zoneCalls.includes('a') && container.textContent.includes('فقط مشاهده'), 'zone selection');
+            return { historyCalls, historyOptions, noPermissionMessage, zoneCalls, zoneInitial, editInitially };
+          } finally {
+            cleanup(); container.remove();
+            for (const name of names) api[name] = original[name];
+          }
+        })()`);
+        expect(ui.historyOptions).toEqual(['b', 'c']);
+        expect(ui.historyCalls).toEqual(['b', 'c']);
+        expect(ui.noPermissionMessage).toBe(true);
+        expect(ui.zoneInitial).toBe('b');
+        expect(ui.editInitially).toBe(true);
+        expect(ui.zoneCalls).toEqual(['b', 'a']);
       } finally {
         cdp?.close();
         if (browser.exitCode === null) {

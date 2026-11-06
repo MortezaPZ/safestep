@@ -67,16 +67,21 @@ export function createApp() {
     }),
   );
 
-  app.use(
-    cors({
-      origin(origin, callback) {
-        // درخواست بدون Origin (اپ موبایل، curl) مجاز است
-        if (!origin || env.corsOrigins.includes(origin)) return callback(null, true);
-        return callback(new Error('این مبدأ اجازه‌ی دسترسی ندارد.'));
-      },
-      credentials: true,
-    }),
-  );
+  app.use((req, res, next) => {
+    const origin = req.get('Origin');
+    if (!origin) return next();
+    let sameOrigin = false;
+    try {
+      const parsed = new URL(origin);
+      const requestOrigin = new URL(`${req.protocol}://${req.get('Host')}`).origin;
+      sameOrigin = origin === parsed.origin && parsed.origin === requestOrigin;
+    } catch { /* Invalid origins are denied below. */ }
+    if (!sameOrigin && !env.corsOrigins.includes(origin)) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'این مبدأ اجازه‌ی دسترسی ندارد.' } });
+    }
+    return next();
+  });
+  app.use(cors({ origin: true, credentials: true }));
 
   // مدارک می‌توانند به‌صورت data URL تصویر ارسال شوند؛ سقف با اعتبارسنجی
   // endpoint مدارک هم‌راستا است تا تصویر قبل از رسیدن به route قطع نشود.

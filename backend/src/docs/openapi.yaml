@@ -729,6 +729,31 @@ paths:
                 properties:
                   settings: { $ref: '#/components/schemas/Settings' }
 
+  /locations/tracking:
+    put:
+      tags: [موقعیت]
+      summary: اعلام شروع یا توقف دستی ردیابی توسط کاربر اصلی
+      description: مستقل از اشتراک‌گذاری است؛ توقف دستی هشدار قطع GPS را متوقف می‌کند و شروع دوباره مهلت تازه می‌دهد.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [active]
+              properties:
+                active: { type: boolean }
+      responses:
+        '200':
+          description: وضعیت ثبت‌شده در سرور
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trackingActive: { type: boolean }
+        '403': { description: فقط کاربر اصلی مجاز است }
+
   # ═══════════════════════════ محدوده‌های امن ═══════════════════════════
 
   /safe-zones:
@@ -854,6 +879,29 @@ paths:
                   countsByType:
                     type: object
                     additionalProperties: { type: integer }
+
+  /alerts/{id}/delivery-receipt:
+    post:
+      tags: [هشدارها]
+      summary: ثبت رسید FCM از گیرندهٔ احراز هویت‌شده
+      description: |
+        زمان نخستین callback احرازشده در سرور ثبت می‌شود. این رسید خوداظهاری است،
+        تأخیر شبکه را در بر دارد و دریافت واقعی یا نمایش اعلان روی گوشی را به‌تنهایی اثبات نمی‌کند.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: رسید ثبت شد یا قبلاً ثبت شده بود
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  receivedAt: { type: string, format: date-time }
+        '404': { description: هشدار یا گیرندهٔ صف FCM یافت نشد }
 
   /alerts/{id}/read:
     post:
@@ -1902,11 +1950,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [lat, lng, accuracyM]
+              required: [lat, lng, accuracyM, environment]
               properties:
                 lat: { type: number, minimum: -90, maximum: 90 }
                 lng: { type: number, minimum: -180, maximum: 180 }
                 accuracyM: { type: number, minimum: 0, maximum: 10000 }
+                environment: { type: string, enum: [open, urban] }
       responses:
         '201': { description: خطای GPS و دقت اعلامی ذخیره شد }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -1935,6 +1984,26 @@ paths:
                   items: { type: integer, minimum: 1, maximum: 5 }
       responses:
         '201': { description: پاسخ و نمره ذخیره شد }
+
+  /evaluation/export/{dataset}:
+    get:
+      tags: [ارزیابی میدانی]
+      summary: خروجی CSV دادهٔ پژوهشی برای مدیر
+      description: بدون نام حساب یا مختصات؛ شناسه‌ها همچنان قابل پیوند هستند و رسید FCM خوداظهاری است.
+      parameters:
+        - in: path
+          name: dataset
+          required: true
+          schema:
+            type: string
+            enum: [location_reference_samples, sus_responses, alert_deliveries, fall_events, location_telemetry]
+      responses:
+        '200':
+          description: فایل CSV
+          content:
+            text/csv:
+              schema: { type: string }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /evaluation/summary:
     get:

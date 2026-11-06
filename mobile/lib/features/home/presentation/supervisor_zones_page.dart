@@ -12,13 +12,15 @@ import '../../../core/widgets/app_snackbar.dart';
 import '../../tracking/presentation/zone_overlay.dart';
 import '../../watching/domain/watched_person.dart';
 import '../../watching/presentation/watching_controller.dart';
+import '../../settings/domain/document_policy.dart';
 
 /// تعریف محدوده امن، فقط برای ناظر اصلی.
 class SupervisorZonesPage extends ConsumerStatefulWidget {
   const SupervisorZonesPage({super.key});
 
   @override
-  ConsumerState<SupervisorZonesPage> createState() => _SupervisorZonesPageState();
+  ConsumerState<SupervisorZonesPage> createState() =>
+      _SupervisorZonesPageState();
 }
 
 class _SupervisorZonesPageState extends ConsumerState<SupervisorZonesPage> {
@@ -61,7 +63,8 @@ class _SupervisorZonesPageState extends ConsumerState<SupervisorZonesPage> {
     final String? subjectId = _subjectId;
     if (subjectId == null) return;
     try {
-      final Map<String, dynamic> data = await ref.read(apiClientProvider).get<Map<String, dynamic>>(
+      final Map<String, dynamic> data =
+          await ref.read(apiClientProvider).get<Map<String, dynamic>>(
         ApiEndpoints.safeZones,
         (dynamic raw) => Map<String, dynamic>.from(raw as Map),
         query: <String, dynamic>{'subjectUserId': subjectId},
@@ -91,7 +94,8 @@ class _SupervisorZonesPageState extends ConsumerState<SupervisorZonesPage> {
     try {
       await ref.read(apiClientProvider).post<Map<String, dynamic>>(
         ApiEndpoints.safeZones,
-        (dynamic raw) => raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{},
+        (dynamic raw) =>
+            raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{},
         body: <String, dynamic>{
           'name': name,
           'centerLat': lat,
@@ -120,20 +124,24 @@ class _SupervisorZonesPageState extends ConsumerState<SupervisorZonesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final List<WatchedPerson> mains = ref.watch(watchingControllerProvider).people
+    final List<WatchedPerson> mains = ref
+        .watch(watchingControllerProvider)
+        .people
         .where((WatchedPerson person) => person.isMainSupervisor)
         .toList();
     return AppScaffold(
       title: 'ابزار ناظر اصلی',
       body: ListView(
-        padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.xl),
+        padding:
+            const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.xl),
         children: <Widget>[
           if (mains.isEmpty)
             const Text('فقط ناظر اصلی می‌تواند محدوده امن تعریف کند.')
           else ...<Widget>[
             DropdownButton<String>(
               isExpanded: true,
-              value: _subjectId != null && mains.any((WatchedPerson p) => p.userId == _subjectId)
+              value: _subjectId != null &&
+                      mains.any((WatchedPerson p) => p.userId == _subjectId)
                   ? _subjectId
                   : mains.first.userId,
               items: <DropdownMenuItem<String>>[
@@ -151,7 +159,8 @@ class _SupervisorZonesPageState extends ConsumerState<SupervisorZonesPage> {
             const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _name,
-              decoration: const InputDecoration(hintText: 'نام محدوده، مثلاً خانه'),
+              decoration:
+                  const InputDecoration(hintText: 'نام محدوده، مثلاً خانه'),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
@@ -167,14 +176,16 @@ class _SupervisorZonesPageState extends ConsumerState<SupervisorZonesPage> {
             const SizedBox(height: AppSpacing.lg),
             const _PrimaryDocumentsForm(),
             const SizedBox(height: AppSpacing.lg),
-            Text('محدوده‌های فعلی', style: Theme.of(context).textTheme.titleMedium),
+            Text('محدوده‌های فعلی',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             if (_zones.isEmpty)
               const Text('هنوز محدوده‌ای نیست.')
             else
               for (final MapZone zone in _zones)
                 AppCard(
-                  child: Text('${zone.name} — شعاع ${zone.radiusM.round()} متر'),
+                  child:
+                      Text('${zone.name} — شعاع ${zone.radiusM.round()} متر'),
                 ),
           ],
         ],
@@ -187,7 +198,8 @@ class _PrimaryDocumentsForm extends ConsumerStatefulWidget {
   const _PrimaryDocumentsForm();
 
   @override
-  ConsumerState<_PrimaryDocumentsForm> createState() => _PrimaryDocumentsFormState();
+  ConsumerState<_PrimaryDocumentsForm> createState() =>
+      _PrimaryDocumentsFormState();
 }
 
 class _PrimaryDocumentsFormState extends ConsumerState<_PrimaryDocumentsForm> {
@@ -234,15 +246,18 @@ class _PrimaryDocumentsFormState extends ConsumerState<_PrimaryDocumentsForm> {
       final String condition = _condition.text.trim();
       if (condition.length >= 2) body['healthCondition'] = condition;
       await ref.read(apiClientProvider).post<Map<String, dynamic>>(
-        '/documents',
-        (dynamic raw) => raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{},
-        body: body,
-      );
+            '/documents',
+            (dynamic raw) => raw is Map
+                ? Map<String, dynamic>.from(raw)
+                : <String, dynamic>{},
+            body: body,
+          );
       _condition.clear();
       if (mounted) {
         setState(() {
           _image = null;
-          _status = 'مدرک برای تأیید مدیر ارسال شد. مشکل کنار اسم، بعد از تأیید دیده می‌شود.';
+          _status =
+              'مدرک برای تأیید مدیر ارسال شد. مشکل کنار اسم، بعد از تأیید دیده می‌شود.';
         });
       }
     } catch (error) {
@@ -258,25 +273,31 @@ class _PrimaryDocumentsFormState extends ConsumerState<_PrimaryDocumentsForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text('ارسال مدارک کاربر اصلی', style: Theme.of(context).textTheme.titleMedium),
+          Text('ارسال مدارک کاربر اصلی',
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
-          const Text('ناظر اصلی می‌تواند مدرک هویت کاربر اصلی را برای تأیید مدیر بفرستد.'),
+          const Text(
+              'ناظر اصلی می‌تواند مدرک هویت کاربر اصلی را برای تأیید مدیر بفرستد.'),
           const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: _condition,
-            decoration: const InputDecoration(hintText: 'مشکل شخص، مثلاً مشکل قلب'),
+            maxLength: DocumentPolicy.healthConditionMaxLength,
+            decoration:
+                const InputDecoration(hintText: 'مشکل شخص، مثلاً مشکل قلب'),
           ),
           const SizedBox(height: AppSpacing.sm),
           OutlinedButton.icon(
             onPressed: _busy ? null : _pickImage,
             icon: const Icon(Icons.photo_library_outlined),
-            label: Text(_image == null ? 'انتخاب تصویر مدرک' : 'تغییر تصویر مدرک'),
+            label:
+                Text(_image == null ? 'انتخاب تصویر مدرک' : 'تغییر تصویر مدرک'),
           ),
           if (_image != null) ...<Widget>[
             const SizedBox(height: AppSpacing.sm),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.memory(_image!.bytes, height: 160, fit: BoxFit.contain),
+              child:
+                  Image.memory(_image!.bytes, height: 160, fit: BoxFit.contain),
             ),
           ],
           const SizedBox(height: AppSpacing.sm),

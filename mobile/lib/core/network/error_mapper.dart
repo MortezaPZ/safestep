@@ -82,7 +82,8 @@ class ErrorMapper {
       final Map<dynamic, dynamic> err = body['error'] as Map<dynamic, dynamic>;
       final Object? message = err['message'];
       final Object? code = err['code'];
-      if (message is String && message.trim().isNotEmpty) serverMessage = message;
+      if (message is String && message.trim().isNotEmpty)
+        serverMessage = message;
       if (code is String) serverCode = code;
 
       // خطاهای فیلد‌به‌فیلدِ zod: [{ field, message }, ...]
@@ -90,7 +91,9 @@ class ErrorMapper {
       if (details is List) {
         final Map<String, String> map = <String, String>{};
         for (final Object? item in details) {
-          if (item is Map && item['field'] is String && item['message'] is String) {
+          if (item is Map &&
+              item['field'] is String &&
+              item['message'] is String) {
             map[item['field'] as String] = item['message'] as String;
           }
         }
@@ -145,6 +148,7 @@ class ErrorMapper {
           code: serverCode ?? 'TOO_MANY_REQUESTS',
           // قابل تلاش دوباره هست، ولی نه همین حالا
           retryable: false,
+          retryAfter: _retryAfter(response),
         );
 
       default:
@@ -154,6 +158,24 @@ class ErrorMapper {
           code: serverCode ?? 'HTTP_$status',
           kind: AppErrorKind.server,
         );
+    }
+  }
+
+  static Duration? _retryAfter(Response<dynamic>? response) {
+    final String? raw = response?.headers.value('retry-after')?.trim();
+    if (raw == null || raw.isEmpty) return null;
+
+    final int? seconds = int.tryParse(raw);
+    if (seconds != null) {
+      return Duration(seconds: seconds < 0 ? 0 : seconds);
+    }
+
+    try {
+      final DateTime retryAt = HttpDate.parse(raw).toUtc();
+      final Duration delay = retryAt.difference(DateTime.now().toUtc());
+      return delay.isNegative ? Duration.zero : delay;
+    } on FormatException {
+      return null;
     }
   }
 }

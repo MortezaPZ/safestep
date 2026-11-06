@@ -141,7 +141,14 @@ class _TrackingCardState extends ConsumerState<TrackingCard>
 
     if (!value) {
       await controller.stop();
-      if (mounted) A11y.announce(context, 'ارسال موقعیت متوقف شد');
+      if (!mounted) return;
+      final String? syncError =
+          ref.read(trackingControllerProvider).trackingSyncError;
+      if (syncError != null) {
+        AppSnackBar.show(context, syncError, kind: AppSnackKind.error);
+      } else {
+        A11y.announce(context, 'ارسال موقعیت متوقف شد');
+      }
       return;
     }
 
@@ -177,11 +184,18 @@ class _TrackingCardState extends ConsumerState<TrackingCard>
     if (!mounted) return;
 
     if (started) {
+      final String? syncError =
+          ref.read(trackingControllerProvider).trackingSyncError;
+      if (syncError != null) {
+        AppSnackBar.show(context, syncError, kind: AppSnackKind.warning);
+        return;
+      }
       AppHaptics.success(ref);
       A11y.announce(context, 'ارسال موقعیت آغاز شد');
     } else {
-      final String message = ref.read(trackingControllerProvider).error?.message ??
-          'شروع ردیابی ممکن نشد.';
+      final String message =
+          ref.read(trackingControllerProvider).error?.message ??
+              'شروع ردیابی ممکن نشد.';
       AppSnackBar.show(context, message, kind: AppSnackKind.error);
     }
   }
@@ -231,7 +245,26 @@ class _TrackingCardState extends ConsumerState<TrackingCard>
             const Divider(height: AppSpacing.lg),
             Text(
               'سرویس پس‌زمینه روشن نشد؛ با بسته شدن اپ، ارسال موقعیت ممکن است قطع شود.',
-              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.warning),
+              style:
+                  theme.textTheme.bodySmall?.copyWith(color: AppColors.warning),
+            ),
+          ],
+
+          if (state.trackingSyncError != null) ...<Widget>[
+            const Divider(height: AppSpacing.lg),
+            Text(
+              state.trackingSyncError!,
+              style:
+                  theme.textTheme.bodySmall?.copyWith(color: AppColors.danger),
+            ),
+          ],
+
+          if (state.fallSensorWarning != null) ...<Widget>[
+            const Divider(height: AppSpacing.lg),
+            Text(
+              state.fallSensorWarning!,
+              style:
+                  theme.textTheme.bodySmall?.copyWith(color: AppColors.warning),
             ),
           ],
 
@@ -280,7 +313,8 @@ class _TrackingCardState extends ConsumerState<TrackingCard>
           ],
 
           // مکان‌یاب خاموش است
-          if (state.permission == LocationPermissionState.serviceDisabled) ...<Widget>[
+          if (state.permission ==
+              LocationPermissionState.serviceDisabled) ...<Widget>[
             const Divider(height: AppSpacing.lg),
             AppButton(
               label: 'روشن کردن مکان‌یاب گوشی',

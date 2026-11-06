@@ -21,8 +21,10 @@ export function mountZones(container, ctx) {
   let currentLocation = null;
   let map = null;
   let subjectUserId = null;
+  let primaries = [];
   let canEdit = false;
   let destroyed = false;
+  let loadVersion = 0;
 
   /* ─────────────────────── ساخت / ویرایش ─────────────────────── */
 
@@ -421,6 +423,20 @@ export function mountZones(container, ctx) {
           ),
           el('div', { style: { padding: 'var(--space-3)' } }, renderMapCard()),
           el('div.card__body', {},
+            ctx.user?.role === 'guardian' && primaries.length > 1
+              ? el('label.field.mb-4', {},
+                  el('span.field__label', { text: 'کاربر اصلی' }),
+                  el('select.input', {
+                    value: subjectUserId,
+                    ariaLabel: 'انتخاب کاربر برای محدوده‌ها',
+                    onChange: (event) => { subjectUserId = event.target.value; load(); },
+                  }, ...primaries.map((item) => {
+                    const id = item.primaryUserId ?? item.primaryUser?.id;
+                    return el('option', { value: id, selected: String(id) === String(subjectUserId),
+                      text: item.primaryUser?.fullName ?? item.nickname ?? 'کاربر اصلی' });
+                  })),
+                )
+              : null,
             zones.length > 0
               ? el('div', {}, ...zones.map(renderZoneRow))
               : emptyState({
@@ -438,6 +454,7 @@ export function mountZones(container, ctx) {
   }
 
   async function load() {
+    const version = ++loadVersion;
     if (container.childElementCount === 0) {
       render(container, el('div.skeleton.skeleton--map.mb-4'), ...skeleton('row', 3));
     }
@@ -445,24 +462,35 @@ export function mountZones(container, ctx) {
     try {
       if (ctx.user?.role === 'guardian') {
         const links = await api.guardianships();
-        const primaries = links.primaries ?? links.watching ?? [];
-        const first = primaries[0];
-        subjectUserId = first?.primaryUserId ?? first?.primaryUser?.id ?? null;
-        canEdit = Boolean(first?.isMainSupervisor);
+        if (destroyed || version !== loadVersion) return;
+        primaries = (links.primaries ?? links.watching ?? []).filter((item) =>
+          (item.primaryUserId ?? item.primaryUser?.id) && (item.permissions ?? []).includes('view_location'));
+        const selected = primaries.find((item) => String(item.primaryUserId ?? item.primaryUser?.id) === String(subjectUserId))
+          ?? primaries.find((item) => item.isMainSupervisor) ?? primaries[0];
+        subjectUserId = selected?.primaryUserId ?? selected?.primaryUser?.id ?? null;
+        canEdit = Boolean(selected?.isMainSupervisor);
+        if (!subjectUserId) {
+          render(container, emptyState({ icon: '📍', title: 'کاربر مجازی برای نمایش محدوده نیست',
+            text: 'برای دیدن محدوده، دسترسی مشاهدهٔ موقعیت لازم است.' }));
+          return;
+        }
       }
+      const requestedSubjectId = subjectUserId;
       const [zoneResult, locationStatus] = await Promise.all([
-        api.safeZones(subjectUserId),
-        ctx.user?.role === 'guardian' && subjectUserId
+        api.safeZones(requestedSubjectId),
+        ctx.user?.role === 'guardian' && requestedSubjectId
           ? api.watchList().then((result) =>
-              (result.watching ?? []).find((entry) => entry.user?.id === subjectUserId) ?? null)
+              (result.watching ?? []).find((entry) => entry.user?.id === requestedSubjectId) ?? null)
           : api.ownStatus().catch(() => null),
       ]);
 
+      if (destroyed || version !== loadVersion) return;
       zones = zoneResult.zones ?? [];
       currentLocation = locationStatus?.location ?? null;
 
       renderAll();
     } catch (error) {
+      if (destroyed || version !== loadVersion) return;
       render(container, errorState({ text: error.message, onRetry: load }));
     }
   }

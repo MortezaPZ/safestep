@@ -24,6 +24,8 @@ process.env.NODE_ENV = 'production';
 process.env.JWT_ACCESS_SECRET = 'test-secret-not-default-0123456789abcdef0123456789abcdef';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-not-default-0123456789abcdef0123456789';
 process.env.INVITE_CODE_PEPPER = 'test-pepper-not-default-0123456789abcdef0123456789';
+process.env.IDENTITY_DATA_ENCRYPTION_KEY = 'test-identity-encryption-0123456789abcdef';
+process.env.DEMO_MODE = 'false';
 
 const { createApp } = await import('../src/app.js');
 const { default: db } = await import('../src/db/index.js');
@@ -71,7 +73,8 @@ describe('قفل مدارک', () => {
     app = await createApp();
     await runMigrations();
     const { seed } = await import('../src/db/seed.js');
-    await seed();
+    // Production-mode middleware is exercised against PGlite memory only.
+    await seed({ allowProduction: true });
   }, 90_000);
 
   afterAll(async () => {

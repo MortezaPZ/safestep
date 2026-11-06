@@ -468,7 +468,10 @@ async function createDevices(users) {
 
 /* ═══════════════════════════ اجرا ═══════════════════════════ */
 
-export async function seed() {
+export async function seed({ allowProduction = false } = {}) {
+  if (env.isProduction && !allowProduction) {
+    throw new Error('اجرای seed در production ممنوع است؛ فقط با --allow-production-seed صریح اجرا کنید.');
+  }
   await db.connect();
   await runMigrations();
 
@@ -488,7 +491,7 @@ const isDirectRun = process.argv[1]?.replace(/\\/g, '/').endsWith('db/seed.js');
 
 if (isDirectRun) {
   try {
-    const result = await seed();
+    const result = await seed({ allowProduction: process.argv.slice(2).includes('--allow-production-seed') });
 
     const lines = [
       '',

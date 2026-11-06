@@ -29,6 +29,7 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
   bool _samplingReference = false;
   bool _loadingSus = true;
   bool _submittingSus = false;
+  String _sampleEnvironment = 'open';
   String? _referenceError;
   String? _susError;
   String? _referenceMessage;
@@ -205,7 +206,8 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
       final LocationPermissionService permissions = ref.read(
         locationPermissionServiceProvider,
       );
-      final LocationPermissionState permission = await permissions.requestForeground();
+      final LocationPermissionState permission =
+          await permissions.requestForeground();
       if (permission != LocationPermissionState.granted &&
           permission != LocationPermissionState.whileInUseOnly) {
         throw StateError('location_permission');
@@ -218,22 +220,28 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
         lat: position.latitude,
         lng: position.longitude,
         accuracyM: position.accuracy,
+        environment: _sampleEnvironment,
       );
       if (!mounted) return;
       setState(() => _referenceMessage = sample.valid
           ? (_isPersian
-              ? 'نمونه ثبت شد: خطای ${Fa.distance(sample.errorM)}، دقت اعلامی ${Fa.distance(sample.accuracyM)}.'
-              : 'Sample recorded: ${Fa.distance(sample.errorM)} error, ${Fa.distance(sample.accuracyM)} reported accuracy.')
+              ? 'نمونه ثبت شد و در آمار کلی آمده است: خطای ${Fa.distance(sample.errorM)}، دقت اعلامی ${Fa.distance(sample.accuracyM)}؛ valid=true فقط برچسب کیفیت است.'
+              : 'Sample recorded and included in overall stats: ${Fa.distance(sample.errorM)} error, ${Fa.distance(sample.accuracyM)} reported accuracy; valid=true is only a quality label.')
           : (_isPersian
-              ? 'نمونه با دقت ${Fa.distance(sample.accuracyM)} ثبت شد اما برای محاسبه‌ی معتبر (حداکثر ۳۰ متر) پذیرفته نیست.'
-              : 'Sample recorded, but ${Fa.distance(sample.accuracyM)} reported accuracy exceeds the 30 m validity limit.'));
+              ? 'نمونه ثبت شد و در آمار کلی آمده است. دقت اعلامی ${Fa.distance(sample.accuracyM)} بیشتر از ۳۰ متر است؛ valid=false فقط برچسب کیفیت این نمونه است.'
+              : 'Sample recorded and included in overall stats. Reported accuracy ${Fa.distance(sample.accuracyM)} exceeds 30 m; valid=false is only this sample’s quality label.'));
     } catch (error) {
       if (!mounted) return;
-      final String message = error is StateError && error.message == 'save_reference_first'
-          ? (_isPersian ? 'ابتدا نقطه‌ی مرجع نقشه‌برداری‌شده را ذخیره کنید.' : 'Save the surveyed reference point first.')
-          : error is StateError && error.message == 'location_permission'
-              ? (_isPersian ? 'برای ثبت نمونه، مجوز مکان لازم است.' : 'Location permission is required to record a sample.')
-              : _message(error);
+      final String message =
+          error is StateError && error.message == 'save_reference_first'
+              ? (_isPersian
+                  ? 'ابتدا نقطه‌ی مرجع نقشه‌برداری‌شده را ذخیره کنید.'
+                  : 'Save the surveyed reference point first.')
+              : error is StateError && error.message == 'location_permission'
+                  ? (_isPersian
+                      ? 'برای ثبت نمونه، مجوز مکان لازم است.'
+                      : 'Location permission is required to record a sample.')
+                  : _message(error);
       setState(() => _referenceError = message);
     } finally {
       if (mounted) setState(() => _samplingReference = false);
@@ -383,6 +391,31 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
+              DropdownButtonFormField<String>(
+                key: const Key('evaluation-environment-selector'),
+                initialValue: _sampleEnvironment,
+                decoration: InputDecoration(
+                  labelText: fa ? 'محیط نمونه‌برداری' : 'Sample environment',
+                ),
+                items: <DropdownMenuItem<String>>[
+                  DropdownMenuItem<String>(
+                    value: 'open',
+                    child: Text(fa ? 'فضای باز' : 'Open environment'),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'urban',
+                    child: Text(fa ? 'محیط شهری' : 'Urban environment'),
+                  ),
+                ],
+                onChanged: _samplingReference
+                    ? null
+                    : (String? environment) {
+                        if (environment != null) {
+                          setState(() => _sampleEnvironment = environment);
+                        }
+                      },
+              ),
+              const SizedBox(height: AppSpacing.sm),
               OutlinedButton.icon(
                 onPressed: _capturing ? null : _fillFromGps,
                 icon: _capturing
@@ -416,9 +449,14 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
               OutlinedButton.icon(
                 onPressed: _samplingReference ? null : _recordReferenceSample,
                 icon: _samplingReference
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.my_location_outlined),
-                label: Text(fa ? 'ثبت نمونه‌ی GPS در همین نقطه' : 'Record GPS sample at this point'),
+                label: Text(fa
+                    ? 'ثبت نمونه‌ی GPS در همین نقطه'
+                    : 'Record GPS sample at this point'),
               ),
               if (_referenceError != null) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),

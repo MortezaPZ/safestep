@@ -47,6 +47,9 @@ function printBanner() {
 
 async function start() {
   assertProductionSecrets();
+  if (env.isProduction && !env.corsOriginsConfigured) {
+    log.warn('CORS_ORIGINS تنظیم نشده است؛ فقط مبدأ همسان و مبدأ پیش‌فرض مجاز هستند.');
+  }
 
   await db.connect();
   await runMigrations();

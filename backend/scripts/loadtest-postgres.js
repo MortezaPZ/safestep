@@ -19,9 +19,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import autocannon from 'autocannon';
+import { closeLoadServer, roundedMetric } from './loadtest-helpers.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const REPORT_DIR = path.resolve(ROOT, '../docs/evaluation');
+const REPORT_DIR = process.env.LOADTEST_REPORT_DIR
+  ? path.resolve(process.env.LOADTEST_REPORT_DIR)
+  : path.resolve(ROOT, '../docs/evaluation');
 const PASSWORD = 'Load@1234';
 
 // این مقادیر باید قبل از import کردن config تنظobuf شوند تا env.db.driver
@@ -169,7 +172,7 @@ function percentile(values, fraction) {
 function summarize(result, responseLatencies) {
   return {
     requests: result.requests.total,
-    throughput: result.throughput.mean,
+    achievedRate: result.requests.average ?? result.requests.mean ?? result.requests.total / result.duration,
     errors: result.errors + result.non2xx,
     p50: percentile(responseLatencies, 0.50),
     p95: percentile(responseLatencies, 0.95),
@@ -240,11 +243,11 @@ function toMd(rows, { probe, poolBefore, poolAfter, telemetry, duration }) {
       `(حداکثر اتصال پیکربندی‌شده: ${probe.maxConnections ?? 'نامعلوم'})`,
     `مدت هر سناریو: ${duration} ثانیه. درایور: pg. پنجاه کاربر اصلی با توکن مستقل استفاده شدند.`,
     '',
-    '| سناریو | درخواست | میانگین ms | p50 | p95 | p99 | خطا |',
-    '| --- | --- | --- | --- | --- | --- | --- |',
+    '| سناریو | درخواست | نرخ محقق درخواست/ثانیه | میانگین ms | p50 | p95 | p99 | خطا |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- |',
   ];
   for (const r of rows) {
-    lines.push(`| ${r.title} | ${r.requests} | ${r.mean} | ${r.p50} | ${r.p95} | ${r.p99} | ${r.errors} |`);
+    lines.push(`| ${r.title} | ${r.requests} | ${roundedMetric(r.achievedRate)} | ${roundedMetric(r.mean)} | ${roundedMetric(r.p50)} | ${roundedMetric(r.p95)} | ${roundedMetric(r.p99)} | ${r.errors} |`);
   }
   if (poolBefore || poolAfter) {
     lines.push('');
@@ -367,7 +370,7 @@ async function main() {
   process.stdout.write(md);
   process.stdout.write(`\nwrote ${file}\n`);
 
-  server.close();
+  await closeLoadServer(server);
   await telemetryService.flushAll().catch(() => {});
   await db.close();
 }

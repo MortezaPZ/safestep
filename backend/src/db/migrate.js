@@ -11,11 +11,15 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import db from './index.js';
+import env from '../config/env.js';
 import logger from '../utils/logger.js';
 import sensitiveDataRepository from '../repositories/sensitiveDataRepository.js';
+import { assertProductionSecrets } from '../config/env.js';
 
 const log = logger.child({ module: 'migrate' });
 const MIGRATIONS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'migrations');
+const MIGRATION_LOCK_ID = '741234567890123456';
+let migrationQueue = Promise.resolve();
 
 /** فقط نام‌هایی با این الگو پذیرفته می‌شوند — هم نظم می‌آورد و هم جلوی تزریق در INSERT را می‌گیرد. */
 const VALID_NAME = /^\d{3}_[a-z0-9_]+\.sql$/;
@@ -52,7 +56,32 @@ async function migrationFiles() {
  * @returns {Promise<string[]>} فهرست مهاجرت‌هایی که در این اجرا اعمال شدند
  */
 export async function runMigrations() {
+  const run = migrationQueue.then(runMigrationsQueued, runMigrationsQueued);
+  // A failed run must not poison later PGlite or same-process callers.
+  migrationQueue = run.catch(() => {});
+  return run;
+}
+
+async function runMigrationsQueued() {
+  assertProductionSecrets();
   await db.connect();
+
+  const runLocked = async () => {
+    // Check existing ciphertext before any schema changes or legacy encryption.
+    await sensitiveDataRepository.assertSensitiveKeyReadable();
+    return applyPendingMigrations();
+  };
+
+  // PGlite has one connection and no cross-process advisory-lock facility.
+  // The module queue above serializes its callers; PostgreSQL additionally
+  // uses a dedicated session lock shared by every server process.
+  if (env.db.driver === 'pg') {
+    return withPostgresAdvisoryLock(runLocked);
+  }
+  return runLocked();
+}
+
+async function applyPendingMigrations() {
   await ensureMigrationsTable();
 
   const applied = await appliedVersions();
@@ -60,6 +89,7 @@ export async function runMigrations() {
   const pending = files.filter((f) => !applied.has(f));
 
   if (pending.length === 0) {
+    await sensitiveDataRepository.assertSensitiveKeyReadable();
     await sensitiveDataRepository.encryptLegacySensitiveData();
     log.info('دیتابیس به‌روز است؛ مهاجرت جدیدی وجود ندارد', { total: files.length });
     return [];
@@ -77,9 +107,53 @@ export async function runMigrations() {
     log.info('مهاجرت اعمال شد', { file, ms: Date.now() - started });
   }
 
+  await sensitiveDataRepository.assertSensitiveKeyReadable();
   await sensitiveDataRepository.encryptLegacySensitiveData();
 
   return pending;
+}
+
+/**
+ * Serialize schema upgrades across independent PostgreSQL processes.
+ * The lock client is dedicated because advisory locks are session-scoped;
+ * using a pooled query could release it as soon as the pool chooses another
+ * connection. Closing the dedicated client also releases the lock on errors.
+ */
+export async function withPostgresAdvisoryLock(work, createClient) {
+  let client;
+  let locked = false;
+  try {
+    if (createClient) {
+      client = await createClient();
+    } else {
+      const { Client } = await import('pg');
+      client = new Client({ connectionString: env.db.url });
+    }
+    await client.connect();
+    await client.query('SELECT pg_advisory_lock($1::bigint)', [MIGRATION_LOCK_ID]);
+    locked = true;
+    return await work();
+  } finally {
+    if (client) {
+      if (locked) {
+        try {
+          await client.query('SELECT pg_advisory_unlock($1::bigint)', [MIGRATION_LOCK_ID]);
+        } catch (error) {
+          // Closing the session below is the final release path if UNLOCK fails.
+          log.error('آزاد کردن قفل مهاجرت ناموفق بود؛ اتصال اختصاصی بسته می‌شود', {
+            error: error.message,
+          });
+        }
+      }
+      try {
+        await client.end();
+      } catch (error) {
+        log.error('بستن اتصال اختصاصی قفل مهاجرت ناموفق بود', {
+          error: error.message,
+        });
+      }
+    }
+  }
 }
 
 // اگر مستقیم اجرا شود (نه import)، مهاجرت‌ها را اجرا کن و خارج شو

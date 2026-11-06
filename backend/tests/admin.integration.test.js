@@ -358,6 +358,8 @@ describe('نقش ادمین و پنل مدیریت', () => {
 
   it('مدرک هویتی و مشکل سلامت تا زمان تأیید رمزگذاری و نگه‌داری می‌شوند', async () => {
     const imageUrl = 'data:image/png;base64,iVBORw0KGgo=';
+    await db.query("UPDATE users SET verification_status = 'unverified' WHERE id = $1", [sara.id]);
+    invalidateAccountState(sara.id);
     const submitted = await request(app)
       .post('/api/v1/documents')
       .set(auth(sara.token))
@@ -400,6 +402,22 @@ describe('نقش ادمین و پنل مدیریت', () => {
     const document = listed.body.documents.find((item) => item.id === submitted.body.document.id);
     expect(document.imageUrl).toBe(imageUrl);
     expect(document.healthCondition).toBe('آسم');
+  });
+
+  it('ارسال مجدد مدرک حساب تأییدشده را قفل نمی‌کند', async () => {
+    const user = await signUp('09131110055', 'کاربر تأییدشده', 'primary');
+    const response = await request(app).post('/api/v1/documents')
+      .set(auth(user.token))
+      .send({ documentType: 'identity', imageUrl: 'data:image/png;base64,iVBORw0KGgo=' });
+    expect(response.status).toBe(409);
+    const { rows } = await db.query(
+      `SELECT verification_status, (SELECT count(*) FROM identity_documents WHERE user_id = $1) AS documents
+       FROM users WHERE id = $1`, [user.id],
+    );
+    expect(rows[0].verification_status).toBe('verified');
+    expect(Number(rows[0].documents)).toBe(0);
+    const sos = await request(app).post('/api/v1/sos').set(auth(user.token)).send({});
+    expect(sos.status).toBe(201);
   });
 });
 

@@ -399,10 +399,11 @@ export async function locationMetrics({ from = null, to = null } = {}) {
   );
   const { rows: errors } = await db.query(
     `SELECT COUNT(*)::int AS samples, AVG(error_m) AS avg_error_m,
-            percentile_cont(0.50) WITHIN GROUP (ORDER BY error_m) AS p50_error_m
+            COUNT(*) FILTER (WHERE valid = FALSE)::int AS accuracy_over_30,
+            percentile_cont(0.50) WITHIN GROUP (ORDER BY error_m) AS p50_error_m,
+            percentile_cont(0.95) WITHIN GROUP (ORDER BY error_m) AS p95_error_m
        FROM location_reference_samples
-      WHERE valid = TRUE
-        AND ($1::timestamptz IS NULL OR sampled_at >= $1)
+      WHERE ($1::timestamptz IS NULL OR sampled_at >= $1)
         AND ($2::timestamptz IS NULL OR sampled_at <= $2)`,
     [from, to],
   );
@@ -424,9 +425,11 @@ export async function locationMetrics({ from = null, to = null } = {}) {
       samples: errors[0]?.samples ?? 0,
       avgM: num(errors[0]?.avg_error_m),
       p50M: num(errors[0]?.p50_error_m),
+      p95M: num(errors[0]?.p95_error_m),
+      accuracyOver30Count: errors[0]?.accuracy_over_30 ?? 0,
       unit: 'meter',
       definition: 'فاصله‌ی نمونه‌ی GPS میدانی تا مختصات مرجع نقشه‌برداری‌شده',
-      rule: 'نمونه فقط با اقدام صریح در صفحه‌ی ارزیابی ثبت می‌شود و دقت اعلامی باید حداکثر ۳۰ متر باشد',
+      rule: 'همه نمونه‌ها در خلاصه‌اند؛ valid نشان می‌دهد دقت اعلامی حداکثر ۳۰ متر بوده است',
     },
     latency: {
       avgE2eMs: num(r.avg_e2e_ms),
@@ -533,12 +536,12 @@ export async function upsertLocationReference(userId, { lat, lng, label }) {
   };
 }
 
-export async function insertLocationReferenceSample(userId, { errorM, accuracyM }) {
+export async function insertLocationReferenceSample(userId, { errorM, accuracyM, environment, referenceLabel }) {
   const { rows } = await db.query(
-    `INSERT INTO location_reference_samples (user_id, error_m, accuracy_m, valid)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, error_m, accuracy_m, valid, sampled_at`,
-    [userId, errorM, accuracyM, accuracyM <= 30],
+    `INSERT INTO location_reference_samples (user_id, error_m, accuracy_m, valid, environment, reference_label)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, error_m, accuracy_m, valid, environment, reference_label, sampled_at`,
+    [userId, errorM, accuracyM, accuracyM <= 30, environment, referenceLabel ?? null],
   );
   const row = rows[0];
   return {
@@ -546,6 +549,8 @@ export async function insertLocationReferenceSample(userId, { errorM, accuracyM 
     errorM: Number(row.error_m),
     accuracyM: Number(row.accuracy_m),
     valid: row.valid,
+    environment: row.environment,
+    referenceLabel: row.reference_label,
     sampledAt: row.sampled_at,
   };
 }
@@ -578,7 +583,8 @@ export async function susMetrics() {
   const { rows } = await db.query(
     `SELECT COUNT(*)::int AS total, AVG(score) AS avg_score,
             percentile_cont(0.50) WITHIN GROUP (ORDER BY score) AS p50_score
-       FROM sus_responses`,
+       FROM (SELECT DISTINCT ON (user_id) user_id, score
+               FROM sus_responses ORDER BY user_id, created_at DESC, id DESC) latest`,
   );
   const r = rows[0] ?? {};
   return { total: r.total ?? 0, avgScore: num(r.avg_score), p50Score: num(r.p50_score) };

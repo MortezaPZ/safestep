@@ -69,6 +69,7 @@ export function mountHistory(container, ctx, params = {}) {
   let subjectId = params.userId ?? ctx.user.id;
   let isOwn = subjectId === ctx.user.id;
   let watchedPrimaries = [];
+  let requestedSubjectId = params.userId ?? null;
 
   let days = [];
   let selectedDay = null;
@@ -246,6 +247,7 @@ export function mountHistory(container, ctx, params = {}) {
     if (hidden) {
       render(container,
         el('div.card', {}, el('div.card__body', {},
+          renderSubjectPicker(),
           el('div.hidden-location', {},
             el('div', { text: '🙈', style: { fontSize: '2rem' } }),
             el('h3.state-block__title', { text: 'تاریخچه در دسترس نیست' }),
@@ -261,6 +263,7 @@ export function mountHistory(container, ctx, params = {}) {
     if (days.length === 0) {
       render(container,
         el('div.card', {}, el('div.card__body', {},
+          renderSubjectPicker(),
           emptyState({
             icon: '🗺️',
             title: 'تاریخچه‌ای ثبت نشده',
@@ -336,11 +339,12 @@ export function mountHistory(container, ctx, params = {}) {
       if (ctx.user.role === 'guardian') {
         const links = await api.guardianships();
         watchedPrimaries = (links.primaries ?? links.watching ?? []).filter((item) =>
-          item.primaryUserId ?? item.primaryUser?.id,
+          (item.primaryUserId ?? item.primaryUser?.id) && (item.permissions ?? []).includes('emergency'),
         );
-        const requestedId = params.userId && watchedPrimaries.some((item) =>
-          String(item.primaryUserId ?? item.primaryUser?.id) === String(params.userId),
-        ) ? params.userId : null;
+        const requestedId = requestedSubjectId && watchedPrimaries.some((item) =>
+          String(item.primaryUserId ?? item.primaryUser?.id) === String(requestedSubjectId),
+        ) ? requestedSubjectId : null;
+        requestedSubjectId = null;
         const selectedStillValid = watchedPrimaries.some((item) =>
           String(item.primaryUserId ?? item.primaryUser?.id) === String(subjectId),
         );
@@ -352,8 +356,8 @@ export function mountHistory(container, ctx, params = {}) {
         if (!subjectId) {
           render(container, emptyState({
             icon: '🗺️',
-            title: 'کاربر اصلی‌ای برای نمایش تاریخچه نیست',
-            text: 'پس از پیوند با کاربر اصلی، تاریخچهٔ مجاز او از این صفحه در دسترس است.',
+            title: 'دسترسی اضطراری برای تاریخچه وجود ندارد',
+            text: 'تاریخچه فقط برای کاربرانی نمایش داده می‌شود که به شما دسترسی اضطراری داده‌اند.',
           }));
           return;
         }

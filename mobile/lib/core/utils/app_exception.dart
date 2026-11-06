@@ -12,6 +12,7 @@ class AppException implements Exception {
     this.kind = AppErrorKind.unknown,
     this.fieldErrors,
     this.retryable = true,
+    this.retryAfter,
   });
 
   /// پیام فارسی قابل نمایش
@@ -29,6 +30,9 @@ class AppException implements Exception {
   /// آیا نمایش دکمه‌ی «تلاش دوباره» منطقی است؟
   /// برای «رمز نادرست» منطقی نیست؛ برای «اینترنت قطع است» هست.
   final bool retryable;
+
+  /// زمان اعلام‌شده‌ی سرور برای تلاش بعدی، مانند هدر `Retry-After` در ۴۲۹.
+  final Duration? retryAfter;
 
   /* ─────────────────── سازنده‌های آماده ─────────────────── */
 
@@ -78,6 +82,7 @@ class AppException implements Exception {
       kind: kind,
       fieldErrors: fieldErrors,
       retryable: retryable ?? this.retryable,
+      retryAfter: retryAfter,
     );
   }
 

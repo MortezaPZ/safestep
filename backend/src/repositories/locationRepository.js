@@ -102,17 +102,42 @@ export async function findLatest(userId) {
 
 export async function gpsWatchTargets() {
   const { rows } = await db.query(
-    `SELECT DISTINCT ON (p.user_id) p.user_id, p.recorded_at
-       FROM location_pings p
-       JOIN user_settings s ON s.user_id = p.user_id
-       JOIN users u ON u.id = p.user_id
+    `SELECT s.user_id,
+            GREATEST(p.recorded_at, COALESCE(s.tracking_started_at, p.recorded_at)) AS recorded_at,
+            s.ping_interval_sec, s.adaptive_ping_enabled, s.ping_interval_stationary_sec
+       FROM user_settings s
+       JOIN users u ON u.id = s.user_id
+       LEFT JOIN LATERAL (
+         SELECT recorded_at FROM location_pings
+          WHERE user_id = s.user_id AND source <> 'simulator'
+          ORDER BY recorded_at DESC LIMIT 1
+       ) p ON TRUE
       WHERE u.status = 'active'
         AND s.location_sharing_enabled = TRUE
+        AND s.tracking_active = TRUE
+        AND (p.recorded_at IS NOT NULL OR s.tracking_started_at IS NOT NULL)
         AND 'gps_lost' = ANY(s.alert_types)
-        AND p.source <> 'simulator'
-      ORDER BY p.user_id, p.recorded_at DESC`,
+      `,
   );
-  return rows.map((row) => ({ userId: row.user_id, recordedAt: row.recorded_at }));
+  return rows.map((row) => ({
+    userId: row.user_id,
+    recordedAt: row.recorded_at,
+    intervalSec: row.adaptive_ping_enabled
+      ? Math.max(row.ping_interval_sec, row.ping_interval_stationary_sec)
+      : row.ping_interval_sec,
+  }));
+}
+
+export async function setTrackingActive(userId, active) {
+  const { rows } = await db.query(
+    `UPDATE user_settings
+        SET tracking_started_at = CASE WHEN $2 AND (NOT tracking_active OR tracking_started_at IS NULL) THEN now()
+                                      ELSE tracking_started_at END,
+            tracking_active = $2, updated_at = now()
+      WHERE user_id = $1 RETURNING tracking_active`,
+    [userId, active],
+  );
+  return rows[0]?.tracking_active;
 }
 
 /** آخرین موقعیت چند کاربر با یک کوئری — داشبورد عضو خانواده از این استفاده می‌کند. */

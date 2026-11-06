@@ -110,7 +110,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.splash,
     refreshListenable: refresh,
-
     redirect: (BuildContext context, GoRouterState state) {
       final AuthState auth = ref.read(authControllerProvider);
       final String location = state.matchedLocation;
@@ -159,7 +158,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
 
       return null;
     },
-
     routes: <RouteBase>[
       GoRoute(
         path: AppRoutes.splash,
@@ -247,11 +245,23 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.fallCheck,
-        builder: (BuildContext context, GoRouterState state) => FallCheckPage(
-          fallEventId: state.uri.queryParameters['id'] ?? '',
-          countdownSec:
-              int.tryParse(state.uri.queryParameters['sec'] ?? '') ?? 30,
-        ),
+        builder: (BuildContext context, GoRouterState state) {
+          final Map<String, String> query = state.uri.queryParameters;
+          final int? startedAtMs = int.tryParse(query['startedAtMs'] ?? '');
+          final int? deadlineMs = int.tryParse(query['deadlineMs'] ?? '');
+          return FallCheckPage(
+            fallEventId: query['id'] ?? '',
+            countdownSec: int.tryParse(query['sec'] ?? '') ?? 30,
+            startedAt: startedAtMs == null
+                ? null
+                : DateTime.fromMillisecondsSinceEpoch(startedAtMs),
+            deadline: deadlineMs == null
+                ? null
+                : DateTime.fromMillisecondsSinceEpoch(deadlineMs),
+            retryMode: query['retry'] == '1',
+            retryMessage: query['message'],
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.evaluation,
@@ -295,7 +305,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
     ],
-
     errorBuilder: (BuildContext context, GoRouterState state) {
       return Scaffold(
         body: Center(

@@ -82,18 +82,21 @@ export async function listIdentityDocuments({ status = 'pending', limit = 50, of
 
 export async function createIdentityDocument(userId, documentType, imageUrl, healthCondition = null) {
   const checkedImageUrl = validateIdentityImageDataUrl(imageUrl);
-  const { rows } = await db.query(
-    `INSERT INTO identity_documents (user_id, document_type, image_url, health_condition_encrypted)
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
-    [
-      userId,
-      documentType,
-      encryptSensitiveValue(checkedImageUrl),
-      healthCondition ? encryptSensitiveValue(healthCondition) : null,
-    ],
-  );
-  return mapIdentityDocument(rows[0]);
+  return db.transaction(async (tx) => {
+    const { rows: users } = await tx.query(
+      `UPDATE users SET verification_status = 'pending'
+       WHERE id = $1 AND verification_status <> 'verified' RETURNING id`,
+      [userId],
+    );
+    if (!users.length) return null;
+    const { rows } = await tx.query(
+      `INSERT INTO identity_documents (user_id, document_type, image_url, health_condition_encrypted)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [userId, documentType, encryptSensitiveValue(checkedImageUrl),
+        healthCondition ? encryptSensitiveValue(healthCondition) : null],
+    );
+    return mapIdentityDocument(rows[0]);
+  });
 }
 
 export async function reviewIdentityDocument(id, status, reviewerId, rejectionReason = null) {

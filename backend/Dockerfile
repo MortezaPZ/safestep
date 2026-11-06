@@ -9,6 +9,7 @@ COPY backend/package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 
 COPY backend/src ./src
+COPY backend/scripts/falls/generate_synthetic.js ./scripts/falls/generate_synthetic.js
 COPY web /web
 
 ENV NODE_ENV=production

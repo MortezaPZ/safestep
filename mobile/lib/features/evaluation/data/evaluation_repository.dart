@@ -19,7 +19,8 @@ class SusForm {
 }
 
 class ReferenceSample {
-  const ReferenceSample({required this.errorM, required this.accuracyM, required this.valid});
+  const ReferenceSample(
+      {required this.errorM, required this.accuracyM, required this.valid});
   final double errorM;
   final double accuracyM;
   final bool valid;
@@ -69,20 +70,25 @@ class EvaluationRepository {
     required double lat,
     required double lng,
     required double accuracyM,
+    required String environment,
   }) {
     return _api.post<ReferenceSample>(
       ApiEndpoints.evaluationReferenceSample,
       (dynamic data) {
-        final Map<String, dynamic> row = data is Map<String, dynamic>
-            ? data
-            : <String, dynamic>{};
+        final Map<String, dynamic> row =
+            data is Map<String, dynamic> ? data : <String, dynamic>{};
         return ReferenceSample(
           errorM: (row['errorM'] as num?)?.toDouble() ?? 0,
           accuracyM: (row['accuracyM'] as num?)?.toDouble() ?? accuracyM,
           valid: row['valid'] == true,
         );
       },
-      body: <String, dynamic>{'lat': lat, 'lng': lng, 'accuracyM': accuracyM},
+      body: <String, dynamic>{
+        'lat': lat,
+        'lng': lng,
+        'accuracyM': accuracyM,
+        'environment': environment,
+      },
     );
   }
 
@@ -96,9 +102,9 @@ class EvaluationRepository {
           : const <String>[];
       final List<int> choices = data['choices'] is List
           ? (data['choices'] as List)
-                .whereType<num>()
-                .map((num n) => n.toInt())
-                .toList(growable: false)
+              .whereType<num>()
+              .map((num n) => n.toInt())
+              .toList(growable: false)
           : const <int>[1, 2, 3, 4, 5];
       return SusForm(items: items, choices: choices);
     });
@@ -115,5 +121,5 @@ class EvaluationRepository {
 
 final Provider<EvaluationRepository> evaluationRepositoryProvider =
     Provider<EvaluationRepository>((Ref ref) {
-      return EvaluationRepository(ref.watch(apiClientProvider));
-    });
+  return EvaluationRepository(ref.watch(apiClientProvider));
+});

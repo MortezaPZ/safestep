@@ -306,6 +306,35 @@ describe('مسیر کامل: ثبت‌نام تا هشدار اضطراری', ()
     expect(resolve.body.resolvedAt).not.toBeNull();
   });
 
+  it('با اشتراک خاموش، SOS و موقعیت لحظه‌ای فقط به گیرنده اضطراری می‌رسد', async () => {
+    const off = await request(app).put('/api/v1/locations/sharing').set(auth(maryam.token)).send({ enabled: false });
+    expect(off.status).toBe(200);
+    const current = await request(app).get('/api/v1/locations/current')
+      .query({ userId: maryam.id }).set(auth(ali.token));
+    expect(current.body.hidden).toBe(true);
+    const history = await request(app).get('/api/v1/locations/history').query({
+      userId: maryam.id,
+      from: new Date(Date.now() - 86400000).toISOString(),
+      to: new Date(Date.now() + 60000).toISOString(),
+    }).set(auth(ali.token));
+    expect(history.status).toBe(200);
+    expect(history.body.hidden).toBe(true);
+    expect(history.body.points).toEqual([]);
+
+    const point = { lat: 35.729, lng: 51.339 };
+    const sos = await request(app).post('/api/v1/sos').set(auth(maryam.token)).send(point);
+    expect(sos.status).toBe(201);
+    expect(sos.body.location.source).toBe('live');
+    expect(sos.body.recipients.map((r) => r.id)).toEqual([ali.id]);
+    const emergency = await request(app).get('/api/v1/alerts').query({ types: 'sos' }).set(auth(ali.token));
+    const alert = emergency.body.alerts.find((a) => a.id === sos.body.alert.id);
+    expect(alert.lat).toBeCloseTo(point.lat, 5);
+    expect(alert.lng).toBeCloseTo(point.lng, 5);
+    const limited = await request(app).get('/api/v1/alerts').query({ types: 'sos' }).set(auth(zahra.token));
+    expect(limited.body.alerts.some((a) => a.id === sos.body.alert.id)).toBe(false);
+    await request(app).put('/api/v1/locations/sharing').set(auth(maryam.token)).send({ enabled: true });
+  });
+
   it('SOS با نرخ بالا محدود می‌شود', async () => {
     const results = [];
     for (let i = 0; i < 6; i += 1) {

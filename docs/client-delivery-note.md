@@ -1,34 +1,7 @@
-# Delivery note
+# یادداشت تحویل
 
-Send these three files together:
+محتویات و تاریخ هر بسته باید هنگام تحویل با فایل‌های واقعی آن تطبیق داده شوند. `SafeStep-client-delivery-2026-11-01.zip` بستهٔ نسخهٔ ۱ نوامبر است؛ به‌تنهایی نشانهٔ وجود اصلاحات بعدی یا APK امضاشده نیست. فایل‌های نصب و بستهٔ به‌روزشده پس از ساخت و کنترل جداگانه فهرست و تحویل می‌شوند.
 
-1. `Hamghadam-source.zip` — current source (web, server, app)
-2. `hamghadam.apk` — Android install (separate because it is about 180 MB)
-3. `Hamghadam-rahnama.zip` — the letter, the install notes, and a short video
+برای آزمایش میدانی به سرور عمومی با HTTPS، حساب‌های ایجادشده برای همان آزمایش، پیکربندی Firebase و نسخهٔ release امضاشده نیاز است. دستورهای سرور، پیش‌نیازها و راهنمای کلید در `docs/deployment/mobile-release-and-container.md` و مراحل کلاینت در `docs/mobile-client.md` آمده‌اند. نشانی HTTP محلی برای نسخهٔ release مناسب نیست. از حساب‌های دمو و seed در پایگاه واقعی استفاده نکنید.
 
-Changes in this build:
-
-- Map tiles are served by the local server so the map is not blank when public tile servers are unreachable.
-- The guardian role no longer has the support and settings entries.
-- The mobile app is delivered as an installable file.
-
-Run the web app on the computer:
-
-```bash
-cd backend
-npm install
-npm run seed
-npm start
-```
-
-Then open `http://localhost:4080`.
-
-Demo password for every seeded account: `Test@1234`.
-
-- Primary user `09121110001`
-- Guardian `09121110002`
-- Admin `09121110009`
-
-Install `hamghadam.apk` on the phone. The computer must be running the server. Phone and computer must share a Wi-Fi network. On the login screen set the server to `http://<computer-ipv4>:4080`. Read the address with `ipconfig`. `localhost` on the phone is the phone, not the computer.
-
-Install steps are in `docs/mobile-client.md`. Short video: `docs/mobile-guide.mp4`.
+نمونه‌های GPS و پاسخ‌های SUS باید از پیاده‌روی و شرکت‌کنندگان واقعی به دست آیند. نتایج آزمایش دستگاه، دریافت FCM، امضای APK و استقرار HTTPS فقط پس از انجام و ثبت شاهد واقعی قابل تأیید هستند.

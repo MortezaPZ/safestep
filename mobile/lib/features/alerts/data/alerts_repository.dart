@@ -83,7 +83,8 @@ class AlertItem {
       zoneName: Json.strOrNull(json, 'zoneName'),
       isRead: Json.boolOf(json, 'isRead'),
       resolvedAt: Json.date(json, 'resolvedAt'),
-      confidence: Json.dblOrNull(Json.mapOrNull(json['metadata']) ?? json, 'confidence'),
+      confidence: Json.dblOrNull(
+          Json.mapOrNull(json['metadata']) ?? json, 'confidence'),
     );
   }
 }
@@ -150,6 +151,17 @@ class AlertsRepository {
   /// عددی که در فصل ارزیابی، تأخیر واقعی سامانه را می‌سازد.
   Future<void> markRead(String alertId) async {
     await _api.post<void>(ApiEndpoints.alertRead(alertId), (dynamic _) {});
+  }
+
+  /// رسید callback دستگاه برای یک اعلان FCM.
+  ///
+  /// `receivedAt` پاسخ سرور زمان ثبت همین رسید را می‌گوید؛ زمان نمایش
+  /// اعلان به کاربر یا خواندن آن نیست و نباید جای `markRead` استفاده شود.
+  Future<void> recordDeliveryReceipt(String alertId) async {
+    await _api.post<void>(
+      ApiEndpoints.alertDeliveryReceipt(alertId),
+      (dynamic _) {},
+    );
   }
 
   Future<void> markAllRead() async {

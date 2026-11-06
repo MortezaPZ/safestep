@@ -1,67 +1,17 @@
-# Android client
+# راهنمای کلاینت Android
 
-Use this to install and try the app on an Android phone. You do not need to build from source if you have the APK.
+برای آزمایش میدانی، نسخهٔ release امضاشده و نشانی عمومی HTTPS با گواهی معتبر لازم است. فایل APK امضاشده همراه این مستند فرض نشده است؛ آن را پس از ساخت و بررسی امضا جداگانه تحویل بگیرید. راهنمای زیرساخت و تولید کلید در `docs/deployment/mobile-release-and-container.md` است.
 
-## 1. Install
+۱. APK امضاشده را با روش مورد تأیید دستگاه نصب کنید.
+۲. نشانی عمومی `https://<دامنه-آزمایش>` را در صفحهٔ ورود وارد کنید.
+۳. با حسابی که مسئول پروژه برای آزمایش فراهم می‌کند وارد شوید.
 
-`hamghadam.apk` is next to the project or under `safestep/docs/` (about 180 MB, a debug build).
+نشانی‌های HTTP محلی فقط برای build توسعه با manifest مربوط به debug هستند؛ نسخهٔ release اتصال HTTP را نمی‌پذیرد. `localhost` روی گوشی خود گوشی است، نه رایانهٔ توسعه. از اجرای seed دمو روی پایگاه واقعی استفاده نکنید.
 
-1. Copy the file to the phone.
-2. Open it and install. If Android warns about an unknown source, allow installs from the app that received the file.
+## ساخت
 
-## 2. Server on the computer
+در محیطی با Flutter و Android SDK سازگار، پس از دریافت وابستگی‌های معتبر و تنظیم کلید انتشار مالک، از پوشهٔ `mobile` دستور `flutter build apk --release` را اجرا کنید. امضا و اثرانگشت گواهی APK را با `apksigner verify --verbose --print-certs <path-to-release.apk>` بررسی کنید. تا قبل از پیکربندی Firebase و آزمون گوشی واقعی، دریافت اعلان در پس‌زمینه تأیید نشده است. ساخت IPA در Windows انجام نمی‌شود.
 
-```bash
-cd backend
-npm install
-npm run seed
-npm start
-```
+## ارزیابی میدانی
 
-The computer browser should open `http://localhost:4080`.
-
-The phone and the computer must be on the same Wi-Fi network.
-
-Find the computer's IPv4 address with `ipconfig` on Windows. Example: `192.168.1.25`.
-
-In the app, set the server address to:
-
-```text
-http://192.168.1.25:4080
-```
-
-Use your own address. `localhost` on the phone does not reach the computer.
-
-## 3. Demo login
-
-Password for every seeded account: `Test@1234`.
-
-- Guardian: `09121110002`
-- Primary user: `09121110001`
-
-## 4. Build from Android Studio
-
-Open the `mobile` folder.
-
-```bash
-cd mobile
-flutter pub get
-flutter create . --platforms=android
-flutter run
-```
-
-On a real phone, set the same server address on the login screen.
-
-An iOS IPA is not produced on Windows.
-
-## Field evaluation
-
-Open **Field evaluation** from the primary or guardian home page to register a reference point or submit the SUS questionnaire. For position-error measurements, enter coordinates for a known surveyed point. The GPS button only fills an approximate phone fix; it is not ground truth.
-
-## Mobile test coverage
-
-`mobile/test/` contains three tests: server-address normalization, centered fall-window timing, and the field-evaluation form. All three passed with `flutter test --no-pub`. Direct Pub.dev access returned HTTP 403 in the development environment, so dependencies were resolved through a mirror; a clean environment needs Pub.dev or a compatible mirror for packages such as `image_picker`. The source package does not contain 25 mobile tests.
-
-## Video
-
-Short guide: `docs/mobile-guide.mp4`.
+صفحهٔ «ارزیابی میدانی» از خانهٔ کاربر اصلی یا مراقب باز می‌شود. برای خطای موقعیت، مختصات نقطهٔ مرجعِ نقشه‌برداری‌شده را وارد کنید؛ دکمهٔ GPS گوشی فقط یک مختصات تقریبی پر می‌کند و مرجع واقعی محسوب نمی‌شود. دادهٔ پرسشنامه و نمونه‌ها باید از افراد و پیاده‌روی واقعی جمع‌آوری شوند.

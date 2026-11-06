@@ -25,6 +25,12 @@ import logger from '../utils/logger.js';
 import { forbidden, notFound } from '../utils/errors.js';
 import db from '../db/index.js';
 
+export async function recordFcmReceipt(alertId, recipientUserId) {
+  const receivedAt = await alertRepository.recordFcmReceipt(alertId, recipientUserId);
+  if (!receivedAt) throw notFound('هشدار یا گیرنده یافت نشد.');
+  return { receivedAt: new Date(receivedAt).toISOString() };
+}
+
 const log = logger.child({ module: 'alert' });
 
 const ADMIN_FALL_ALERT_FIELDS = Object.freeze([
@@ -413,6 +419,7 @@ export async function resolveAlert(alertId, viewerId) {
 }
 
 export default {
+  recordFcmReceipt,
   raiseAlert,
   listAlerts,
   markRead,

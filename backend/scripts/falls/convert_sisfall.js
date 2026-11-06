@@ -19,7 +19,8 @@ const SOURCE_HZ = 200;
 const TARGET_HZ = 50;
 const DECIMATION = SOURCE_HZ / TARGET_HZ;
 const ADXL345_LSB_PER_G = 256;
-const ITG3200_LSB_PER_DEGREE_PER_SECOND = 14.375;
+// SisFall's published full-scale conversion: 16-bit samples over ±2000 °/s.
+const GYRO_DEGREES_PER_SECOND_PER_LSB = 4000 / 65536;
 const CSV_HEADER = [
   'subject_id', 'recording_id', 'label',
   ...Array.from({ length: 14 }, (_, index) => 'f' + (index + 1)),
@@ -37,7 +38,7 @@ export function parseTxt(text) {
       continue;
     }
     const accScale = G / ADXL345_LSB_PER_G;
-    const gyroScale = Math.PI / (180 * ITG3200_LSB_PER_DEGREE_PER_SECOND);
+    const gyroScale = Math.PI / 180 * GYRO_DEGREES_PER_SECOND_PER_LSB;
     samples.push({
       acc: {
         ax: values[0] * accScale,
@@ -83,17 +84,12 @@ function magnitude(sample) {
 export function selectWindowStarts(samples, label) {
   if (samples.length < WINDOW) return [];
   const maxStart = samples.length - WINDOW;
-  if (label === 1) {
-    let peakIndex = 0;
-    for (let index = 1; index < samples.length; index += 1) {
-      if (magnitude(samples[index]) > magnitude(samples[peakIndex])) peakIndex = index;
-    }
-    const centered = peakIndex - Math.floor(WINDOW / 2);
-    return [Math.max(0, Math.min(maxStart, centered))];
+  let peakIndex = 0;
+  for (let index = 1; index < samples.length; index += 1) {
+    if (magnitude(samples[index]) > magnitude(samples[peakIndex])) peakIndex = index;
   }
-  if (samples.length < WINDOW * 2) return [];
-  const first = Math.floor((samples.length - WINDOW * 2) / 2);
-  return [first, first + WINDOW];
+  const centered = peakIndex - Math.floor(WINDOW / 2);
+  return [Math.max(0, Math.min(maxStart, centered))];
 }
 
 function resolveSubjectId(filePath, stem) {
@@ -130,7 +126,7 @@ export function convertRecording(filePath, text) {
   return { rows, malformed: parsed.malformed, skipped: false, label, subjectId };
 }
 
-export function convertIfPresent() {
+export function convertIfPresent(outputPath = OUT) {
   if (!fs.existsSync(RAW)) {
     process.stdout.write('SisFall raw folder missing; conversion skipped.\n');
     return null;
@@ -159,14 +155,14 @@ export function convertIfPresent() {
   };
   walk(RAW);
   if (counts.windows === 0) throw new Error('No usable SisFall recordings produced feature windows.');
-  fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, rows.join('\n') + '\n', 'utf8');
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, rows.join('\n') + '\n', 'utf8');
   process.stdout.write(
     'Converted ' + counts.fallFiles + ' fall files and ' + counts.adlFiles +
     ' ADL files into ' + counts.windows + ' windows at 50 Hz; skipped ' +
     counts.skippedFiles + ' files and ' + counts.malformedLines + ' malformed lines.\n',
   );
-  return OUT;
+  return outputPath;
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);

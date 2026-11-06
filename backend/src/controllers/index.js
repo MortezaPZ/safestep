@@ -24,6 +24,8 @@ import env from '../config/env.js';
 import { WS_EVENTS, ALL_ALERT_TYPES, AUDIT_ACTIONS } from '../config/constants.js';
 import auditService from '../services/auditService.js';
 import { haversineMeters } from '../utils/geo.js';
+import { evaluationExportColumns, evaluationExportRows } from '../repositories/evaluationExportRepository.js';
+import { evaluationCsv } from '../utils/evaluationCsv.js';
 
 /** ساخت پاسخ پیکربندی کلاینت از روی تنظیمات کاربر و محیط سرور. */
 function buildClientConfig(settingsRow) {
@@ -168,6 +170,12 @@ export const location = {
     const settings = await locationService.setLocationSharing(req.user.id, req.body.enabled);
     res.json({ settings });
   }),
+
+  setTracking: asyncHandler(async (req, res) => {
+    if (req.user.role !== 'primary') throw forbidden('فقط کاربر اصلی می‌تواند ردیابی خود را تغییر دهد.');
+    const trackingActive = await locationService.setTrackingActive(req.user.id, req.body.active);
+    res.json({ trackingActive });
+  }),
 };
 
 /* ─────────────────────── محدوده‌های امن ─────────────────────── */
@@ -246,6 +254,9 @@ export const safeZone = {
 /* ─────────────────────────── هشدارها ─────────────────────────── */
 
 export const alert = {
+  receipt: asyncHandler(async (req, res) => {
+    res.json(await alertService.recordFcmReceipt(req.params.id, req.user.id));
+  }),
   list: asyncHandler(async (req, res) => {
     const { types, unreadOnly, limit, before, userId } = req.query;
     res.json(
@@ -398,6 +409,14 @@ const SUS_ITEMS = [
 ];
 
 export const evaluation = {
+  exportCsv: asyncHandler(async (req, res) => {
+    await telemetryService.flush();
+    const dataset = req.params.dataset;
+    const rows = await evaluationExportRows(dataset);
+    res.set('Cache-Control', 'no-store');
+    res.set('Content-Disposition', `attachment; filename="${dataset}.csv"`);
+    res.type('text/csv').send(evaluationCsv(evaluationExportColumns[dataset], rows));
+  }),
   reference: asyncHandler(async (req, res) => {
     const saved = await logRepository.upsertLocationReference(req.user.id, req.body);
     res.status(201).json(saved);
@@ -414,6 +433,8 @@ export const evaluation = {
     const sample = await logRepository.insertLocationReferenceSample(req.user.id, {
       errorM,
       accuracyM: req.body.accuracyM,
+      environment: req.body.environment,
+      referenceLabel: reference.label,
     });
     res.status(201).json(sample);
   }),

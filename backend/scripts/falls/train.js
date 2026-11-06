@@ -1,5 +1,5 @@
 /**
- * Train the deployed KNN and linear Pegasos classifier from labeled feature rows.
+ * Train a separate generic KNN and linear Pegasos classifier from labeled rows.
  * Subject-aware datasets use nested grouped cross-validation; scaling is fitted
  * only on each training partition. Legacy rows without subject IDs use
  * deterministic stratified folds and are labeled as such in the report.
@@ -11,7 +11,7 @@ import { generateDataset, toCsv } from './generate_synthetic.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const DATA_CSV = path.join(ROOT, 'data/falls/dataset.csv');
-const MODEL_PATH = path.join(ROOT, 'src/services/fallDetection/model.json');
+export const GENERIC_MODEL_PATH = path.join(ROOT, 'data/falls/model-generic.json');
 const REPORT_PATH = path.resolve(ROOT, '../docs/phase3/02-training-report.md');
 const KNN_CANDIDATES = [3, 5, 7, 9];
 const SVM_CANDIDATES = [1e-3, 1e-2, 1e-1];
@@ -307,7 +307,7 @@ function thresholdSweep(scores, source) {
   }));
 }
 
-export function trainFromRows(rows) {
+export function trainFromRows(rows, { onOuterScores } = {}) {
   if (!Array.isArray(rows) || rows.length < 5) {
     throw new Error('At least five labeled feature rows are required.');
   }
@@ -321,6 +321,7 @@ export function trainFromRows(rows) {
   const outerCount = 5;
   const outerFolds = makeFolds(rows, outerCount, SEED);
   const outerScores = [];
+  const outerSelections = [];
 
   for (let outerIndex = 0; outerIndex < outerFolds.length; outerIndex += 1) {
     const test = outerFolds[outerIndex];
@@ -328,6 +329,7 @@ export function trainFromRows(rows) {
     const groups = new Set(trainRows.map((row) => row.subjectId).filter(Boolean)).size;
     const innerCount = subjectGrouped ? Math.min(4, groups) : 4;
     const selected = selectParameters(trainRows, innerCount, SEED + outerIndex * 101);
+    outerSelections.push({ fold: outerIndex + 1, k: selected.k, lambda: selected.lambda });
     const scaling = stats(trainRows);
     const train = trainRows.map((row) => ({
       label: row.label,
@@ -340,6 +342,8 @@ export function trainFromRows(rows) {
       const margin = svmMargin(svm, z);
       const agreeRatio = nearestFallRatio(train, z, selected.k);
       outerScores.push({
+        fold: outerIndex + 1,
+        subjectId: row.subjectId ?? null,
         label: row.label,
         margin,
         agreeRatio,
@@ -368,6 +372,7 @@ export function trainFromRows(rows) {
     outerScores,
     subjectGrouped ? 'subject-grouped-nested-5-fold-out-of-fold-diagnostic' : 'stratified-nested-5-fold-out-of-fold-diagnostic',
   );
+  if (onOuterScores) onOuterScores(outerScores);
 
   return {
     version: '1.1.0',
@@ -381,6 +386,7 @@ export function trainFromRows(rows) {
       hyperparameterSelection: 'four-fold inner cross-validation; scaling refit inside every fold',
       rowCount: rows.length,
       subjectCount: subjectGrouped ? finalGroups : null,
+      outerSelections,
     },
     standardization: scaling,
     knn: { k: selected.k, points: knnPoints },
@@ -409,7 +415,7 @@ function faPct(value) {
   return (value * 100).toFixed(2) + '٪';
 }
 
-function writeReport(model, rowCount) {
+function writeReport(model, rowCount, reportPath = REPORT_PATH) {
   const cv = model.cv;
   const report = [
     '# گزارش آموزش تشخیص سقوط',
@@ -436,28 +442,29 @@ function writeReport(model, rowCount) {
     'CSV جاروب آستانه‌ها مقایسهٔ تشخیصی روی پیش‌بینی‌های بیرونی است و برای انتخاب آستانهٔ نهایی باید مجموعهٔ آزمون مستقل داشته باشید.',
     '',
   ].join('\n');
-  fs.mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
-  fs.writeFileSync(REPORT_PATH, report, 'utf8');
+  fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+  fs.writeFileSync(reportPath, report, 'utf8');
 }
 
-export function runTrain() {
+export function runTrain({ dataPath = DATA_CSV, modelPath = GENERIC_MODEL_PATH, reportPath = REPORT_PATH } = {}) {
   let datasetKind = 'real';
   let rows;
-  if (fs.existsSync(DATA_CSV)) {
-    const source = fs.readFileSync(DATA_CSV, 'utf8');
+  if (fs.existsSync(dataPath)) {
+    const source = fs.readFileSync(dataPath, 'utf8');
     rows = parseCsv(source);
     if (source.includes('# SYNTHETIC')) datasetKind = 'synthetic';
   } else {
     const generated = generateDataset({ perClass: 2000 });
-    fs.mkdirSync(path.dirname(DATA_CSV), { recursive: true });
-    fs.writeFileSync(DATA_CSV, toCsv(generated), 'utf8');
+    fs.mkdirSync(path.dirname(dataPath), { recursive: true });
+    fs.writeFileSync(dataPath, toCsv(generated), 'utf8');
     rows = generated;
     datasetKind = 'synthetic';
   }
   const model = trainFromRows(rows);
   model.datasetKind = datasetKind;
-  fs.writeFileSync(MODEL_PATH, JSON.stringify(model), 'utf8');
-  writeReport(model, rows.length);
+  fs.mkdirSync(path.dirname(modelPath), { recursive: true });
+  fs.writeFileSync(modelPath, JSON.stringify(model), 'utf8');
+  writeReport(model, rows.length, reportPath);
   return model;
 }
 

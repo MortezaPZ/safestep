@@ -49,14 +49,16 @@ class OwnStatus {
 
     final List<String> names = <String>[];
     if (sharing != null) {
-      for (final Map<String, dynamic> viewer in Json.mapList(sharing['viewers'])) {
+      for (final Map<String, dynamic> viewer
+          in Json.mapList(sharing['viewers'])) {
         final String name = Json.str(viewer, 'fullName');
         if (name.isNotEmpty) names.add(name);
       }
     }
 
     return OwnStatus(
-      sharingEnabled: sharing == null ? true : Json.boolOf(sharing, 'enabled', true),
+      sharingEnabled:
+          sharing == null ? true : Json.boolOf(sharing, 'enabled', true),
       viewerCount: sharing == null ? 0 : Json.intOf(sharing, 'viewerCount'),
       viewerNames: names,
       batteryLevel: Json.intOrNull(json, 'batteryLevel'),
@@ -107,7 +109,8 @@ class LocationRepository {
       },
       body: <String, dynamic>{
         'pings': samples
-            .map((LocationSample s) => s.copyWith(isQueuedReplay: true).toJson())
+            .map(
+                (LocationSample s) => s.copyWith(isQueuedReplay: true).toJson())
             .toList(),
       },
     );
@@ -145,6 +148,23 @@ class LocationRepository {
             : Json.boolOf(settings, 'locationSharingEnabled', enabled);
       },
       body: <String, dynamic>{'enabled': enabled},
+    );
+  }
+
+  /// وضعیت توقف دستی ردیابی، مستقل از اجازه‌ی اشتراک‌گذاری موقعیت.
+  Future<bool> setTrackingActive(bool active) async {
+    return _api.put<bool>(
+      ApiEndpoints.trackingActive,
+      (dynamic data) {
+        if (data is! Map<String, dynamic> || data['trackingActive'] is! bool) {
+          throw const AppException(
+            message: 'پاسخ سرور درباره‌ی وضعیت ردیابی قابل خواندن نبود.',
+            code: 'BAD_PAYLOAD',
+          );
+        }
+        return data['trackingActive'] as bool;
+      },
+      body: <String, dynamic>{'active': active},
     );
   }
 }

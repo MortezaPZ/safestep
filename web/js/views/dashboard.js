@@ -12,6 +12,7 @@
  * خودش باشد، نه گزارشی که دیگران از او می‌گیرند.
  */
 import api from '../api.js';
+import { getSosLocation } from '../utils/sos-location.js';
 import { carePanel } from './care-panel.js';
 import realtime, { WS_EVENTS } from '../realtime.js';
 import SafeMap from '../map.js';
@@ -244,20 +245,9 @@ export function mountDashboard(container, ctx) {
     haptic([60, 40, 60, 40, 120]);
 
     try {
-      const location = await new Promise((resolve) => {
-        if (!navigator.geolocation) return resolve(null);
-        navigator.geolocation.getCurrentPosition(
-          (position) => resolve(position.coords),
-          () => resolve(null),
-          { enableHighAccuracy: true, maximumAge: 0, timeout: 4000 },
-        );
-      });
+      const location = await getSosLocation(navigator.geolocation);
       const result = await api.triggerSos({
-        ...(location ? {
-          lat: location.latitude,
-          lng: location.longitude,
-          accuracyM: location.accuracy,
-        } : {}),
+        ...(location ?? {}),
         batteryLevel: status?.batteryLevel ?? undefined,
       });
 

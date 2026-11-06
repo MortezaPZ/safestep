@@ -21,6 +21,7 @@ import '../../auth/presentation/auth_controller.dart';
 import '../../fall/data/fall_repository.dart';
 import '../../tracking/data/location_repository.dart';
 import '../../tracking/presentation/tracking_controller.dart';
+import '../domain/document_policy.dart';
 
 /// تنظیمات.
 ///
@@ -82,7 +83,6 @@ class SettingsPage extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           const SizedBox(height: AppSpacing.md),
-
           if (user != null) ...<Widget>[
             AppCard(
               semanticLabel: '${user.fullName}، ${user.role.label}',
@@ -117,7 +117,6 @@ class SettingsPage extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.md),
           ],
-
           AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,14 +129,16 @@ class SettingsPage extends ConsumerWidget {
                   children: <Widget>[
                     ChoiceChip(
                       label: const Text('فارسی'),
-                      selected: ref.watch(accessibilityProvider).localeCode == 'fa',
+                      selected:
+                          ref.watch(accessibilityProvider).localeCode == 'fa',
                       onSelected: (_) => ref
                           .read(accessibilityProvider.notifier)
                           .setLocaleCode('fa'),
                     ),
                     ChoiceChip(
                       label: const Text('English'),
-                      selected: ref.watch(accessibilityProvider).localeCode == 'en',
+                      selected:
+                          ref.watch(accessibilityProvider).localeCode == 'en',
                       onSelected: (_) => ref
                           .read(accessibilityProvider.notifier)
                           .setLocaleCode('en'),
@@ -148,25 +149,25 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-
           AppCard(
             padding: EdgeInsets.zero,
             child: Column(
               children: <Widget>[
                 _SettingsTile(
                   icon: Icons.notifications_active_outlined,
-                  title: 'اعلان لحظه‌ای',
+                  title: 'اعلان محلی',
                   subtitle: ref.watch(pushStatusProvider).reason,
                   onTap: () async {
                     try {
-                      final String reason = await ref.read(pushServiceProvider).enableAndConfirm();
-                      ref.read(pushStatusProvider.notifier).state = PushStatus(
-                        available: true,
-                        reason: reason,
+                      final PushStatus status = await enablePushAndReadStatus(
+                        ref.read(pushServiceProvider),
                       );
+                      ref.read(pushStatusProvider.notifier).state = status;
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('اعلان لحظه‌ای فعال شد')),
+                          SnackBar(
+                            content: Text(pushPermissionFeedback(status)),
+                          ),
                         );
                       }
                     } catch (error) {
@@ -195,15 +196,22 @@ class SettingsPage extends ConsumerWidget {
                       context: context,
                       builder: (BuildContext context) => AlertDialog(
                         title: const Text('اشتراک موقعیت'),
-                        content: const Text('ناظر اصلی حتی پس از خاموش کردن هم می‌تواند موقعیت را ببیند.'),
+                        content: const Text(
+                            'ناظر اصلی حتی پس از خاموش کردن هم می‌تواند موقعیت را ببیند.'),
                         actions: <Widget>[
-                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('خاموش')),
-                          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('روشن')),
+                          TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('خاموش')),
+                          TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('روشن')),
                         ],
                       ),
                     );
                     if (enable == null) return;
-                    await ref.read(locationRepositoryProvider).setSharing(enable);
+                    await ref
+                        .read(locationRepositoryProvider)
+                        .setSharing(enable);
                   },
                 ),
                 const Divider(height: 1),
@@ -224,17 +232,23 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsTile(
                   icon: Icons.personal_injury_outlined,
                   title: 'تشخیص سقوط',
-                  subtitle: 'با زدن این گزینه گزارش سقوط برای ناظر و مدیر ثبت می‌شود',
+                  subtitle:
+                      'با زدن این گزینه گزارش سقوط برای ناظر و مدیر ثبت می‌شود',
                   onTap: () async {
                     if (ref.read(currentUserProvider)?.role == UserRole.admin) {
                       context.go(AppRoutes.adminFalls);
                       return;
                     }
                     try {
-                      await ref.read(fallRepositoryProvider).reportMissed();
+                      await ref.read(fallRepositoryProvider).reportMissed(
+                            location:
+                                ref.read(trackingControllerProvider).lastSample,
+                          );
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('گزارش سقوط ثبت شد و برای ناظر و مدیر ارسال شد')),
+                          const SnackBar(
+                              content: Text(
+                                  'گزارش سقوط ثبت شد و برای ناظر و مدیر ارسال شد')),
                         );
                       }
                     } catch (error) {
@@ -260,13 +274,13 @@ class SettingsPage extends ConsumerWidget {
               ],
             ),
           ),
-
-          const SizedBox(height: AppSpacing.lg),
-          const _DocumentsCard(),
-          const SizedBox(height: AppSpacing.md),
+          if (DocumentPolicy.canUpload(user?.verificationStatus)) ...<Widget>[
+            const SizedBox(height: AppSpacing.lg),
+            const _DocumentsCard(),
+            const SizedBox(height: AppSpacing.md),
+          ],
           const _SupportCard(),
           const SizedBox(height: AppSpacing.lg),
-
           if (user != null)
             AppButton(
               label: 'خروج از حساب',
@@ -275,16 +289,13 @@ class SettingsPage extends ConsumerWidget {
               destructive: true,
               onPressed: () => _confirmLogout(context, ref),
             ),
-
           const SizedBox(height: AppSpacing.lg),
-
           Center(
             child: Text(
               '${AppConfig.appName} — نسخه‌ی ۱٫۰٫۰',
               style: theme.textTheme.bodySmall,
             ),
           ),
-
           const SizedBox(height: AppSpacing.xl),
         ],
       ),
@@ -381,7 +392,8 @@ class _DocumentsCardState extends ConsumerState<_DocumentsCard> {
                     : map['status'] == 'pending'
                         ? 'در انتظار'
                         : '${map['status']}';
-                final health = map['status'] == 'approved' ? map['healthCondition'] : null;
+                final health =
+                    map['status'] == 'approved' ? map['healthCondition'] : null;
                 final name = map['userName'] ?? '';
                 return '$name $status${health == null ? '' : ' — مشکل: $health'}';
               }).join('\n');
@@ -398,13 +410,15 @@ class _DocumentsCardState extends ConsumerState<_DocumentsCard> {
     } on FormatException catch (error) {
       if (mounted) setState(() => _uploadStatus = error.message);
     } catch (error) {
-      if (mounted) setState(() => _uploadStatus = 'انتخاب تصویر ناموفق بود: $error');
+      if (mounted)
+        setState(() => _uploadStatus = 'انتخاب تصویر ناموفق بود: $error');
     }
   }
 
   Future<void> _send() async {
     if (_image == null) {
-      setState(() => _uploadStatus = 'ابتدا تصویر مدرک را از گالری انتخاب کنید.');
+      setState(
+          () => _uploadStatus = 'ابتدا تصویر مدرک را از گالری انتخاب کنید.');
       return;
     }
     setState(() {
@@ -412,28 +426,29 @@ class _DocumentsCardState extends ConsumerState<_DocumentsCard> {
       _uploadStatus = '';
     });
     try {
-    final Map<String, dynamic> body = <String, dynamic>{
-      'documentType': 'identity',
-      'imageUrl': _image!.dataUrl,
-    };
-    final String condition = _condition.text.trim();
-    if (condition.length >= 2) body['healthCondition'] = condition;
-    if (_subjectUserId != null) body['subjectUserId'] = _subjectUserId;
-    await ref.read(apiClientProvider).post<Map<String, dynamic>>(
-      '/documents',
-      (dynamic raw) => Map<String, dynamic>.from(raw as Map),
-      body: body,
-    );
-    _condition.clear();
+      final Map<String, dynamic> body = <String, dynamic>{
+        'documentType': 'identity',
+        'imageUrl': _image!.dataUrl,
+      };
+      final String condition = _condition.text.trim();
+      if (condition.length >= 2) body['healthCondition'] = condition;
+      if (_subjectUserId != null) body['subjectUserId'] = _subjectUserId;
+      await ref.read(apiClientProvider).post<Map<String, dynamic>>(
+            '/documents',
+            (dynamic raw) => Map<String, dynamic>.from(raw as Map),
+            body: body,
+          );
+      _condition.clear();
       if (mounted) {
         setState(() {
           _image = null;
           _uploadStatus = 'تصویر مدرک برای بررسی ارسال شد.';
         });
       }
-    await _load();
+      await _load();
     } catch (error) {
-      if (mounted) setState(() => _uploadStatus = 'ارسال مدرک ناموفق بود: $error');
+      if (mounted)
+        setState(() => _uploadStatus = 'ارسال مدرک ناموفق بود: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -452,23 +467,29 @@ class _DocumentsCardState extends ConsumerState<_DocumentsCard> {
           const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: _condition,
-            decoration: const InputDecoration(hintText: 'مشکل شخص، مثلاً بیماری قلبی'),
+            maxLength: DocumentPolicy.healthConditionMaxLength,
+            decoration:
+                const InputDecoration(hintText: 'مشکل شخص، مثلاً بیماری قلبی'),
           ),
           const SizedBox(height: AppSpacing.sm),
           OutlinedButton.icon(
             onPressed: _busy ? null : _pickImage,
             icon: const Icon(Icons.photo_library_outlined),
-            label: Text(_image == null ? 'انتخاب تصویر مدرک' : 'تغییر تصویر مدرک'),
+            label:
+                Text(_image == null ? 'انتخاب تصویر مدرک' : 'تغییر تصویر مدرک'),
           ),
           if (_image != null) ...<Widget>[
             const SizedBox(height: AppSpacing.sm),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.memory(_image!.bytes, height: 160, fit: BoxFit.contain),
+              child:
+                  Image.memory(_image!.bytes, height: 160, fit: BoxFit.contain),
             ),
           ],
           const SizedBox(height: AppSpacing.sm),
-          AppButton(label: _busy ? 'در حال ارسال…' : 'ارسال مدرک', onPressed: _busy ? null : _send),
+          AppButton(
+              label: _busy ? 'در حال ارسال…' : 'ارسال مدرک',
+              onPressed: _busy ? null : _send),
           if (_uploadStatus.isNotEmpty) ...<Widget>[
             const SizedBox(height: AppSpacing.sm),
             Text(_uploadStatus),
@@ -509,9 +530,9 @@ class _SupportCardState extends ConsumerState<_SupportCard> {
   Future<void> _load() async {
     try {
       final data = await ref.read(apiClientProvider).get<Map<String, dynamic>>(
-        '/support/messages',
-        (dynamic raw) => Map<String, dynamic>.from(raw as Map),
-      );
+            '/support/messages',
+            (dynamic raw) => Map<String, dynamic>.from(raw as Map),
+          );
       final messages = (data['messages'] as List?) ?? const [];
       if (!mounted) return;
       setState(() {
@@ -532,7 +553,8 @@ class _SupportCardState extends ConsumerState<_SupportCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text('پیام به پشتیبانی', style: Theme.of(context).textTheme.titleMedium),
+          Text('پیام به پشتیبانی',
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           TextField(controller: _body, minLines: 2, maxLines: 4),
           const SizedBox(height: AppSpacing.sm),

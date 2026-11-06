@@ -89,7 +89,7 @@ export async function submitIdentityDocument(userId, documentType, imageUrl, hea
     imageUrl,
     healthCondition,
   );
-  await adminRepository.setVerificationStatus(userId, 'pending');
+  if (!document) throw conflict('کاربر تأییدشده نمی‌تواند مدرک جدید ارسال کند.');
   invalidateAccountState(userId);
   return { document, verificationStatus: 'pending' };
 }

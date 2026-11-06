@@ -278,6 +278,13 @@ router.put(
   location.setSharing,
 );
 
+router.put(
+  '/locations/tracking',
+  requireAuth,
+  validate({ body: z.object({ active: z.boolean() }) }),
+  location.setTracking,
+);
+
 /* ═══════════════════════ محدوده‌های امن ═══════════════════════ */
 
 const latLngPair = z.union([
@@ -402,6 +409,14 @@ router.get(
     }),
   }),
   alert.list,
+);
+
+router.post(
+  '/alerts/:id/delivery-receipt',
+  requireAuth,
+  generalLimiter,
+  validate({ params: z.object({ id: schemas.uuid }) }),
+  alert.receipt,
 );
 
 router.post(
@@ -559,6 +574,7 @@ router.post(
       lat: z.number().min(-90).max(90),
       lng: z.number().min(-180).max(180),
       accuracyM: z.number().min(0).max(10_000),
+      environment: z.enum(['open', 'urban']),
     }),
   }),
   evaluation.sampleReference,
@@ -577,6 +593,15 @@ router.post(
 );
 
 router.get('/evaluation/summary', requireAuth, requireAdmin, evaluation.summary);
+router.get(
+  '/evaluation/export/:dataset',
+  requireAuth,
+  requireAdmin,
+  validate({ params: z.object({ dataset: z.enum([
+    'location_reference_samples', 'sus_responses', 'alert_deliveries', 'fall_events', 'location_telemetry',
+  ]) }) }),
+  evaluation.exportCsv,
+);
 
 router.post('/simulator/stop', requireAuth, simulator.stop);
 router.get('/simulator/status', requireAuth, simulator.status);

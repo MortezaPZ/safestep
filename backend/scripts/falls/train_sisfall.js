@@ -4,6 +4,8 @@
  * put them under data/falls/raw/SisFall or provide a grouped feature CSV.
  */
 import fs from 'node:fs';
+import os from 'node:os';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convertIfPresent } from './convert_sisfall.js';
@@ -16,12 +18,24 @@ const DATA_CSV = path.resolve(process.env.SISFALL_FEATURE_CSV || path.join(ROOT,
 const MODEL_PATH = path.join(ROOT, 'src/services/fallDetection/model.json');
 const REPORT_PATH = path.resolve(ROOT, '../docs/phase3/04-sisfall-training-report.md');
 const SWEEP_PATH = path.resolve(ROOT, '../docs/evaluation/fall-rule-threshold-sweep.csv');
+const OOF_PATH = path.resolve(ROOT, '../docs/evaluation/fall-out-of-fold-scores.csv');
 const SOURCE_REVISION = 'f8a95e5c953169985dc9641e1a5772e6b7b47a83';
 const SOURCE_ARCHIVE_URL = `https://huggingface.co/datasets/Trupal7/Sisfall_Dataset/resolve/${SOURCE_REVISION}/SisFall_dataset.zip`;
 const SOURCE_ARCHIVE_SHA256 = '7f0dd1583e39fee0f402a6855976eb12517f7eaecdacce871d5b3421793ad665';
 
 function pct(value) {
   return `${(value * 100).toFixed(2)}%`;
+}
+
+export function outOfFoldCsv(rows) {
+  const csvCell = (value) => {
+    let text = String(value ?? '');
+    if (typeof value === 'string' && /^[=+@\-\t\r]/.test(text)) text = "'" + text;
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  return ['fold,subject_id,label,margin,agree_ratio', ...rows.map((row) =>
+    [row.fold, row.subjectId, row.label, row.margin, row.agreeRatio].map(csvCell).join(','),
+  )].join('\n') + '\n';
 }
 
 export function thresholdSweepCsv(rows) {
@@ -77,27 +91,21 @@ README داخل آرشیو ۴٬۵۱۰ فایل را اعلام می‌کند، �
 }
 
 function main() {
-  if (!fs.existsSync(DATA_CSV)) {
-    if (PREPARED_CSV) {
-      throw new Error(`Prepared SisFall feature CSV not found: ${DATA_CSV}`);
+  const converted = PREPARED_CSV ? null : path.join(os.tmpdir(), `safestep-sisfall-${randomUUID()}.csv`);
+  let source;
+  try {
+    if (converted) {
+      if (!fs.existsSync(RAW)) {
+        throw new Error(`SisFall source data not found. Add raw recordings under ${RAW} or set SISFALL_FEATURE_CSV to a prepared feature CSV.`);
+      }
+      convertIfPresent(converted);
     }
-    if (!fs.existsSync(RAW)) {
-      throw new Error(
-        `SisFall source data not found. Add raw recordings under ${RAW} or set SISFALL_FEATURE_CSV to a prepared feature CSV.`,
-      );
-    }
-    convertIfPresent();
+    source = fs.readFileSync(converted ?? DATA_CSV, 'utf8');
+  } finally {
+    if (converted && fs.existsSync(converted)) fs.unlinkSync(converted);
   }
-
-  let source = fs.readFileSync(DATA_CSV, 'utf8');
   if (source.includes('# SYNTHETIC')) {
-    if (!PREPARED_CSV && fs.existsSync(RAW)) {
-      convertIfPresent();
-      source = fs.readFileSync(DATA_CSV, 'utf8');
-    }
-    if (source.includes('# SYNTHETIC')) {
-      throw new Error(`Refusing to train the SisFall model from synthetic data: ${DATA_CSV}`);
-    }
+    throw new Error(`Refusing to train the SisFall model from synthetic data: ${DATA_CSV}`);
   }
   const rows = parseCsv(source);
   if (rows.length === 0) throw new Error(`No valid labeled feature rows found in ${DATA_CSV}`);
@@ -105,12 +113,14 @@ function main() {
       throw new Error('SisFall rows must include subject_id and recording_id columns. Regenerate with convert_sisfall.js or provide a 17-column grouped feature CSV.');
   }
 
-  const model = trainFromRows(rows);
+  let scores;
+  const model = trainFromRows(rows, { onOuterScores: (outerScores) => { scores = outerScores; } });
   model.datasetKind = 'sisfall-public-simulated-falls';
   fs.writeFileSync(MODEL_PATH, JSON.stringify(model), 'utf8');
 
   fs.mkdirSync(path.dirname(SWEEP_PATH), { recursive: true });
   fs.writeFileSync(SWEEP_PATH, thresholdSweepCsv(model.thresholdSweep), 'utf8');
+  fs.writeFileSync(OOF_PATH, outOfFoldCsv(scores), 'utf8');
   writeReport(model, rows.length);
   process.stdout.write(`Trained SisFall model from ${rows.length} rows; threshold sweep: ${SWEEP_PATH}\n`);
 }

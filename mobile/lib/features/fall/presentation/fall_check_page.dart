@@ -7,8 +7,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_exception.dart';
 import '../../../core/utils/fa.dart';
-import '../data/fall_repository.dart';
+import '../../../core/push/push_service.dart';
+import '../data/fall_response_coordinator.dart';
+import '../../tracking/presentation/tracking_controller.dart';
 
 /// صفحه‌ی تمام‌صفحه پس از تشخیص مثبت: شمارش معکوس و دو دکمه‌ی درشت.
 class FallCheckPage extends ConsumerStatefulWidget {
@@ -16,10 +19,18 @@ class FallCheckPage extends ConsumerStatefulWidget {
     super.key,
     required this.fallEventId,
     this.countdownSec = 30,
+    this.startedAt,
+    this.deadline,
+    this.retryMode = false,
+    this.retryMessage,
   });
 
   final String fallEventId;
   final int countdownSec;
+  final DateTime? startedAt;
+  final DateTime? deadline;
+  final bool retryMode;
+  final String? retryMessage;
 
   @override
   ConsumerState<FallCheckPage> createState() => FallCheckPageState();
@@ -29,21 +40,57 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
   late int _left;
   Timer? _timer;
   bool _submitted = false;
+  bool _sending = false;
+  bool _retryMode = false;
+  String? _responseError;
   DateTime? _started;
+  DateTime? _deadline;
 
   @override
   void initState() {
     super.initState();
-    _left = widget.countdownSec;
-    _started = DateTime.now();
+    final DateTime now = DateTime.now();
+    _started = widget.startedAt ?? now;
+    _deadline = widget.deadline ??
+        _started!.add(Duration(seconds: widget.countdownSec));
+    _left = _remainingSeconds(now);
+    _retryMode = widget.retryMode;
+    _responseError = widget.retryMessage;
     HapticFeedback.heavyImpact();
+    unawaited(_showFallNotification());
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _submitted) return;
-      setState(() => _left -= 1);
-      if (_left <= 0) {
+      setState(() => _left = _remainingSeconds(DateTime.now()));
+      if (_left <= 0 && !_retryMode) {
         unawaited(_send('no_response'));
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant FallCheckPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.retryMode && !_retryMode) {
+      _retryMode = true;
+      _timer?.cancel();
+    }
+  }
+
+  int _remainingSeconds(DateTime now) {
+    final int remaining = _deadline!.difference(now).inSeconds;
+    return remaining < 0 ? 0 : remaining;
+  }
+
+  Future<void> _showFallNotification() async {
+    try {
+      await ref.read(pushServiceProvider).showFallCheckNotification(
+            eventId: widget.fallEventId,
+            startedAt: _started!,
+            deadline: _deadline!,
+          );
+    } catch (error) {
+      debugPrint('اعلان بررسی سقوط نمایش داده نشد: $error');
+    }
   }
 
   @override
@@ -53,26 +100,49 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
   }
 
   Future<void> _send(String feedback) async {
-    if (_submitted) return;
-    _submitted = true;
+    if (_submitted || _sending) return;
+    _sending = true;
     _timer?.cancel();
-    final int elapsed = DateTime.now().difference(_started ?? DateTime.now()).inSeconds;
+    final int elapsed =
+        DateTime.now().difference(_started ?? DateTime.now()).inSeconds;
+    final FallResponseCoordinator coordinator =
+        ref.read(fallResponseCoordinatorProvider);
+    final TrackingController tracking =
+        ref.read(trackingControllerProvider.notifier);
+    final PushService push = ref.read(pushServiceProvider);
     try {
-      await ref.read(fallRepositoryProvider).feedback(
-            id: widget.fallEventId,
-            feedback: feedback,
-            respondedWithinSec: elapsed.clamp(0, 600),
-          );
-    } catch (_) {
-      // حتی اگر شبکه قطع باشد صفحه بسته می‌شود؛ watchdog سرور پشتیبان است
-    }
-    if (mounted) {
-      final GoRouter? router = GoRouter.maybeOf(context);
-      if (router != null) {
-        router.go(AppRoutes.home);
-      } else {
-        Navigator.of(context).maybePop();
+      final bool submitted = await coordinator.respond(
+                eventId: widget.fallEventId,
+                feedback: feedback,
+                respondedWithinSec: elapsed,
+              );
+      if (!submitted) {
+        _responseError = 'پاسخ دیگری در حال ثبت است. کمی صبر کنید.';
+        return;
       }
+      _submitted = true;
+      if (tracking.mounted) tracking.clearPendingFall();
+      try {
+        await push.cancelFallCheckNotification();
+      } catch (error) {
+        debugPrint('اعلان سقوط لغو نشد: $error');
+      }
+      if (mounted) {
+        final GoRouter? router = GoRouter.maybeOf(context);
+        if (router != null) {
+          router.go(AppRoutes.home);
+        } else {
+          Navigator.of(context).maybePop();
+        }
+      }
+    } catch (error) {
+      _retryMode = true;
+      _responseError = error is AppException
+          ? error.message
+          : 'پاسخ ثبت نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.';
+    } finally {
+      _sending = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -98,6 +168,15 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
                     ),
               ),
               const SizedBox(height: 24),
+              if (_responseError != null || _retryMode) ...<Widget>[
+                Text(
+                  _responseError ??
+                      'پاسخ هنوز ثبت نشده است. اتصال را بررسی کنید و دوباره یکی از گزینه‌ها را بزنید.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 12),
+              ],
               Expanded(
                 child: Semantics(
                   liveRegion: true,
@@ -120,13 +199,18 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
                 height: 72,
                 child: FilledButton(
                   style: FilledButton.styleFrom(backgroundColor: Colors.white),
-                  onPressed: () => _send('false_alarm'),
-                  child: Text(
-                    'حالم خوب است',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: AppColors.danger, fontSize: 22),
-                  ),
+                  onPressed: _sending ? null : () => _send('false_alarm'),
+                  child: _sending
+                      ? const CircularProgressIndicator()
+                      : Text(
+                          'حالم خوب است',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 22,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -137,8 +221,13 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
                     foregroundColor: Colors.white,
                     side: const BorderSide(color: Colors.white, width: 2),
                   ),
-                  onPressed: () => _send('confirmed'),
-                  child: const Text('کمک می‌خواهم', style: TextStyle(fontSize: 22)),
+                  onPressed: _sending ? null : () => _send('confirmed'),
+                  child: _sending
+                      ? const CircularProgressIndicator()
+                      : const Text(
+                          'کمک می‌خواهم',
+                          style: TextStyle(fontSize: 22),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),

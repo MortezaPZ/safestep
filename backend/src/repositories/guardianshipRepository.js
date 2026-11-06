@@ -117,6 +117,8 @@ export async function upsert({ primaryUserId, guardianUserId, permissions, nickn
        nickname    = COALESCE(EXCLUDED.nickname, guardianships.nickname),
        status      = 'active',
        revoked_at  = NULL,
+       is_main_supervisor = CASE WHEN guardianships.status = 'active'
+                                 THEN guardianships.is_main_supervisor ELSE FALSE END,
        created_at  = now()
      RETURNING *`,
     [primaryUserId, guardianUserId, permissions, nickname ?? null],
@@ -136,6 +138,8 @@ export async function updatePermissions(id, permissions) {
 
 export async function setMainSupervisor(primaryUserId, guardianshipId) {
   return db.transaction(async (tx) => {
+    // Serialize switches even when the primary has no active relationships.
+    await tx.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [primaryUserId]);
     const { rows: active } = await tx.query(
       `SELECT id FROM guardianships
         WHERE primary_user_id = $1 AND status = 'active'
@@ -144,20 +148,23 @@ export async function setMainSupervisor(primaryUserId, guardianshipId) {
     );
     if (!active.some((row) => row.id === guardianshipId)) return null;
 
+    await tx.query(
+      `UPDATE guardianships SET is_main_supervisor = FALSE
+        WHERE primary_user_id = $1 AND status = 'active' AND is_main_supervisor = TRUE`,
+      [primaryUserId],
+    );
     const { rows } = await tx.query(
-      `UPDATE guardianships
-          SET is_main_supervisor = (id = $2)
-        WHERE primary_user_id = $1 AND status = 'active'
-        RETURNING *`,
+      `UPDATE guardianships SET is_main_supervisor = TRUE
+        WHERE id = $2 AND primary_user_id = $1 AND status = 'active' RETURNING *`,
       [primaryUserId, guardianshipId],
     );
-    return mapGuardianship(rows.find((row) => row.id === guardianshipId));
+    return mapGuardianship(rows[0]);
   });
 }
 
 export async function revoke(id) {
   const { rows } = await db.query(
-    `UPDATE guardianships SET status = 'revoked', revoked_at = now()
+    `UPDATE guardianships SET status = 'revoked', revoked_at = now(), is_main_supervisor = FALSE
      WHERE id = $1 AND status = 'active'
      RETURNING *`,
     [id],

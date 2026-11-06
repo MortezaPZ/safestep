@@ -16,6 +16,7 @@ import '../../fall/data/fall_detector_service.dart';
 import '../../fall/data/fall_repository.dart';
 import '../data/location_queue.dart';
 import '../data/location_repository.dart';
+import '../data/tracking_intent_sync.dart';
 import '../data/permission_service.dart';
 import '../domain/location_sample.dart';
 
@@ -34,6 +35,8 @@ class TrackingState {
     this.powerSave = false,
     this.pendingFall,
     this.foregroundServiceAvailable = true,
+    this.fallSensorWarning,
+    this.trackingSyncError,
   });
 
   final TrackingStatus status;
@@ -54,6 +57,8 @@ class TrackingState {
   final bool powerSave;
   final FallDetectResult? pendingFall;
   final bool foregroundServiceAvailable;
+  final String? fallSensorWarning;
+  final String? trackingSyncError;
 
   bool get isActive =>
       status == TrackingStatus.live || status == TrackingStatus.offline;
@@ -70,7 +75,12 @@ class TrackingState {
     bool? powerSave,
     FallDetectResult? pendingFall,
     bool? foregroundServiceAvailable,
+    String? fallSensorWarning,
+    String? trackingSyncError,
     bool clearError = false,
+    bool clearPendingFall = false,
+    bool clearFallSensorWarning = false,
+    bool clearTrackingSyncError = false,
   }) {
     return TrackingState(
       status: status ?? this.status,
@@ -82,9 +92,15 @@ class TrackingState {
       batteryLevel: batteryLevel ?? this.batteryLevel,
       error: clearError ? null : (error ?? this.error),
       powerSave: powerSave ?? this.powerSave,
-      pendingFall: pendingFall ?? this.pendingFall,
+      pendingFall: clearPendingFall ? null : (pendingFall ?? this.pendingFall),
       foregroundServiceAvailable:
           foregroundServiceAvailable ?? this.foregroundServiceAvailable,
+      fallSensorWarning: clearFallSensorWarning
+          ? null
+          : (fallSensorWarning ?? this.fallSensorWarning),
+      trackingSyncError: clearTrackingSyncError
+          ? null
+          : (trackingSyncError ?? this.trackingSyncError),
     );
   }
 }
@@ -106,7 +122,31 @@ class TrackingState {
 /// کمک لازم داشته باشد. بدون صف، آن چند دقیقه از تاریخچه برای همیشه گم
 /// می‌شود و مراقب یک شکاف بی‌توضیح می‌بیند.
 class TrackingController extends StateNotifier<TrackingState> {
-  TrackingController(this._ref) : super(const TrackingState());
+  TrackingController(this._ref, {TrackingIntentStore? trackingIntentStore})
+      : super(const TrackingState()) {
+    _trackingIntentSync = TrackingIntentSynchronizer(
+      store: trackingIntentStore ?? SharedPreferencesTrackingIntentStore(),
+      send: (bool active) async {
+        final bool confirmed = await _repository.setTrackingActive(active);
+        if (confirmed != active) {
+          throw const AppException(
+            message: 'وضعیت ردیابی در پاسخ سرور با درخواست شما هماهنگ نبود.',
+            code: 'TRACKING_STATE_MISMATCH',
+          );
+        }
+      },
+      currentUserId: () {
+        final AuthState auth = _ref.read(authControllerProvider);
+        return auth.isAuthenticated ? auth.user?.id : null;
+      },
+      onStatus: (String? message) {
+        if (!mounted) return;
+        state = message == null
+            ? state.copyWith(clearTrackingSyncError: true)
+            : state.copyWith(trackingSyncError: message);
+      },
+    );
+  }
 
   final Ref _ref;
 
@@ -116,6 +156,10 @@ class TrackingController extends StateNotifier<TrackingState> {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _flushTimer;
   FallDetectorService? _fallDetector;
+  late final TrackingIntentSynchronizer _trackingIntentSync;
+  int _trackingCommandGeneration = 0;
+  Future<void> _localLifecycleQueue = Future<void>.value();
+  String? _lastKnownTrackingUserId;
 
   final Battery _battery = Battery();
 
@@ -153,10 +197,15 @@ class TrackingController extends StateNotifier<TrackingState> {
   ///
   /// اگر مجوز نباشد، **خودش درخواست نمی‌کند**: لایه‌ی رابط کاربری باید اول
   /// توضیح دهد چرا. این تابع فقط وضعیت را برمی‌گرداند تا صفحه تصمیم بگیرد.
-  Future<bool> start() async {
+  Future<bool> start() {
+    final int command = ++_trackingCommandGeneration;
     state = state.copyWith(status: TrackingStatus.starting, clearError: true);
+    return _enqueueLocalLifecycle<bool>(() => _start(command));
+  }
 
+  Future<bool> _start(int command) async {
     final LocationPermissionState permission = await _permissions.check();
+    if (command != _trackingCommandGeneration) return false;
     state = state.copyWith(permission: permission);
 
     if (permission == LocationPermissionState.serviceDisabled) {
@@ -177,17 +226,37 @@ class TrackingController extends StateNotifier<TrackingState> {
     }
 
     final bool foregroundServiceAvailable = await _startForegroundService();
-    _fallDetector ??= FallDetectorService(_ref.read(fallRepositoryProvider));
+    if (command != _trackingCommandGeneration) {
+      return false;
+    }
+    _fallDetector ??= FallDetectorService(
+      _ref.read(fallRepositoryProvider),
+      currentLocation: () => state.lastSample,
+      isFallCheckActive: () => state.pendingFall != null,
+    );
     _fallDetector!.onPositive = (FallDetectResult result) {
+      if (command != _trackingCommandGeneration) return;
+      if (state.pendingFall != null) return;
       state = state.copyWith(pendingFall: result);
     };
+    _fallDetector!.onSensorError = (String sensorName) {
+      if (!mounted || command != _trackingCommandGeneration) return;
+      state = state.copyWith(
+        fallSensorWarning:
+            'حسگر $sensorName در دسترس نیست؛ تشخیص سقوط در این گوشی فعال نیست.',
+      );
+    };
+    state = state.copyWith(clearFallSensorWarning: true);
     try {
       await _fallDetector!.start();
     } catch (error) {
       debugPrint('حسگر سقوط راه‌اندازی نشد: $error');
     }
+    if (command != _trackingCommandGeneration) return false;
     await _listenConnectivity();
-    await _startPositionStream();
+    if (command != _trackingCommandGeneration) return false;
+    await _startPositionStream(command);
+    if (command != _trackingCommandGeneration) return false;
 
     _flushTimer?.cancel();
     // تخلیه‌ی دوره‌ای صف، مستقل از رویداد اتصال: بعضی گوشی‌ها تغییر شبکه را
@@ -202,6 +271,8 @@ class TrackingController extends StateNotifier<TrackingState> {
       foregroundServiceAvailable: foregroundServiceAvailable,
     );
     await _updateQueueCount();
+    if (command != _trackingCommandGeneration) return false;
+    await _sendTrackingIntent(true);
     return true;
   }
 
@@ -209,7 +280,32 @@ class TrackingController extends StateNotifier<TrackingState> {
   ///
   /// صف پاک **نمی‌شود**: نمونه‌های ارسال‌نشده متعلق به تاریخچه‌ی کاربرند و
   /// با روشن شدن دوباره فرستاده می‌شوند.
-  Future<void> stop() async {
+  Future<void> stop() {
+    final int command = ++_trackingCommandGeneration;
+    // صف‌کردن intent همین‌جا، قبل از پاک‌سازی محلی؛ اگر شروع تازه‌ای برسد،
+    // synchronizer آن را بعد از این توقف می‌فرستد.
+    final Future<void> intent = _sendTrackingIntent(false);
+    return _enqueueLocalLifecycle<void>(() async {
+      if (command == _trackingCommandGeneration) {
+        await _stopLocalTracking();
+        if (command == _trackingCommandGeneration) {
+          state = state.copyWith(status: TrackingStatus.off);
+        }
+      }
+      await intent;
+    });
+  }
+
+  Future<T> _enqueueLocalLifecycle<T>(Future<T> Function() action) {
+    final Future<T> operation = _localLifecycleQueue.then<T>((_) => action());
+    _localLifecycleQueue = operation.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {},
+    );
+    return operation;
+  }
+
+  Future<void> _stopLocalTracking() async {
     await _positionSub?.cancel();
     _positionSub = null;
 
@@ -222,8 +318,47 @@ class TrackingController extends StateNotifier<TrackingState> {
     await _fallDetector?.stop();
 
     await _stopForegroundService();
+  }
 
-    state = state.copyWith(status: TrackingStatus.off);
+  Future<void> _sendTrackingIntent(bool active) async {
+    final AuthState auth = _ref.read(authControllerProvider);
+    final String? authenticatedUserId =
+        auth.isAuthenticated ? auth.user?.id : null;
+    if (authenticatedUserId != null) {
+      _lastKnownTrackingUserId = authenticatedUserId;
+    }
+    final String? userId = authenticatedUserId ?? _lastKnownTrackingUserId;
+    if (userId == null) {
+      state = state.copyWith(
+        trackingSyncError: active
+            ? 'شروع ردیابی به سرور اعلام نشد؛ دوباره وارد حساب شوید.'
+            : 'توقف ردیابی به سرور اعلام نشد؛ دوباره وارد حساب شوید.',
+      );
+      return;
+    }
+    await _trackingIntentSync.setDesiredState(userId: userId, active: active);
+    final AuthState latestAuth = _ref.read(authControllerProvider);
+    if (authenticatedUserId == null &&
+        (!latestAuth.isAuthenticated || latestAuth.user?.id != userId) &&
+        mounted) {
+      state = state.copyWith(
+        trackingSyncError: active
+            ? 'شروع ردیابی برای ارسال پس از ورود ذخیره شد؛ هنوز به سرور نرسیده است.'
+            : 'توقف ردیابی برای ارسال پس از ورود ذخیره شد؛ هنوز به سرور نرسیده است.',
+      );
+    }
+  }
+
+  /// ارسال دوباره‌ی آخرین قصد ذخیره‌شده پس از ورود یا برگشت اینترنت.
+  Future<void> retryPendingTrackingIntent() async {
+    final AuthState auth = _ref.read(authControllerProvider);
+    final String? userId = auth.isAuthenticated ? auth.user?.id : null;
+    if (userId == null) return;
+    await _trackingIntentSync.retryPending(userId);
+  }
+
+  void clearPendingFall() {
+    state = state.copyWith(clearPendingFall: true);
   }
 
   @override
@@ -261,7 +396,8 @@ class TrackingController extends StateNotifier<TrackingState> {
         androidNotificationOptions: AndroidNotificationOptions(
           channelId: 'safestep_tracking',
           channelName: 'اشتراک موقعیت',
-          channelDescription: 'وقتی موقعیت شما در حال ارسال است نمایش داده می‌شود',
+          channelDescription:
+              'وقتی موقعیت شما در حال ارسال است نمایش داده می‌شود',
           // اهمیت پایین: اعلان دیده می‌شود ولی صدا و لرزش ندارد.
           // این اعلان قرار است دائمی باشد؛ اگر هر بار تذکر بدهد، کاربر
           // خاموشش می‌کند و ردیابی پس‌زمینه از کار می‌افتد.
@@ -306,18 +442,23 @@ class TrackingController extends StateNotifier<TrackingState> {
 
   /* ═══════════════════════ جریان موقعیت ═══════════════════════ */
 
-  Future<void> _startPositionStream() async {
+  Future<void> _startPositionStream([int? expectedGeneration]) async {
+    final int generation = expectedGeneration ?? _trackingCommandGeneration;
     await _positionSub?.cancel();
+    if (generation != _trackingCommandGeneration) return;
 
     final LocationSettings settings = _buildLocationSettings();
 
-    _positionSub = Geolocator.getPositionStream(locationSettings: settings).listen(
-      _onPosition,
+    _positionSub =
+        Geolocator.getPositionStream(locationSettings: settings).listen(
+      (Position position) => unawaited(_onPosition(position, generation)),
       onError: (Object error) {
+        if (generation != _trackingCommandGeneration) return;
         state = state.copyWith(
           status: TrackingStatus.blocked,
           error: AppException(
-            message: 'دریافت موقعیت با مشکل مواجه شد. مکان‌یاب گوشی را بررسی کنید.',
+            message:
+                'دریافت موقعیت با مشکل مواجه شد. مکان‌یاب گوشی را بررسی کنید.',
             code: 'POSITION_STREAM',
             kind: AppErrorKind.permission,
           ),
@@ -334,7 +475,8 @@ class TrackingController extends StateNotifier<TrackingState> {
   LocationSettings _buildLocationSettings() {
     if (defaultTargetPlatform.isAndroidLike) {
       return AndroidSettings(
-        accuracy: state.powerSave ? LocationAccuracy.medium : LocationAccuracy.high,
+        accuracy:
+            state.powerSave ? LocationAccuracy.medium : LocationAccuracy.high,
         distanceFilter: 10,
         intervalDuration: Duration(seconds: _intervalSec),
         // اعلان جداگانه‌ی geolocator خاموش است تا با اعلان سرویس
@@ -360,10 +502,12 @@ class TrackingController extends StateNotifier<TrackingState> {
   /// چیزی نفرستیم تا اینکه داده‌ی گمراه‌کننده بفرستیم.
   static const double _maxAcceptableAccuracyM = 150;
 
-  Future<void> _onPosition(Position position) async {
+  Future<void> _onPosition(Position position, int generation) async {
+    if (generation != _trackingCommandGeneration) return;
     if (position.accuracy > _maxAcceptableAccuracyM) return;
 
     final int? battery = await _readBattery();
+    if (generation != _trackingCommandGeneration) return;
 
     final LocationSample sample = LocationSample(
       clientUuid: _uuid.v4(),
@@ -403,7 +547,7 @@ class TrackingController extends StateNotifier<TrackingState> {
           DateTime.now().difference(_stillSince!).inSeconds >= 300;
       if (shouldSave != powerSave) {
         powerSave = shouldSave;
-        unawaited(_startPositionStream());
+        unawaited(_startPositionStream(generation));
       }
     }
 
@@ -413,13 +557,14 @@ class TrackingController extends StateNotifier<TrackingState> {
       powerSave: powerSave,
     );
 
-    await _deliver(sample);
+    await _deliver(sample, generation);
   }
 
   /// تلاش برای ارسال؛ در صورت شکست، صف.
-  Future<void> _deliver(LocationSample sample) async {
+  Future<void> _deliver(LocationSample sample, int generation) async {
     try {
       await _repository.sendPing(sample);
+      if (generation != _trackingCommandGeneration) return;
 
       state = state.copyWith(
         status: TrackingStatus.live,
@@ -431,6 +576,7 @@ class TrackingController extends StateNotifier<TrackingState> {
       // اتصال برقرار است؛ فرصت خوبی برای تخلیه‌ی صف
       unawaited(_flushQueue());
     } on AppException catch (error) {
+      if (generation != _trackingCommandGeneration) return;
       // خطای احراز هویت را صف نمی‌کنیم: نشست تمام شده و تلاش دوباره
       // فایده‌ای ندارد؛ کنترلر احراز هویت خودش کاربر را بیرون می‌برد.
       if (error.kind == AppErrorKind.auth) {
@@ -458,8 +604,11 @@ class TrackingController extends StateNotifier<TrackingState> {
 
         state = state.copyWith(online: online);
 
-        // با برگشت اینترنت، بلافاصله صف تخلیه می‌شود
-        if (online) unawaited(_flushQueue());
+        // با برگشت اینترنت، بلافاصله صف نمونه‌ها و intent توقف/شروع تخلیه می‌شود.
+        if (online) {
+          unawaited(_flushQueue());
+          unawaited(retryPendingTrackingIntent());
+        }
       },
     );
   }
@@ -556,7 +705,8 @@ extension on TargetPlatform {
   bool get isAndroidLike => this == TargetPlatform.android;
 }
 
-final StateNotifierProvider<TrackingController, TrackingState> trackingControllerProvider =
+final StateNotifierProvider<TrackingController, TrackingState>
+    trackingControllerProvider =
     StateNotifierProvider<TrackingController, TrackingState>((ref) {
   return TrackingController(ref);
 });

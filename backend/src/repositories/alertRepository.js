@@ -23,6 +23,22 @@ export async function findById(id) {
   return mapAlert(rows[0]);
 }
 
+/** Record the first authenticated callback from a recipient of an FCM job. */
+export async function recordFcmReceipt(alertId, recipientUserId) {
+  const { rows } = await db.query(
+    `INSERT INTO fcm_device_receipts (alert_id, recipient_user_id)
+     SELECT $1, $2 WHERE EXISTS (
+       SELECT 1 FROM notification_outbox
+        WHERE alert_id = $1 AND user_id = $2 AND channel = 'fcm'
+     )
+     ON CONFLICT (alert_id, recipient_user_id)
+     DO UPDATE SET received_at = fcm_device_receipts.received_at
+     RETURNING received_at`,
+    [alertId, recipientUserId],
+  );
+  return rows[0]?.received_at ?? null;
+}
+
 /**
  * فهرست هشدارها برای مجموعه‌ای از کاربران اصلی.
  *

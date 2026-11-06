@@ -8,9 +8,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { predict } from '../../src/services/fallDetection/classifier.js';
 import { evaluateTransition } from '../../src/services/geofenceEngine.js';
+import { parseSyntheticCsv } from './synthetic-roc.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const outDir = path.resolve(here, '../../../docs/evaluation');
+const outDir = process.env.EVALUATION_OUTPUT_DIR
+  ? path.resolve(process.env.EVALUATION_OUTPUT_DIR)
+  : path.resolve(here, '../../../docs/evaluation');
 fs.mkdirSync(outDir, { recursive: true });
 
 function writeCsv(name, rows) {
@@ -19,19 +22,13 @@ function writeCsv(name, rows) {
   return file;
 }
 
-const csvPath = path.resolve(here, '../../data/falls/dataset.csv');
+const csvPath = process.env.EVALUATION_DATASET_CSV
+  ? path.resolve(process.env.EVALUATION_DATASET_CSV)
+  : path.resolve(here, '../../data/falls/dataset.csv');
 let syntheticRocSummary = null;
-if (fs.existsSync(csvPath)) {
-  const lines = fs.readFileSync(csvPath, 'utf8').trim().split(/\r?\n/).slice(1);
-  const scored = [];
-  for (const line of lines) {
-    const cols = line.split(',');
-    const label = Number(cols[0]);
-    const features = cols.slice(1, 15).map(Number);
-    if (features.length !== 14 || features.some((n) => Number.isNaN(n))) continue;
-    const result = predict(features);
-    scored.push({ label, confidence: result.confidence });
-  }
+const syntheticRows = fs.existsSync(csvPath) ? parseSyntheticCsv(fs.readFileSync(csvPath, 'utf8')) : null;
+if (syntheticRows) {
+  const scored = syntheticRows.map(({ label, features }) => ({ label, confidence: predict(features).confidence }));
 
   const positives = scored.filter((row) => row.label === 1).length;
   const negatives = scored.length - positives;
@@ -64,7 +61,7 @@ if (fs.existsSync(csvPath)) {
   writeCsv('roc-threshold.csv', roc);
   syntheticRocSummary = `samples=${scored.length} auc≈${auc.toFixed(3)} positives=${positives} negatives=${negatives}`;
 } else {
-  process.stdout.write('Synthetic dataset not packaged; skipped roc-threshold.csv regeneration.\n');
+  process.stdout.write('Synthetic dataset missing or invalid; skipped roc-threshold.csv regeneration.\n');
 }
 
 const fence = ['hysteresis_m,debounce_count,false_exit_count,true_exit_count,source'];
@@ -91,52 +88,7 @@ for (const hysteresisM of [0, 10, 25, 40]) {
   fence.push([hysteresisM, debounceCount, falseExits, trueExits, 'geofence-engine-simulation'].join(','));
 }
 
-const model = (await import('../../src/services/fallDetection/classifier.js')).loadModel();
-const prototypes = model.knn.points;
-const k = model.knn.k;
-function looConfidence(index) {
-  const [vec, label] = prototypes[index];
-  const dists = [];
-  for (let j = 0; j < prototypes.length; j += 1) {
-    if (j === index) continue;
-    const other = prototypes[j][0];
-    let d = 0;
-    for (let i = 0; i < vec.length; i += 1) {
-      const diff = vec[i] - other[i];
-      d += diff * diff;
-    }
-    dists.push([Math.sqrt(d), prototypes[j][1]]);
-  }
-  dists.sort((a, b) => a[0] - b[0]);
-  const nearest = dists.slice(0, k);
-  const agree = nearest.filter((item) => item[1] === 1).length / nearest.length;
-  return { label, confidence: agree };
-}
-const loo = prototypes.map((_, index) => looConfidence(index));
-const looPos = loo.filter((row) => row.label === 1).length;
-const looNeg = loo.length - looPos;
-const looRows = ['threshold,tpr,fpr,tp,fp,fn,tn,source'];
-for (let step = 0; step <= 20; step += 1) {
-  const threshold = step / 20;
-  let tp = 0;
-  let fp = 0;
-  let fn = 0;
-  let tn = 0;
-  for (const row of loo) {
-    const predicted = row.confidence >= threshold ? 1 : 0;
-    if (predicted === 1 && row.label === 1) tp += 1;
-    else if (predicted === 1 && row.label === 0) fp += 1;
-    else if (predicted === 0 && row.label === 1) fn += 1;
-    else tn += 1;
-  }
-  looRows.push([
-    threshold.toFixed(2),
-    (looPos ? tp / looPos : 0).toFixed(4),
-    (looNeg ? fp / looNeg : 0).toFixed(4),
-    tp, fp, fn, tn,
-    'sisfall-prototypes-leave-one-out',
-  ].join(','));
-}
-writeCsv('roc-sisfall-loo.csv', looRows);
+// roc-sisfall-loo.csv is a historical artifact tied to an older model.
+// Replacing it with a different model would falsify its documented provenance.
 writeCsv('geofence-false-alarms.csv', fence);
 if (syntheticRocSummary) process.stdout.write(`${syntheticRocSummary}\n`);

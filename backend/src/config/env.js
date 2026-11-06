@@ -53,6 +53,7 @@ const env = {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
+  corsOriginsConfigured: Boolean(process.env.CORS_ORIGINS?.trim()),
 
   db: {
     driver: resolveDbDriver(),

@@ -608,6 +608,11 @@ export async function setLocationSharing(userId, enabled) {
   return settings;
 }
 
+export async function setTrackingActive(userId, active) {
+  await userRepository.getSettings(userId);
+  return locationRepository.setTrackingActive(userId, active);
+}
+
 /** خلاصه‌ی وضعیت کاربر برای کارت بالای داشبورد خودش. */
 export async function getOwnStatus(userId) {
   const [ping, zoneStates, settings, zones] = await Promise.all([
@@ -648,7 +653,7 @@ export async function checkGpsLostAlerts(now = Date.now()) {
   const targets = await locationRepository.gpsWatchTargets();
   let raised = 0;
   for (const target of targets) {
-    const gps = detectGpsLost(target.recordedAt, env.gpsLostAfterSec, now);
+    const gps = detectGpsLost(target.recordedAt, Math.max(env.gpsLostAfterSec, 3 * target.intervalSec), now);
     if (!gps.isLost) continue;
     const last = await alertRepository.findLastOfType(target.userId, ALERT_TYPES.GPS_LOST);
     if (last && new Date(last.createdAt).getTime() >= new Date(target.recordedAt).getTime()) continue;
@@ -672,6 +677,7 @@ export default {
   getHistoryDays,
   deleteHistory,
   setLocationSharing,
+  setTrackingActive,
   getOwnStatus,
   checkGpsLostAlerts,
   assertCanViewLocation,
