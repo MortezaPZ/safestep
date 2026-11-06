@@ -4,8 +4,8 @@
 
 | مورد | وضعیت | شواهد و کار باقی‌مانده |
 |---|---|---|
-| ۵۹ | مسدود | کد Firebase، ثبت توکن و callback در `mobile/lib/core/push/` و رسید مجاز سرور در `backend/tests/fcm.receipt.test.js` وجود دارد. `notification.outbox.test.js` قرارداد پیام و آزمون‌های موبایل منطق محلی را بررسی می‌کنند. وابستگی‌ها با lockfile در کش مجزا حل شدند؛ ساخت استاندارد، پیکربندی Firebase و آزمون گوشی هنوز لازم‌اند. رسید فقط زمان ثبت سروری است، نه اثبات نمایش. |
-| ۶۰ | مسدود | راهنما در `docs/deployment/mobile-release-and-container.md` و `docs/mobile-client.md`. سرور عمومی، دامنه HTTPS، کلید امضا و APK امضاشده موجود یا تأیید نشده‌اند. ساخت debug نیز به دانلود وابستگی رسمی با پاسخ ۴۰۳ برخورد کرد. |
+| ۵۹ | مسدود | کد Firebase، ثبت توکن و callback در `mobile/lib/core/push/` و رسید مجاز سرور در `backend/tests/fcm.receipt.test.js` وجود دارد. `notification.outbox.test.js` قرارداد پیام و آزمون‌های موبایل منطق محلی را بررسی می‌کنند. وابستگی‌ها با lockfile حل و debug بدون تنظیمات Firebase ساخته شد؛ پیکربندی Firebase و آزمون گوشی هنوز لازم‌اند. رسید فقط زمان ثبت سروری است، نه اثبات نمایش. |
+| ۶۰ | مسدود | راهنما در `docs/deployment/mobile-release-and-container.md` و `docs/mobile-client.md`. سرور عمومی، دامنه HTTPS، کلید امضای انتشار و APK انتشار امضاشده موجود یا تأیید نشده‌اند. ساخت debug آزمایشی در کپی مستقل موفق شد؛ این APK فاقد پیکربندی واقعی Firebase است. |
 | ۶۱ | انجام شد | مهاجرت `019_reference_sample_context.sql`، صفحه `mobile/lib/features/evaluation/presentation/evaluation_page.dart` و آزمون‌های `evaluation.reference.test.js` و `evaluation_page_test.dart`؛ نمونه واقعی هنوز باید جمع‌آوری شود. |
 | ۶۲ | انجام شد | `backend/src/repositories/evaluationExportRepository.js`، `backend/src/utils/evaluationCsv.js` و `backend/tests/evaluation.export.api.test.js`. برچسب مرجع را از اطلاعات شخصی پاک نگه دارید؛ شناسه‌ها ناشناس‌سازی کامل نیستند. |
 | ۶۳ | انجام شد | بازآموزی مشترک روی آرشیو تأییدشده، `docs/evaluation/fall-out-of-fold-scores.csv` با ۴٬۵۰۵ ردیف و پنج انتخاب fold را در `model.json` تولید کرد؛ تعداد، برچسب‌ها و گروه‌بندی ۳۸ فرد کنترل شدند. |
@@ -41,4 +41,5 @@
 - `backend/tests/migrate.lock.test.js` با PostgreSQL 17 ایزوله، اجرای هم‌زمان دو پردازه و آزادشدن قفل هنگام خطا را بررسی کرد؛ اجرای اول به علت کدگذاری WIN1256 شکست خورد و اجرای بعدی روی پایگاه تازه UTF-8 موفق شد.
 - `flutter build apk --debug --no-pub` پس از استفاده از مسیر لاتین به دریافت `flutter_embedding_debug` از سرور رسمی رسید و به‌علت HTTP 403 شکست خورد. `flutter analyze` با خطای سرویس تحلیل شکست خورد؛ تحلیل مستقیم Dart در بخش اعلان فقط پیشنهادهای informational داشت.
 - تلاش بعدی ساخت debug با آینه Flutter در مسیر موقت به خطای کش Kotlin و سپس در یک کپی آزمایشی به خطای شناسایی افزونه‌ها رسید؛ هیچ APK حاصل از این تلاش‌ها تأیید نشده است.
+- پس از بازسازی فهرست افزونه‌ها در همان کپی مستقل، ساخت debug با آینه Flutter موفق شد؛ `apksigner` امضای Android Debug را با روش v2 تأیید کرد. SHA-256 فایل `46fb91b61fd45aff3d67e43a017bad3f113113b2787ed0c61a18fd56e4dbb4d4` است. این نسخه فاقد فایل پیکربندی واقعی Firebase و امضای انتشار است و آزمایش دستگاه نشده است.
 - آرشیو محلی SisFall با SHA-256 ثبت‌شده تأیید و بازآموزی شد. پیکربندی و اعتبارنامه Firebase، دامنه و سرور عمومی، کلید امضا و گوشی Android در دسترس نیستند؛ نتیجه واقعی تحویل اعلان یا آزمایش میدانی موجود نیست.
