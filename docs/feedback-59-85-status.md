@@ -8,14 +8,14 @@
 | ۶۰ | مسدود | راهنما در `docs/deployment/mobile-release-and-container.md` و `docs/mobile-client.md`. سرور عمومی، دامنه HTTPS، کلید امضا و APK امضاشده موجود یا تأیید نشده‌اند. ساخت debug نیز به دانلود وابستگی رسمی با پاسخ ۴۰۳ برخورد کرد. |
 | ۶۱ | انجام شد | مهاجرت `019_reference_sample_context.sql`، صفحه `mobile/lib/features/evaluation/presentation/evaluation_page.dart` و آزمون‌های `evaluation.reference.test.js` و `evaluation_page_test.dart`؛ نمونه واقعی هنوز باید جمع‌آوری شود. |
 | ۶۲ | انجام شد | `backend/src/repositories/evaluationExportRepository.js`، `backend/src/utils/evaluationCsv.js` و `backend/tests/evaluation.export.api.test.js`. برچسب مرجع را از اطلاعات شخصی پاک نگه دارید؛ شناسه‌ها ناشناس‌سازی کامل نیستند. |
-| ۶۳ | مسدود | تولید امتیاز بیرونی و تنظیمات هر fold در `backend/scripts/falls/train.js` و `train_sisfall.js` آماده است و `fall.training.test.js` fixture کوچک را بررسی می‌کند؛ CSV و مدل واقعی فقط از اجرای مشترک پس از تهیه داده خام به دست می‌آید. |
+| ۶۳ | انجام شد | بازآموزی مشترک روی آرشیو تأییدشده، `docs/evaluation/fall-out-of-fold-scores.csv` با ۴٬۵۰۵ ردیف و پنج انتخاب fold را در `model.json` تولید کرد؛ تعداد، برچسب‌ها و گروه‌بندی ۳۸ فرد کنترل شدند. |
 | ۶۴ | انجام شد | API و پایگاه در `backend/src/repositories/locationRepository.js` و مهاجرت ۰۱۴؛ همگام‌سازی در `mobile/lib/features/tracking/data/tracking_intent_sync.dart`. آزمون‌های `tracking.intent.test.js` و `tracking_intent_sync_test.dart`. اجرای میدانی مستقل لازم است. |
 | ۶۵ | انجام شد | `web/js/views/history.js` و `backend/tests/web.browser.smoke.test.js` دسترسی و انتخاب کاربر را در Chromium کنترل می‌کنند. |
-| ۶۶ | مسدود | ضریب و توضیح در `backend/scripts/falls/convert_sisfall.js` و `backend/data/falls/README.md`؛ آزمون fixture در `fall.training.test.js`. بازآموزی مشترک با ۷۰ نیازمند داده خام معتبر است. |
+| ۶۶ | انجام شد | ضریب و توضیح در `backend/scripts/falls/convert_sisfall.js` و `backend/data/falls/README.md`؛ آزمون fixture در `fall.training.test.js` و بازآموزی مشترک با ۷۰ روی داده خام با هش تأییدشده انجام شد. |
 | ۶۷ | انجام شد | `backend/scripts/loadtest-helpers.js` و `loadtest-postgres.js` بسته‌شدن سرور و نرخ محقق را اصلاح می‌کنند؛ `loadtest.shutdown.test.js` پاسخ در جریان را می‌آزماید. گزارش `docs/evaluation/load-test-postgres-2026-11-06-isolated-pg17.md`: در PostgreSQL 17 ایزوله، ۳۰۰۰ درخواست SOS در ۶۰ ثانیه و صفر خطای گزارش‌شده؛ در لاگ این اجرا خطای بستن زودهنگام pool دیده نشد. این نتیجه تضمین رفتار در همه شرایط یا آزمون PostgreSQL 16 نیست. |
 | ۶۸ | مسدود | اعلان محلی و دکمه‌ها در `mobile/lib/core/push/push_service.dart` و `fall_check_page.dart`؛ آزمون‌های `push_service_test.dart` و `fall_check_page_test.dart`. رفتار کامل در پس‌زمینه و قفل صفحه و رسید هشدار ورودی نیازمند گوشی و FCM واقعی است. |
 | ۶۹ | انجام شد | ارسال آخرین موقعیت در `mobile/lib/features/fall/data/fall_repository.dart` و آزمون‌های `fall_repository_test.dart`؛ آزمون روی گوشی واقعی انجام نشده است. |
-| ۷۰ | مسدود | پنجره‌های یکسان در `backend/scripts/falls/convert_sisfall.js` و آزمون `fall.training.test.js`؛ بازآموزی و جاروب واقعی با داده خام SisFall باقی است. |
+| ۷۰ | انجام شد | پنجره‌های یکسان در `backend/scripts/falls/convert_sisfall.js` و آزمون `fall.training.test.js`؛ یک اجرای کامل ۴٬۵۰۵ پنجره، مدل جدید و ۴۸ سطر جاروب را تولید کرد. این داده شامل سقوط شبیه‌سازی‌شده است. |
 | ۷۱ | انجام شد | پاک‌سازی قله در `mobile/lib/features/fall/data/fall_detector_service.dart` و آزمون `fall_detector_service_test.dart`؛ آزمون حسگر واقعی باقی است. |
 | ۷۲ | انجام شد | محدودسازی و تلاش دوباره در `mobile/lib/features/fall/data/fall_request_limiter.dart` و `fall_repository.dart`؛ آزمون‌های detector و repository، از جمله شمارش همه درخواست‌های اولیه و retry در سقف و حفظ شناسه رخداد. |
 | ۷۳ | انجام شد | نگهداری رخداد فعال و هماهنگ‌کننده پاسخ در `mobile/lib/features/tracking/presentation/tracking_controller.dart` و `mobile/lib/features/fall/data/fall_response_coordinator.dart`؛ `fall_response_coordinator_test.dart` و `fall_check_page_test.dart`. آزمون دستگاه باقی است. |
@@ -34,10 +34,10 @@
 
 ## آخرین بررسی‌ها و محدودیت‌ها
 
-- PGlite: در اجرای کامل پس از اصلاح قفل مهاجرت، ۳۶ فایل و ۲۵۹ آزمون موفق شدند؛ یک آزمون PostgreSQL در این اجرا رد شد (skip) و جداگانه روی PostgreSQL 17 ایزوله موفق بود. تست Chromium نیز در اجرای کامل بود.
+- PGlite: در اجرای کامل پس از بازآموزی مدل، ۳۶ فایل و ۲۶۰ آزمون موفق شدند؛ یک آزمون PostgreSQL در این اجرا اجرا نشد (skip) و جداگانه روی PostgreSQL 17 ایزوله موفق بود. تست Chromium نیز در اجرای کامل بود.
 - Flutter: `flutter test --no-pub` پس از تغییرات اعلان و کنترل نرخ، ۳۵ آزمون موفق. این اجرا از کش موجود استفاده کرده و اصالت تمام وابستگی‌ها یا ساخت release را اثبات نمی‌کند.
 - PostgreSQL 16 و Docker در این محیط شناسایی نشدند. بخشی از migrationها و چند سناریو قبلاً روی نمونه ایزوله PostgreSQL 17 بررسی شدند؛ این معادل اجرای کل suite روی PostgreSQL 16 نیست.
 - آزمون بار شش سناریو روی PostgreSQL 17.11 ایزوله انجام و گزارش جداگانه آن ذخیره شد؛ این سنجش تحویل واقعی اعلان به گوشی یا استقرار عملیاتی را پوشش نمی‌دهد.
 - `backend/tests/migrate.lock.test.js` با PostgreSQL 17 ایزوله، اجرای هم‌زمان دو پردازه و آزادشدن قفل هنگام خطا را بررسی کرد؛ اجرای اول به علت کدگذاری WIN1256 شکست خورد و اجرای بعدی روی پایگاه تازه UTF-8 موفق شد.
 - `flutter build apk --debug --no-pub` پس از استفاده از مسیر لاتین به دریافت `flutter_embedding_debug` از سرور رسمی رسید و به‌علت HTTP 403 شکست خورد. `flutter analyze` با خطای سرویس تحلیل شکست خورد؛ تحلیل مستقیم Dart در بخش اعلان فقط پیشنهادهای informational داشت.
-- فایل خام SisFall، پیکربندی و اعتبارنامه Firebase، دامنه و سرور عمومی، کلید امضا و گوشی Android در دسترس نیستند. هیچ نتیجه‌ای برای بازآموزی، تحویل واقعی اعلان یا آزمایش میدانی ساخته نشده است.
+- آرشیو محلی SisFall با SHA-256 ثبت‌شده تأیید و بازآموزی شد. پیکربندی و اعتبارنامه Firebase، دامنه و سرور عمومی، کلید امضا و گوشی Android در دسترس نیستند؛ نتیجه واقعی تحویل اعلان یا آزمایش میدانی موجود نیست.

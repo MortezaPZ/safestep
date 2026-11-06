@@ -2,6 +2,8 @@
 
 این گزارش، موارد شماره‌دار ۱ تا ۵۸ را به ترتیب شمارهٔ بازخوردها فهرست می‌کند. محل هر تغییر، نام بخش برنامه، آزمون یا سندی است که باید بررسی شود. «انجام شد» به پیاده‌سازی کد یا اصلاح مستند اشاره دارد؛ هرجا دادهٔ واقعی، گوشی، کلید انتشار یا سرویس بیرونی لازم بوده، محدودیت همان‌جا ثبت شده است.
 
+اعداد آموزش ۷٬۲۱۲ پنجره در موارد ۹ و ۵۴ مربوط به اجرای قبلی‌اند؛ مدل فعلی پس از بازخوردهای ۶۳، ۶۶ و ۷۰ با ۴٬۵۰۵ پنجره بازآموزی شده است. نتایج فعلی در `docs/phase3/04-sisfall-training-report.md` و `docs/evaluation/defense-and-metrics.md` آمده‌اند.
+
 | شماره | نتیجه و محل دقیق بررسی |
 | ---: | --- |
 | ۱ | **پیاده شد.** `TrackingController.start()` سرویس `FallDetectorService` را راه می‌اندازد و در پایان ردیابی آن را متوقف می‌کند؛ ویژگی‌های گوشی از `/falls/detect` فرستاده می‌شوند. پنجرهٔ پس از ضربه در مورد ۵۶ آمده است. فایل‌ها: `mobile/lib/features/tracking/presentation/tracking_controller.dart`, `mobile/lib/features/fall/data/fall_detector_service.dart`. سه تست Flutter پاس شدند. به‌دلیل 403 مستقیم Pub.dev، بسته‌های hosted با mirror حل شدند و lockfile با URL canonical `https://pub.dev` به‌روز شد. analyzer خطای کد نداشت و ۵ warning رفع شدند؛ ۲۶ info باقی است. debug APK با گواهی Debug و release APK به‌صورت unsigned ساخته شدند؛ امضای release با کلید مالک پروژه باقی است، مورد ۵۰ را ببینید. |

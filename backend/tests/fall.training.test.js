@@ -5,6 +5,7 @@ import os from 'node:os';
 import { GENERIC_MODEL_PATH, groupFolds, parseCsv, runTrain, trainFromRows } from '../scripts/falls/train.js';
 import {
   convertRecording,
+  convertIfPresent,
   downsampleTo50Hz,
   parseTxt,
   selectWindowStarts,
@@ -12,6 +13,16 @@ import {
 import { outOfFoldCsv, thresholdSweepCsv } from '../scripts/falls/train_sisfall.js';
 
 describe('SisFall conversion', () => {
+  it('converts recordings from an explicitly selected raw directory', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sisfall-input-test-'));
+    const raw = path.join(dir, 'SA03');
+    fs.mkdirSync(raw);
+    fs.writeFileSync(path.join(raw, 'F01_SA03_R01.txt'),
+      Array.from({ length: 1200 }, () => '0,0,256,0,0,0,0,0,0;').join('\n'));
+    const out = path.join(dir, 'features.csv');
+    expect(convertIfPresent(out, dir)).toBe(out);
+    expect(parseCsv(fs.readFileSync(out, 'utf8'))).toHaveLength(1);
+  });
   it('parses nine-channel rows with trailing semicolons and converts physical units', () => {
     const parsed = parseTxt('256,0,0,16.384,0,0,0,0,0;\n');
     expect(parsed.malformed).toBe(0);

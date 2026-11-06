@@ -2,17 +2,17 @@
 
 ## Fall classifier
 
-The current `backend/src/services/fallDetection/model.json` is labeled `sisfall-public-simulated-falls`. It was retrained from 7,212 windows converted from 4,505 recordings in a pinned public SisFall mirror. Validation groups all windows by subject and performs nested five-fold cross-validation:
+The current `backend/src/services/fallDetection/model.json` is labeled `sisfall-public-simulated-falls`. It was retrained from 4,505 peak-centered windows converted from 4,505 recordings in a pinned public SisFall mirror. Validation groups all windows by subject and performs nested five-fold cross-validation:
 
 | Model | Accuracy | Precision | Recall | F1 | TP | FP | TN | FN |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| KNN, k=9 | 0.9908 | 0.9800 | 0.9833 | 0.9817 | 1768 | 36 | 5378 | 30 |
-| Linear SVM | 0.9479 | 0.9740 | 0.8126 | 0.8860 | 1461 | 39 | 5375 | 337 |
-| Combined rule | 0.9886 | 0.9837 | 0.9705 | 0.9770 | 1745 | 29 | 5385 | 53 |
+| KNN | 0.9802 | 0.9760 | 0.9744 | 0.9752 | 1752 | 43 | 2664 | 46 |
+| Linear SVM | 0.9678 | 0.9625 | 0.9566 | 0.9596 | 1720 | 67 | 2640 | 78 |
+| Combined rule | 0.9789 | 0.9803 | 0.9666 | 0.9734 | 1738 | 35 | 2672 | 60 |
 
-The model keeps all 7,212 training windows as KNN points. SisFall falls were safely simulated during collection. The dataset README says older participants performed ADLs only except SE06, a Judo expert who also simulated falls; these scores therefore do not establish fall performance for frail older adults, unexpected real-world falls, or a new device population. See `docs/phase3/04-sisfall-training-report.md` for the pinned mirror revision, archive hash, conversion details, and the archive's recording-count discrepancy.
+The model keeps all 4,505 training windows as KNN points. The final KNN uses k=9; the values selected independently within outer folds are recorded in the model. SisFall falls were safely simulated during collection. The dataset README says older participants performed ADLs only except SE06, a Judo expert who also simulated falls; these scores therefore do not establish fall performance for frail older adults, unexpected real-world falls, or a new device population. See `docs/phase3/04-sisfall-training-report.md` for the pinned mirror revision, archive hash, conversion details, and the archive's recording-count discrepancy.
 
-`docs/evaluation/fall-rule-threshold-sweep.csv` contains 48 out-of-fold combinations of the combined rule's `margin` and `agreeRatio` thresholds. The `sensitivity` column is serialized from out-of-fold recall. Treat this as a diagnostic sweep; select production thresholds only with a separate participant-level validation set.
+`docs/evaluation/fall-rule-threshold-sweep.csv` contains 48 out-of-fold combinations of the combined rule's `margin` and `agreeRatio` thresholds. The individual scores are in `docs/evaluation/fall-out-of-fold-scores.csv`. The `sensitivity` column is serialized from out-of-fold recall. Treat this as a diagnostic sweep; select production thresholds only with a separate participant-level validation set.
 
 `roc-sisfall-loo.csv` is a legacy artifact from the previous 1,443-prototype model. It is not held-out validation: its prototypes were selected using the full 7,212-window set. Do not cite its 0.9889 sensitivity as a generalization estimate or as a metric for the current model. Use only the subject-grouped CV results above.
 
@@ -38,4 +38,4 @@ FCM is not active in the current build, and there is no measured phone-receipt l
 
 ## PostgreSQL load test
 
-`load-test-postgres-2026-11-01.md` is a local run against PostgreSQL 17.11. Each of six scenarios lasted 60 seconds and used 50 independent user tokens/connections, including an SOS burst. All HTTP scenarios reported zero request errors. That run used the previous 5-second/200-row telemetry settings and ended with 1,950 queued and 16,936 dropped records. The service now flushes every second in batches of 500, but the updated settings have not been rerun against PostgreSQL; current telemetry completeness is unverified. Neither run measures phone-delivery latency or cloud-vendor performance.
+`load-test-postgres-2026-11-01.md` is a historical local run against PostgreSQL 17.11 using previous telemetry settings. The newer `load-test-postgres-2026-11-06-isolated-pg17.md` ran six 60-second scenarios on an isolated PostgreSQL 17.11 instance, including an SOS burst; it reported zero HTTP errors and zero dropped telemetry at the sampled point. Neither run measures phone-delivery latency or cloud-vendor performance.

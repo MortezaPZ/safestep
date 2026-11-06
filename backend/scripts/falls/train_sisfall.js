@@ -12,7 +12,7 @@ import { convertIfPresent } from './convert_sisfall.js';
 import { parseCsv, trainFromRows } from './train.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const RAW = path.join(ROOT, 'data/falls/raw/SisFall');
+const RAW = path.resolve(process.env.SISFALL_RAW_DIR || path.join(ROOT, 'data/falls/raw/SisFall'));
 const PREPARED_CSV = Boolean(process.env.SISFALL_FEATURE_CSV);
 const DATA_CSV = path.resolve(process.env.SISFALL_FEATURE_CSV || path.join(ROOT, 'data/falls/dataset.csv'));
 const MODEL_PATH = path.join(ROOT, 'src/services/fallDetection/model.json');
@@ -64,7 +64,7 @@ function writeReport(model, rowCount) {
   const ensemble = model.cv.ensemble;
   const inputProvenance = PREPARED_CSV
     ? 'ورودی از مسیر `SISFALL_FEATURE_CSV` داده شده است. این اسکریپت وجود `subject_id` و `recording_id` را بررسی می‌کند، اما منشأ یا hash فایل CSV آماده را تأیید نمی‌کند؛ منشأ آن باید جداگانه ثبت شود.'
-    : 'مسیر پیش‌فرض، ضبط‌های خام را از آرشیو mirror زیر دریافت می‌کند. نسخهٔ mirror ثابت است و hash آرشیو ZIP برابر ' + SOURCE_ARCHIVE_SHA256 + ' است. خود اسکریپت hash آرشیو را کنترل نمی‌کند؛ این hash برای کنترل دانلود در راهنمای `backend/data/falls/README.md` آمده است.';
+    : 'ورودی از پوشهٔ ضبط خام محلی خوانده می‌شود. انتظار می‌رود داده از آرشیو mirror زیر تهیه شود؛ hash آرشیو ZIP برابر ' + SOURCE_ARCHIVE_SHA256 + ' است. خود اسکریپت آرشیو را دانلود یا hash آن را کنترل نمی‌کند؛ اجراکننده باید منشأ و hash را جداگانه کنترل کند.';
   const report = `# گزارش بازتولید آموزش مدل سقوط SisFall
 
 این گزارش با اجرای \`npm run train:fall:sisfall\` تولید شده است.
@@ -98,7 +98,7 @@ function main() {
       if (!fs.existsSync(RAW)) {
         throw new Error(`SisFall source data not found. Add raw recordings under ${RAW} or set SISFALL_FEATURE_CSV to a prepared feature CSV.`);
       }
-      convertIfPresent(converted);
+      convertIfPresent(converted, RAW);
     }
     source = fs.readFileSync(converted ?? DATA_CSV, 'utf8');
   } finally {

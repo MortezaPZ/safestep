@@ -4,17 +4,17 @@
 
 ## منشأ داده و بازتولید
 
-دادهٔ خام در مخزن نگهداری نمی‌شود. منبع قابل‌بازتولید، mirror مجموعه در [Hugging Face](https://huggingface.co/datasets/Trupal7/Sisfall_Dataset/tree/f8a95e5c953169985dc9641e1a5772e6b7b47a83) و آرشیو [SisFall_dataset.zip](https://huggingface.co/datasets/Trupal7/Sisfall_Dataset/resolve/f8a95e5c953169985dc9641e1a5772e6b7b47a83/SisFall_dataset.zip) در commit ثابت `f8a95e5c953169985dc9641e1a5772e6b7b47a83` است. کارت این mirror مجوز CC BY 4.0 را اعلام می‌کند؛ مقالهٔ اصلی SisFall را [Sucerquia و همکاران، ۲۰۱۷](https://doi.org/10.3390/s17010198) ارجاع دهید. مسیر پیش‌فرض، ضبط‌های خام را از آرشیو mirror زیر دریافت می‌کند. نسخهٔ mirror ثابت است و hash آرشیو ZIP برابر 7f0dd1583e39fee0f402a6855976eb12517f7eaecdacce871d5b3421793ad665 است. خود اسکریپت hash آرشیو را کنترل نمی‌کند؛ این hash برای کنترل دانلود در راهنمای `backend/data/falls/README.md` آمده است.
+دادهٔ خام در مخزن نگهداری نمی‌شود. منبع قابل‌بازتولید، mirror مجموعه در [Hugging Face](https://huggingface.co/datasets/Trupal7/Sisfall_Dataset/tree/f8a95e5c953169985dc9641e1a5772e6b7b47a83) و آرشیو [SisFall_dataset.zip](https://huggingface.co/datasets/Trupal7/Sisfall_Dataset/resolve/f8a95e5c953169985dc9641e1a5772e6b7b47a83/SisFall_dataset.zip) در commit ثابت `f8a95e5c953169985dc9641e1a5772e6b7b47a83` است. کارت این mirror مجوز CC BY 4.0 را اعلام می‌کند؛ مقالهٔ اصلی SisFall را [Sucerquia و همکاران، ۲۰۱۷](https://doi.org/10.3390/s17010198) ارجاع دهید. در این اجرا، هش SHA-256 آرشیو محلی پیش از استخراج با مقدار `7f0dd1583e39fee0f402a6855976eb12517f7eaecdacce871d5b3421793ad665` مطابقت داده شد. اسکریپت آموزش ضبط‌های خام محلی را می‌خواند و خودش آرشیو را دانلود یا هش آن را تأیید نمی‌کند.
 
 README داخل آرشیو ۴٬۵۱۰ فایل را اعلام می‌کند، اما در همین revision تعداد فایل‌های ضبط با نام‌گذاری داده ۴٬۵۰۵ است: ۱٬۷۹۸ سقوط شبیه‌سازی‌شده و ۲٬۷۰۷ فعالیت روزمره. README منبع می‌گوید شرکت‌کنندگان سالمند فقط فعالیت روزمره را اجرا کردند، به‌جز SE06 که متخصص جودو بود و سقوط‌ها را هم شبیه‌سازی کرد؛ بنابراین این اعتبارسنجی، عملکرد سقوط در سالمندان ناتوان را ثابت نمی‌کند. پنج فایل `D17_SE15_R01..R05.txt` در پوشهٔ `SA15` قرار دارند؛ تبدیل‌گر شناسهٔ پوشه را بر شناسهٔ داخل نام فایل مقدم می‌گیرد. این اختلاف و قاعده در راهنمای داده ثبت شده‌اند.
 
 ## آموزش و اعتبارسنجی
 
-- ردیف‌های ویژگی: 7212
+- ردیف‌های ویژگی: 4505
 - برچسب داده: `sisfall-public-simulated-falls`
-- KNN (k=9): دقت 99.08%، precision 98.00%، recall 98.33%، F1 98.17%
-- Linear SVM: دقت 94.79%، precision 97.40%، recall 81.26%، F1 88.60%
-- قاعدهٔ ترکیبی: دقت 98.86%، precision 98.37%، recall 97.05%، F1 97.70%
-- زمان آموزش: 2026-11-01T13:12:54.493Z
+- KNN (k=9): دقت 98.02%، precision 97.60%، recall 97.44%، F1 97.52%
+- Linear SVM: دقت 96.78%، precision 96.25%، recall 95.66%، F1 95.96%
+- قاعدهٔ ترکیبی: دقت 97.89%، precision 98.03%، recall 96.66%، F1 97.34%
+- زمان آموزش: 2026-11-06T07:57:45.586Z
 
 اعتبارسنجی subject-grouped nested cross-validation است؛ مقیاس‌بندی درون هر fold برازش می‌شود و تنظیم ابرپارامتر در foldهای داخلی انجام می‌شود. جاروب ۴۸ ترکیب threshold از امتیازهای out-of-fold در `docs/evaluation/fall-rule-threshold-sweep.csv` نوشته شده است. این نتایج جای ارزیابی روی افراد/پیاده‌روی مستقل و دادهٔ واقعی محصول را نمی‌گیرند. سقوط‌های SisFall در آزمایش شبیه‌سازی شده‌اند و سقوط ناخواسته در محیط واقعی نیستند.

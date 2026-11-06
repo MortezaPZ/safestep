@@ -126,8 +126,8 @@ export function convertRecording(filePath, text) {
   return { rows, malformed: parsed.malformed, skipped: false, label, subjectId };
 }
 
-export function convertIfPresent(outputPath = OUT) {
-  if (!fs.existsSync(RAW)) {
+export function convertIfPresent(outputPath = OUT, rawPath = RAW) {
+  if (!fs.existsSync(rawPath)) {
     process.stdout.write('SisFall raw folder missing; conversion skipped.\n');
     return null;
   }
@@ -153,7 +153,7 @@ export function convertIfPresent(outputPath = OUT) {
       rows.push(...result.rows.map((row) => row.join(',')));
     }
   };
-  walk(RAW);
+  walk(rawPath);
   if (counts.windows === 0) throw new Error('No usable SisFall recordings produced feature windows.');
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, rows.join('\n') + '\n', 'utf8');
