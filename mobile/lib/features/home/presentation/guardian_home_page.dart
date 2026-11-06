@@ -103,7 +103,17 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
         _AlertsButton(unread: unread),
         IconButton(
           onPressed: () async {
-            await ref.read(authControllerProvider.notifier).logout();
+            final bool remoteDeviceRemoved =
+                await ref.read(authControllerProvider.notifier).logout();
+            if (!remoteDeviceRemoved && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'بدون اتصال، لغو دستگاه در سرور انجام نشد؛ ممکن است اعلان‌های حساب قبلی به این دستگاه برسند.',
+                  ),
+                ),
+              );
+            }
           },
           icon: const Icon(Icons.logout_rounded),
           tooltip: 'خروج',
@@ -135,8 +145,7 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
               child: EmptyView(
                 icon: Icons.group_outlined,
                 title: 'هنوز به کسی وصل نشده‌اید',
-                message:
-                    'از فردی که می‌خواهید همراهش باشید بخواهید کد دعوت '
+                message: 'از فردی که می‌خواهید همراهش باشید بخواهید کد دعوت '
                     'شش‌رقمی‌اش را برایتان بفرستد.',
                 actionLabel: 'وارد کردن کد دعوت',
                 onAction: _openRedeem,
@@ -159,8 +168,8 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
                 main
                     ? 'ناظر اصلی'
                     : emergency
-                    ? 'ناظر با دسترسی اضطراری'
-                    : 'ناظر بدون دسترسی اضطراری',
+                        ? 'ناظر با دسترسی اضطراری'
+                        : 'ناظر بدون دسترسی اضطراری',
               ),
               const SizedBox(height: AppSpacing.sm),
               if (main) ...<Widget>[
@@ -178,7 +187,6 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
-
               for (int i = 0; i < state.people.length; i++)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -187,24 +195,19 @@ class _GuardianHomePageState extends ConsumerState<GuardianHomePage> {
                     child: _PersonStatusCard(person: state.people[i]),
                   ),
                 ),
-
               const SizedBox(height: AppSpacing.md),
-
               AppButton(
                 label: 'اتصال به فرد تازه',
                 icon: Icons.qr_code_scanner_rounded,
                 variant: AppButtonVariant.outlined,
                 onPressed: _openRedeem,
               ),
-
               const SizedBox(height: AppSpacing.md),
-
               Text(
                 'برای دیدن نقشه‌ی زنده، روی هر نفر ضربه بزنید.',
                 style: theme.textTheme.bodySmall,
                 textAlign: TextAlign.center,
               ),
-
               const SizedBox(height: AppSpacing.xl),
             ],
           );
@@ -304,8 +307,7 @@ class _PersonStatusCard extends StatelessWidget {
 
     // فهرست خالی یعنی سرور سطوح دسترسی را در این پاسخ نفرستاده، نه اینکه
     // دسترسی وجود ندارد؛ در آن حالت پیام هشدار نمایش داده نمی‌شود.
-    final bool canView =
-        person.permissions.isEmpty ||
+    final bool canView = person.permissions.isEmpty ||
         person.permissions.contains(SharePermission.viewLocation);
 
     return AppCard(
@@ -376,7 +378,6 @@ class _PersonStatusCard extends StatelessWidget {
               A11y.decorative(const Icon(Icons.chevron_left_rounded)),
             ],
           ),
-
           if (point != null && !person.hidden) ...<Widget>[
             const Divider(height: AppSpacing.lg),
             Wrap(
@@ -429,7 +430,6 @@ class _PersonStatusCard extends StatelessWidget {
               ],
             ),
           ],
-
           if (!canView) ...<Widget>[
             const Divider(height: AppSpacing.lg),
             Text(
@@ -453,10 +453,8 @@ class _PersonStatusCard extends StatelessWidget {
       final String name = person.outsideZoneName ?? 'محدوده امن';
       final DateTime? since = person.outsideSince;
       if (since == null) return 'خارج از «$name» است';
-      final int minutes = DateTime.now()
-          .difference(since)
-          .inMinutes
-          .clamp(1, 100000);
+      final int minutes =
+          DateTime.now().difference(since).inMinutes.clamp(1, 100000);
       return 'خارج از «$name» است، حدود $minutes دقیقه';
     }
     return 'در حال پایش';

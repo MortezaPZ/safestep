@@ -66,7 +66,17 @@ class SettingsPage extends ConsumerWidget {
     await tracking.clearQueue();
 
     // هدایت به صفحه‌ی ورود را روتر انجام می‌دهد
-    await ref.read(authControllerProvider.notifier).logout();
+    final bool remoteDeviceRemoved =
+        await ref.read(authControllerProvider.notifier).logout();
+    if (!remoteDeviceRemoved && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'بدون اتصال، لغو دستگاه در سرور انجام نشد؛ ممکن است اعلان‌های حساب قبلی به این دستگاه برسند.',
+          ),
+        ),
+      );
+    }
   }
 
   @override

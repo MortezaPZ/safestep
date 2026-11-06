@@ -33,6 +33,10 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Firebase project configuration is supplied by the project owner.
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist
+
 # Symbolication related
 app.*.symbols
 

@@ -77,19 +77,19 @@ function fcmMessageBody(token, { title, body, data, severity }) {
   return {
     message: {
       token,
-      notification: { title, body },
-      data: stringifyData(data, severity),
+      // Android must receive data-only messages so the background handler can
+      // show the alert and record its receipt. iOS receives an APNs alert below.
+      data: stringifyData({ ...data, title, body }, severity),
       android: {
-        priority: critical ? 'HIGH' : 'NORMAL',
-        notification: {
-          channel_id: critical ? 'safestep_sos' : 'safestep_alerts',
-          sound: critical ? 'sos_alert' : 'default',
-        },
+        priority: 'HIGH',
       },
       apns: {
-        headers: { 'apns-priority': critical ? '10' : '5' },
+        headers: { 'apns-priority': critical ? '10' : '5', 'apns-push-type': 'alert' },
         payload: {
           aps: {
+            // iOS can display an APNs alert before the app checks its current
+            // account; keep lock-screen text free of another user's details.
+            alert: { title: 'هشدار هم‌قدم', body: 'برای مشاهده جزئیات وارد برنامه شوید.' },
             sound: critical ? 'sos_alert.caf' : 'default',
             'interruption-level': critical ? 'critical' : 'active',
           },
@@ -215,16 +215,20 @@ export async function notify(userIds, message) {
 
   try {
     const devices = await deviceRepository.pushTokensFor(targets);
-    const tokens = devices.map((d) => d.token).filter(Boolean);
-    if (tokens.length === 0) {
+    const tokenDevices = devices.filter((d) => d.token);
+    if (tokenDevices.length === 0) {
       return { driver: 'local', sent: online.length, failed: targets.length - online.length, fellBack: true };
     }
 
     let sent = 0;
     let failed = 0;
     const invalidTokens = [];
-    for (const token of tokens) {
-      const result = await sendFcmToToken(token, payload);
+    for (const device of tokenDevices) {
+      const token = device.token;
+      const result = await sendFcmToToken(token, {
+        ...payload,
+        data: { ...payload.data, recipientUserId: device.userId },
+      });
       if (result.ok) sent += 1;
       else {
         failed += 1;

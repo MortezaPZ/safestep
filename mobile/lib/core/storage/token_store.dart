@@ -29,12 +29,28 @@ class TokenStore {
   static const String _kRefresh = 'auth.refreshToken';
   static const String _kUser = 'auth.user';
   static const String _kInstallId = 'device.installId';
+  static const String _kPushSignedOut = 'push.signedOut';
 
   /* ─────────────────────── توکن‌ها ─────────────────────── */
 
   Future<String?> readAccessToken() => _read(_kAccess);
   Future<String?> readRefreshToken() => _read(_kRefresh);
   Future<String?> readInstallId() => _read(_kInstallId);
+
+  /// Fail closed for background FCM: a storage error must not reveal a
+  /// previous account's alert while the app is signed out.
+  Future<bool> isPushSignedOut() async {
+    try {
+      return await _storage.read(key: _kPushSignedOut) == '1';
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> markPushSignedOut() =>
+      _storage.write(key: _kPushSignedOut, value: '1');
+
+  Future<void> markPushSignedIn() => _storage.delete(key: _kPushSignedOut);
 
   Future<void> saveTokens({
     required String accessToken,
@@ -89,6 +105,11 @@ class TokenStore {
   /// `installId` عمداً پاک **نمی‌شود**: همان گوشی است، فقط کاربرش عوض شده.
   /// پاک کردنش یعنی ساختن یک ردیف دستگاه جدید در هر بار ورود.
   Future<void> clearSession() async {
+    try {
+      await markPushSignedOut();
+    } catch (_) {
+      // Continue clearing auth secrets even if the push fence cannot be saved.
+    }
     await _storage.delete(key: _kAccess);
     await _storage.delete(key: _kRefresh);
     await _storage.delete(key: _kUser);

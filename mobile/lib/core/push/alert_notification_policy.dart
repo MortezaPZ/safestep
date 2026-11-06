@@ -36,6 +36,7 @@ AndroidNotificationDetails buildAlertAndroidDetails({
     category: critical
         ? AndroidNotificationCategory.alarm
         : AndroidNotificationCategory.event,
+    onlyAlertOnce: true,
     playSound: true,
     enableVibration: critical,
   );

@@ -35,7 +35,7 @@ class DeviceRegistrar {
   ///
   /// شکستش هرگز جریان ورود را متوقف نمی‌کند: کاربری که وارد شده، نباید
   /// به‌خاطر خطای یک درخواست جانبی بیرون بماند.
-  Future<void> registerCurrentDevice({String? pushToken}) async {
+  Future<bool> registerCurrentDevice({String? pushToken}) async {
     try {
       final String installId = await _tokenStore.installId(() => _uuid.v4());
       final _DeviceInfo info = await _collect();
@@ -53,8 +53,50 @@ class DeviceRegistrar {
           if (pushToken != null) 'pushToken': pushToken,
         },
       );
+      return true;
     } catch (_) {
       // بی‌صدا. این یک عملیات کمکی است، نه بخشی از مسیر بحرانی.
+      return false;
+    }
+  }
+
+  /// Removes this installation from the currently authenticated account.
+  ///
+  /// The API binds the deletion to the bearer token and only returns devices
+  /// owned by that account, so an install id can never delete another user's
+  /// device. A failed request returns false; callers must not claim that the
+  /// remote FCM token was revoked.
+  Future<bool> unregisterCurrentDevice() async {
+    try {
+      final String? installId = await _tokenStore.readInstallId();
+      if (installId == null || installId.isEmpty) return true;
+
+      final List<Map<String, dynamic>> devices =
+          await _api.get<List<Map<String, dynamic>>>(
+        ApiEndpoints.devices,
+        (dynamic data) {
+          if (data is! Map) return <Map<String, dynamic>>[];
+          final Object? rawDevices = data['devices'];
+          if (rawDevices is! List) return <Map<String, dynamic>>[];
+          return rawDevices
+              .whereType<Map>()
+              .map((Map item) => Map<String, dynamic>.from(item))
+              .toList(growable: false);
+        },
+      );
+
+      for (final Map<String, dynamic> device in devices) {
+        if (device['installId'] != installId) continue;
+        final Object? id = device['id'];
+        if (id is! String || id.isEmpty) return false;
+        return await _api.delete<bool>(
+          ApiEndpoints.device(id),
+          (dynamic data) => data is Map && data['ok'] == true,
+        );
+      }
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

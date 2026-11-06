@@ -4,7 +4,7 @@
 
 | مورد | وضعیت | شواهد و کار باقی‌مانده |
 |---|---|---|
-| ۵۹ | مسدود | رسید مجاز و idempotent در `backend/src/routes/index.js` و `backend/tests/fcm.receipt.test.js`؛ API موبایل در `mobile/lib/features/alerts/data/alerts_repository.dart`. اتصال Firebase، دریافت و ثبت توکن و callback واقعی پیاده نشده است. دسترسی به بسته‌های رسمی، پیکربندی Firebase و گوشی لازم است. رسید فقط زمان ثبت سروری است، نه اثبات نمایش. |
+| ۵۹ | مسدود | کد Firebase، ثبت توکن و callback در `mobile/lib/core/push/` و رسید مجاز سرور در `backend/tests/fcm.receipt.test.js` وجود دارد. `notification.outbox.test.js` قرارداد پیام و آزمون‌های موبایل منطق محلی را بررسی می‌کنند. وابستگی‌ها با lockfile در کش مجزا حل شدند؛ ساخت استاندارد، پیکربندی Firebase و آزمون گوشی هنوز لازم‌اند. رسید فقط زمان ثبت سروری است، نه اثبات نمایش. |
 | ۶۰ | مسدود | راهنما در `docs/deployment/mobile-release-and-container.md` و `docs/mobile-client.md`. سرور عمومی، دامنه HTTPS، کلید امضا و APK امضاشده موجود یا تأیید نشده‌اند. ساخت debug نیز به دانلود وابستگی رسمی با پاسخ ۴۰۳ برخورد کرد. |
 | ۶۱ | انجام شد | مهاجرت `019_reference_sample_context.sql`، صفحه `mobile/lib/features/evaluation/presentation/evaluation_page.dart` و آزمون‌های `evaluation.reference.test.js` و `evaluation_page_test.dart`؛ نمونه واقعی هنوز باید جمع‌آوری شود. |
 | ۶۲ | انجام شد | `backend/src/repositories/evaluationExportRepository.js`، `backend/src/utils/evaluationCsv.js` و `backend/tests/evaluation.export.api.test.js`. برچسب مرجع را از اطلاعات شخصی پاک نگه دارید؛ شناسه‌ها ناشناس‌سازی کامل نیستند. |
@@ -35,9 +35,10 @@
 ## آخرین بررسی‌ها و محدودیت‌ها
 
 - PGlite: در اجرای کامل پس از بازآموزی مدل، ۳۶ فایل و ۲۶۰ آزمون موفق شدند؛ یک آزمون PostgreSQL در این اجرا اجرا نشد (skip) و جداگانه روی PostgreSQL 17 ایزوله موفق بود. تست Chromium نیز در اجرای کامل بود.
-- Flutter: `flutter test --no-pub` پس از تغییرات اعلان و کنترل نرخ، ۳۵ آزمون موفق. این اجرا از کش موجود استفاده کرده و اصالت تمام وابستگی‌ها یا ساخت release را اثبات نمی‌کند.
+- Flutter: `flutter pub get --offline --enforce-lockfile` با کش مجزا موفق شد و سپس `flutter test --no-pub` روی پروژه ۴۵ آزمون موفق داشت. آرشیو ۳۹ وابستگی بازیابی‌شده با هش lockfile و هفت بسته Firebase با هش و محتوای کش تطبیق داده شدند. این نتایج جای ساخت Android/iOS یا آزمون Firebase واقعی را نمی‌گیرد.
 - PostgreSQL 16 و Docker در این محیط شناسایی نشدند. بخشی از migrationها و چند سناریو قبلاً روی نمونه ایزوله PostgreSQL 17 بررسی شدند؛ این معادل اجرای کل suite روی PostgreSQL 16 نیست.
 - آزمون بار شش سناریو روی PostgreSQL 17.11 ایزوله انجام و گزارش جداگانه آن ذخیره شد؛ این سنجش تحویل واقعی اعلان به گوشی یا استقرار عملیاتی را پوشش نمی‌دهد.
 - `backend/tests/migrate.lock.test.js` با PostgreSQL 17 ایزوله، اجرای هم‌زمان دو پردازه و آزادشدن قفل هنگام خطا را بررسی کرد؛ اجرای اول به علت کدگذاری WIN1256 شکست خورد و اجرای بعدی روی پایگاه تازه UTF-8 موفق شد.
 - `flutter build apk --debug --no-pub` پس از استفاده از مسیر لاتین به دریافت `flutter_embedding_debug` از سرور رسمی رسید و به‌علت HTTP 403 شکست خورد. `flutter analyze` با خطای سرویس تحلیل شکست خورد؛ تحلیل مستقیم Dart در بخش اعلان فقط پیشنهادهای informational داشت.
+- تلاش بعدی ساخت debug با آینه Flutter در مسیر موقت به خطای کش Kotlin و سپس در یک کپی آزمایشی به خطای شناسایی افزونه‌ها رسید؛ هیچ APK حاصل از این تلاش‌ها تأیید نشده است.
 - آرشیو محلی SisFall با SHA-256 ثبت‌شده تأیید و بازآموزی شد. پیکربندی و اعتبارنامه Firebase، دامنه و سرور عمومی، کلید امضا و گوشی Android در دسترس نیستند؛ نتیجه واقعی تحویل اعلان یا آزمایش میدانی موجود نیست.

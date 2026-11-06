@@ -49,6 +49,11 @@ class _SafeStepAppState extends ConsumerState<SafeStepApp> {
         available: push.available,
         reason: push.reason,
       );
+      final String? currentUserId = ref.read(authControllerProvider).user?.id;
+      if (currentUserId != null &&
+          ref.read(authControllerProvider).isAuthenticated) {
+        unawaited(push.syncTokenForCurrentAccount(userId: currentUserId));
+      }
       await ref
           .read(trackingControllerProvider.notifier)
           .retryPendingTrackingIntent();
@@ -120,8 +125,20 @@ class _SafeStepAppState extends ConsumerState<SafeStepApp> {
         if (userId != null && userId != previous) {
           unawaited(
             ref
+                .read(pushServiceProvider)
+                .syncTokenForCurrentAccount(userId: userId)
+                .catchError((Object error) {
+              debugPrint('ثبت توکن اعلان پس از ورود شکست خورد: $error');
+            }),
+          );
+          unawaited(
+            ref
                 .read(trackingControllerProvider.notifier)
                 .retryPendingTrackingIntent(),
+          );
+        } else if (userId == null && previous != null) {
+          unawaited(
+            ref.read(pushServiceProvider).clearCurrentAccount(userId: previous),
           );
         }
       },

@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/accessibility/accessibility_settings.dart';
 import '../../../core/device/device_registrar.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/push/push_service.dart';
+import '../../../core/storage/token_store.dart';
 import '../../../core/utils/app_exception.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_models.dart';
@@ -37,7 +39,8 @@ class AuthState {
 
   final AppException? error;
 
-  bool get isAuthenticated => status == AuthStatus.authenticated && user != null;
+  bool get isAuthenticated =>
+      status == AuthStatus.authenticated && user != null;
   bool get isReady => status != AuthStatus.unknown;
 
   AuthState copyWith({
@@ -65,6 +68,7 @@ class AuthController extends StateNotifier<AuthState> {
   AuthController(this._ref) : super(const AuthState());
 
   final Ref _ref;
+  bool _signOutInProgress = false;
 
   AuthRepository get _repository => _ref.read(authRepositoryProvider);
 
@@ -86,7 +90,8 @@ class AuthController extends StateNotifier<AuthState> {
     final AppUser? cached = await _repository.restoreLocalUser();
 
     if (cached == null) {
-      state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true);
+      state =
+          state.copyWith(status: AuthStatus.unauthenticated, clearUser: true);
       return;
     }
 
@@ -164,24 +169,64 @@ class AuthController extends StateNotifier<AuthState> {
 
   /* ─────────────────────── خروج ─────────────────────── */
 
-  Future<void> logout() async {
+  Future<bool> logout() async {
+    if (_signOutInProgress) return false;
+    _signOutInProgress = true;
     state = state.copyWith(busy: true);
-    await _repository.logout();
-    state = const AuthState(status: AuthStatus.unauthenticated);
+    bool remoteDeviceRemoved = true;
+    try {
+      final String? userId = state.user?.id;
+      await _prepareLocalPushSignOut();
+      if (userId != null) {
+        await _ref
+            .read(pushServiceProvider)
+            .clearCurrentAccount(userId: userId);
+        remoteDeviceRemoved =
+            await _ref.read(deviceRegistrarProvider).unregisterCurrentDevice();
+        if (!remoteDeviceRemoved) {
+          debugPrint(
+              'دستگاه اعلان از حساب سرور حذف نشد؛ اتصال شبکه را بررسی کنید.');
+        }
+      }
+      await _repository.logout();
+      state = const AuthState(status: AuthStatus.unauthenticated);
+      return remoteDeviceRemoved;
+    } finally {
+      _signOutInProgress = false;
+    }
   }
 
   /// خروج اجباری — وقتی سرور نشست را باطل کرده است.
   Future<void> _forceSignOut() async {
-    await _repository.clearLocal();
-    state = const AuthState(
-      status: AuthStatus.unauthenticated,
-      error: AppException.unauthorized,
-    );
+    if (_signOutInProgress) return;
+    _signOutInProgress = true;
+    try {
+      final String? userId = state.user?.id;
+      await _prepareLocalPushSignOut();
+      if (userId != null) {
+        await _ref
+            .read(pushServiceProvider)
+            .clearCurrentAccount(userId: userId);
+        final bool removed =
+            await _ref.read(deviceRegistrarProvider).unregisterCurrentDevice();
+        if (!removed) {
+          debugPrint(
+              'دستگاه اعلان از حساب سرور حذف نشد؛ نشست محلی پاک می‌شود.');
+        }
+      }
+      await _repository.clearLocal();
+      state = const AuthState(
+        status: AuthStatus.unauthenticated,
+        error: AppException.unauthorized,
+      );
+    } finally {
+      _signOutInProgress = false;
+    }
   }
 
   /// از میان‌افزار شبکه صدا زده می‌شود، وقتی تازه‌سازی توکن هم شکست خورده.
   Future<void> handleSessionExpired() async {
-    if (state.status != AuthStatus.authenticated) return;
+    if (_signOutInProgress || state.status != AuthStatus.authenticated) return;
     await _forceSignOut();
   }
 
@@ -194,8 +239,26 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> _afterSignIn() async {
     state = state.copyWith(busy: false);
 
+    try {
+      await _ref.read(tokenStoreProvider).markPushSignedIn();
+    } catch (error) {
+      debugPrint('وضعیت اعلان برای حساب تازه ذخیره نشد: $error');
+    }
+
     // ثبت دستگاه (بی‌صدا شکست می‌خورد)
     await _ref.read(deviceRegistrarProvider).registerCurrentDevice();
+
+    final String? userId = state.user?.id;
+    if (userId != null) {
+      unawaited(
+        _ref
+            .read(pushServiceProvider)
+            .syncTokenForCurrentAccount(userId: userId)
+            .catchError((Object error) {
+          debugPrint('ثبت توکن FCM پس از ورود شکست خورد: $error');
+        }),
+      );
+    }
 
     // ترجیحات دسترس‌پذیریِ ذخیره‌شده روی سرور، روی تنظیم محلی اعمال می‌شود.
     // جهت همگام‌سازی فقط همین یک بار سرور→اپ است؛ در ادامه‌ی کار برعکس
@@ -211,6 +274,15 @@ class AuthController extends StateNotifier<AuthState> {
           );
     } catch (_) {
       // تنظیمات محلی همان‌طور که هست می‌ماند
+    }
+  }
+
+  Future<void> _prepareLocalPushSignOut() async {
+    try {
+      await _ref.read(tokenStoreProvider).markPushSignedOut();
+    } catch (error) {
+      // The auth repository still clears all session secrets below.
+      debugPrint('علامت خروج اعلان محلی ذخیره نشد: $error');
     }
   }
 

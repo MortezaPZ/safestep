@@ -1,9 +1,27 @@
 import java.util.Properties
 
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        if (file("google-services.json").isFile) {
+            classpath("com.google.gms:google-services:4.4.2")
+        }
+    }
+}
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Do not invent a Firebase project or break builds for installations that do
+// not have the project's real google-services.json file.
+if (file("google-services.json").isFile) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 val releaseProperties = Properties()

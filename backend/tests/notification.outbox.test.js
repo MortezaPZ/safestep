@@ -182,9 +182,20 @@ describe('صف FCM', () => {
     );
     expect(rows.every((r) => r.status === 'sent')).toBe(true);
     expect(globalThis.fetch).toHaveBeenCalled();
-    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1].body);
+    const body = vi.mocked(globalThis.fetch).mock.calls
+      .map((call) => JSON.parse(call[1].body))
+      .find((message) => message.message.data.alertId === sos.body.alert.id);
+    expect(body).toBeDefined();
     expect(body.message.token).toBe('live-token');
-    expect(body.message.android.notification.channel_id).toBe('safestep_sos');
+    expect(body.message.notification).toBeUndefined();
+    expect(body.message.android).toEqual({ priority: 'HIGH' });
+    expect(body.message.data).toMatchObject({
+      alertId: sos.body.alert.id, recipientUserId: guardian.id, severity: 'critical',
+      title: expect.any(String), body: expect.any(String),
+    });
+    expect(body.message.apns.payload.aps.alert).toEqual({
+      title: 'هشدار هم‌قدم', body: 'برای مشاهده جزئیات وارد برنامه شوید.',
+    });
   });
 
   it('پاسخ ۴۰۴ UNREGISTERED توکن را پاک می‌کند', async () => {

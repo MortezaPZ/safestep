@@ -74,7 +74,10 @@ export async function processOnce() {
       let allOk = tokens.length > 0;
       let lastError = tokens.length ? null : 'No push token registered';
       for (const token of tokens) {
-        const result = await sendFcmToToken(token, payload);
+        const result = await sendFcmToToken(token, {
+          ...payload,
+          data: { ...payload.data, recipientUserId: row.userId },
+        });
         if (result.invalidToken) await deviceRepository.clearPushToken(token);
         if (!result.ok) {
           allOk = false;
