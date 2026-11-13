@@ -122,6 +122,45 @@ describe('nested subject-grouped training', () => {
     expect(folds.flat()).toHaveLength(rows.length);
   });
 
+  it('keeps real SisFall-sized outer and inner grouped folds nonempty and balanced', () => {
+    const subjects = [
+      ...Array.from({ length: 23 }, (_, index) => ({
+        subjectId: 'SA' + String(index + 1).padStart(2, '0'),
+        rows: index === 16 ? 153 : index === 19 ? 150 : 154,
+        positive: index === 19 ? 73 : 75,
+      })),
+      ...[59, 48, 59, 59, 59, 154, 59, 59, 59, 59, 59, 59, 59, 59, 58]
+        .map((size, index) => ({
+          subjectId: 'SE' + String(index + 1).padStart(2, '0'),
+          rows: size,
+          positive: size === 154 ? 75 : 0,
+        })),
+    ];
+    const groupedRows = subjects.flatMap(({ subjectId, rows: size, positive }) =>
+      Array.from({ length: size }, (_, index) => ({
+        subjectId,
+        label: index < positive ? 1 : 0,
+      })),
+    );
+    const outer = groupFolds(groupedRows, 5, 0x5eed);
+    const outerSizes = outer.map((fold) => fold.length);
+
+    expect(outer.every((fold) => fold.length > 0)).toBe(true);
+    expect(Math.max(...outerSizes) - Math.min(...outerSizes)).toBeLessThan(300);
+    expect(groupFolds(groupedRows, 5, 0x5eed).map((fold) =>
+      [...new Set(fold.map((row) => row.subjectId))].sort(),
+    )).toEqual(outer.map((fold) => [...new Set(fold.map((row) => row.subjectId))].sort()));
+
+    for (let outerIndex = 0; outerIndex < outer.length; outerIndex += 1) {
+      const trainingRows = outer.flatMap((fold, foldIndex) =>
+        foldIndex === outerIndex ? [] : fold,
+      );
+      const inner = groupFolds(trainingRows, 4, 0x5eed + outerIndex);
+      expect(inner.every((fold) => fold.length > 0)).toBe(true);
+      expect(inner.flat()).toHaveLength(trainingRows.length);
+    }
+  });
+
   it('parses subject metadata and reports out-of-fold ensemble metrics', () => {
     const parsed = parseCsv([
       'subject_id,recording_id,label,' + Array.from({ length: 14 }, (_, i) => 'f' + (i + 1)).join(','),

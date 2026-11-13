@@ -105,6 +105,7 @@ export async function submitIdentityDocumentForPrimary(actor, primaryUserId, doc
 export async function reviewIdentityDocument(id, status, actor, reason = null) {
   const document = await adminRepository.reviewIdentityDocument(id, status, actor.id, reason);
   if (!document) throw notFound('مدرک یافت نشد.');
+  if (document.conflict) throw conflict('این مدرک قبلاً بررسی شده است.');
   const next = status === 'approved' ? 'verified' : 'rejected';
   invalidateAccountState(document.userId);
   return { document, verificationStatus: next };

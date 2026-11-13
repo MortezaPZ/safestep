@@ -404,6 +404,50 @@ describe('نقش ادمین و پنل مدیریت', () => {
     expect(document.healthCondition).toBe('آسم');
   });
 
+  it('تأیید مدرک جدید مدارک معوق دیگر را می‌بندد و رد مدرک قدیمی حساب را قفل نمی‌کند', async () => {
+    const user = await signUp('09130000886', 'کاربر دارای دو مدرک', 'primary');
+    await db.query("UPDATE users SET verification_status = 'unverified' WHERE id = $1", [user.id]);
+    invalidateAccountState(user.id);
+    const imageUrl = 'data:image/png;base64,iVBORw0KGgo=';
+
+    const first = await request(app)
+      .post('/api/v1/documents')
+      .set(auth(user.token))
+      .send({ documentType: 'identity', imageUrl });
+    const second = await request(app)
+      .post('/api/v1/documents')
+      .set(auth(user.token))
+      .send({ documentType: 'identity', imageUrl });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+
+    const approved = await request(app)
+      .post(`/api/v1/admin/documents/${second.body.document.id}/approve`)
+      .set(auth(admin.token));
+    expect(approved.status).toBe(200);
+
+    const staleRejection = await request(app)
+      .post(`/api/v1/admin/documents/${first.body.document.id}/reject`)
+      .set(auth(admin.token))
+      .send({ reason: 'مدرک قدیمی' });
+    expect(staleRejection.status).toBe(409);
+    expect(staleRejection.body.error.code).toBe('CONFLICT');
+
+    const { rows } = await db.query(
+      `SELECT u.verification_status, d.id, d.status
+         FROM users u JOIN identity_documents d ON d.user_id = u.id
+        WHERE u.id = $1 ORDER BY d.created_at, d.id`,
+      [user.id],
+    );
+    const statusById = Object.fromEntries(rows.map((row) => [row.id, row.status]));
+    expect(statusById[first.body.document.id]).toBe('rejected');
+    expect(statusById[second.body.document.id]).toBe('approved');
+    expect(rows.every((row) => row.verification_status === 'verified')).toBe(true);
+
+    const sos = await request(app).post('/api/v1/sos').set(auth(user.token)).send({});
+    expect(sos.status).toBe(201);
+  });
+
   it('ارسال مجدد مدرک حساب تأییدشده را قفل نمی‌کند', async () => {
     const user = await signUp('09131110055', 'کاربر تأییدشده', 'primary');
     const response = await request(app).post('/api/v1/documents')

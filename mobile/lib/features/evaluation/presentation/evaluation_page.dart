@@ -29,7 +29,7 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
   bool _samplingReference = false;
   bool _loadingSus = true;
   bool _submittingSus = false;
-  String _sampleEnvironment = 'open';
+  String? _sampleEnvironment;
   String? _referenceError;
   String? _susError;
   String? _referenceMessage;
@@ -194,6 +194,8 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
   }
 
   Future<void> _recordReferenceSample() async {
+    final String? environment = _sampleEnvironment;
+    if (environment == null || _samplingReference) return;
     setState(() {
       _samplingReference = true;
       _referenceError = null;
@@ -220,7 +222,7 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
         lat: position.latitude,
         lng: position.longitude,
         accuracyM: position.accuracy,
-        environment: _sampleEnvironment,
+        environment: environment,
       );
       if (!mounted) return;
       setState(() => _referenceMessage = sample.valid
@@ -447,7 +449,10 @@ class _EvaluationPageState extends ConsumerState<EvaluationPage> {
               ),
               const SizedBox(height: AppSpacing.sm),
               OutlinedButton.icon(
-                onPressed: _samplingReference ? null : _recordReferenceSample,
+                key: const Key('evaluation-record-sample'),
+                onPressed: _sampleEnvironment == null || _samplingReference
+                    ? null
+                    : _recordReferenceSample,
                 icon: _samplingReference
                     ? const SizedBox(
                         width: 18,

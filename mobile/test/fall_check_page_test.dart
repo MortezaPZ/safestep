@@ -49,8 +49,8 @@ class _NoopTrackingIntentStore implements TrackingIntentStore {
 }
 
 class _TestTrackingController extends TrackingController {
-  _TestTrackingController(Ref ref)
-      : super(ref, trackingIntentStore: _NoopTrackingIntentStore()) {
+  _TestTrackingController(super.ref)
+      : super(trackingIntentStore: _NoopTrackingIntentStore()) {
     state = state.copyWith(
       pendingFall: const FallDetectResult(
         isFall: true,

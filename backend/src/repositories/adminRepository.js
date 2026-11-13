@@ -101,20 +101,38 @@ export async function createIdentityDocument(userId, documentType, imageUrl, hea
 
 export async function reviewIdentityDocument(id, status, reviewerId, rejectionReason = null) {
   return db.transaction(async (tx) => {
-    const { rows: documents } = await tx.query(
-      `SELECT id, user_id, health_condition_encrypted
-         FROM identity_documents WHERE id = $1 FOR UPDATE`,
+    const { rows: candidates } = await tx.query(
+      'SELECT user_id FROM identity_documents WHERE id = $1',
       [id],
+    );
+    const candidate = candidates[0];
+    if (!candidate) return null;
+
+    // Lock the account first so concurrent reviews of sibling documents use
+    // the same lock order and cannot deadlock while closing pending siblings.
+    const { rows: users } = await tx.query(
+      'SELECT id FROM users WHERE id = $1 FOR UPDATE',
+      [candidate.user_id],
+    );
+    if (!users[0]) return null;
+
+    const { rows: documents } = await tx.query(
+      `SELECT id, user_id, status, health_condition_encrypted
+         FROM identity_documents WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+      [id, candidate.user_id],
     );
     const pending = documents[0];
     if (!pending) return null;
+    if (pending.status !== 'pending') return { conflict: true, userId: pending.user_id };
 
     const healthCondition = status === 'approved' && pending.health_condition_encrypted
       ? decryptSensitiveValue(pending.health_condition_encrypted)
       : null;
     await tx.query(
       `UPDATE users
-          SET verification_status = $2,
+          SET verification_status = CASE
+                WHEN verification_status = 'verified' AND $2 = 'rejected'
+                THEN verification_status ELSE $2 END,
               health_condition = CASE WHEN $3::text IS NOT NULL
                                       THEN $3 ELSE health_condition END
         WHERE id = $1`,
@@ -124,6 +142,16 @@ export async function reviewIdentityDocument(id, status, reviewerId, rejectionRe
         healthCondition ? encryptSensitiveValue(healthCondition) : null,
       ],
     );
+    if (status === 'approved') {
+      await tx.query(
+        `UPDATE identity_documents
+            SET status = 'rejected', reviewed_by = $2, reviewed_at = now(),
+                rejection_reason = 'Superseded by an approved document',
+                health_condition_encrypted = NULL
+          WHERE user_id = $1 AND id <> $3 AND status = 'pending'`,
+        [pending.user_id, reviewerId, id],
+      );
+    }
     await tx.query(
       `UPDATE identity_documents
           SET status = $2, reviewed_by = $3, reviewed_at = now(),

@@ -6,9 +6,11 @@ The current `backend/src/services/fallDetection/model.json` is labeled `sisfall-
 
 | Model | Accuracy | Precision | Recall | F1 | TP | FP | TN | FN |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| KNN | 0.9802 | 0.9760 | 0.9744 | 0.9752 | 1752 | 43 | 2664 | 46 |
-| Linear SVM | 0.9678 | 0.9625 | 0.9566 | 0.9596 | 1720 | 67 | 2640 | 78 |
-| Combined rule | 0.9789 | 0.9803 | 0.9666 | 0.9734 | 1738 | 35 | 2672 | 60 |
+| KNN | 0.9816 | 0.9782 | 0.9755 | 0.9769 | 1754 | 39 | 2668 | 44 |
+| Linear SVM | 0.9700 | 0.9663 | 0.9583 | 0.9623 | 1723 | 60 | 2647 | 75 |
+| Combined rule | 0.9798 | 0.9808 | 0.9683 | 0.9745 | 1741 | 34 | 2673 | 57 |
+
+The regenerated outer-fold row counts are 942, 935, 888, 852, and 888; all five folds contain held-out subjects. The subject groups remain intact, and the inner parameter selection uses four non-empty subject-grouped folds for each outer fit.
 
 The model keeps all 4,505 training windows as KNN points. The final KNN uses k=9; the values selected independently within outer folds are recorded in the model. SisFall falls were safely simulated during collection. The dataset README says older participants performed ADLs only except SE06, a Judo expert who also simulated falls; these scores therefore do not establish fall performance for frail older adults, unexpected real-world falls, or a new device population. See `docs/phase3/04-sisfall-training-report.md` for the pinned mirror revision, archive hash, conversion details, and the archive's recording-count discrepancy.
 

@@ -70,14 +70,21 @@ void main() {
     final Finder environmentSelector =
         find.byKey(const Key('evaluation-environment-selector'));
     expect(environmentSelector, findsOneWidget);
-    expect(find.text('Open environment'), findsOneWidget);
+    final OutlinedButton sampleButton = tester.widget<OutlinedButton>(
+      find.byKey(const Key('evaluation-record-sample')),
+    );
+    expect(sampleButton.onPressed, isNull);
 
     await tester.tap(environmentSelector);
     await tester.pumpAndSettle();
-    expect(find.text('Urban environment'), findsOneWidget);
-    await tester.tap(find.text('Urban environment').last);
+    expect(find.text('Open environment'), findsOneWidget);
+    await tester.tap(find.text('Urban environment'));
     await tester.pumpAndSettle();
 
     expect(find.text('Urban environment'), findsOneWidget);
+    final OutlinedButton enabledSampleButton = tester.widget<OutlinedButton>(
+      find.byKey(const Key('evaluation-record-sample')),
+    );
+    expect(enabledSampleButton.onPressed, isNotNull);
   });
 }

@@ -57,7 +57,6 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
     _retryMode = widget.retryMode;
     _responseError = widget.retryMessage;
     HapticFeedback.heavyImpact();
-    unawaited(_showFallNotification());
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _submitted) return;
       setState(() => _left = _remainingSeconds(DateTime.now()));
@@ -81,18 +80,6 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
     return remaining < 0 ? 0 : remaining;
   }
 
-  Future<void> _showFallNotification() async {
-    try {
-      await ref.read(pushServiceProvider).showFallCheckNotification(
-            eventId: widget.fallEventId,
-            startedAt: _started!,
-            deadline: _deadline!,
-          );
-    } catch (error) {
-      debugPrint('اعلان بررسی سقوط نمایش داده نشد: $error');
-    }
-  }
-
   @override
   void dispose() {
     _timer?.cancel();
@@ -112,10 +99,10 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
     final PushService push = ref.read(pushServiceProvider);
     try {
       final bool submitted = await coordinator.respond(
-                eventId: widget.fallEventId,
-                feedback: feedback,
-                respondedWithinSec: elapsed,
-              );
+        eventId: widget.fallEventId,
+        feedback: feedback,
+        respondedWithinSec: elapsed,
+      );
       if (!submitted) {
         _responseError = 'پاسخ دیگری در حال ثبت است. کمی صبر کنید.';
         return;
@@ -202,7 +189,7 @@ class FallCheckPageState extends ConsumerState<FallCheckPage> {
                   onPressed: _sending ? null : () => _send('false_alarm'),
                   child: _sending
                       ? const CircularProgressIndicator()
-                      : Text(
+                      : const Text(
                           'حالم خوب است',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

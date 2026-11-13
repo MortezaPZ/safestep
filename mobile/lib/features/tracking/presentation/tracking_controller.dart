@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/app_config.dart';
+import '../../../core/push/push_service.dart';
 import '../../../core/utils/app_exception.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../auth/domain/auth_models.dart';
@@ -34,6 +35,8 @@ class TrackingState {
     this.error,
     this.powerSave = false,
     this.pendingFall,
+    this.pendingFallStartedAt,
+    this.pendingFallDeadline,
     this.foregroundServiceAvailable = true,
     this.fallSensorWarning,
     this.trackingSyncError,
@@ -56,6 +59,8 @@ class TrackingState {
   final AppException? error;
   final bool powerSave;
   final FallDetectResult? pendingFall;
+  final DateTime? pendingFallStartedAt;
+  final DateTime? pendingFallDeadline;
   final bool foregroundServiceAvailable;
   final String? fallSensorWarning;
   final String? trackingSyncError;
@@ -74,6 +79,8 @@ class TrackingState {
     AppException? error,
     bool? powerSave,
     FallDetectResult? pendingFall,
+    DateTime? pendingFallStartedAt,
+    DateTime? pendingFallDeadline,
     bool? foregroundServiceAvailable,
     String? fallSensorWarning,
     String? trackingSyncError,
@@ -93,6 +100,12 @@ class TrackingState {
       error: clearError ? null : (error ?? this.error),
       powerSave: powerSave ?? this.powerSave,
       pendingFall: clearPendingFall ? null : (pendingFall ?? this.pendingFall),
+      pendingFallStartedAt: clearPendingFall
+          ? null
+          : (pendingFallStartedAt ?? this.pendingFallStartedAt),
+      pendingFallDeadline: clearPendingFall
+          ? null
+          : (pendingFallDeadline ?? this.pendingFallDeadline),
       foregroundServiceAvailable:
           foregroundServiceAvailable ?? this.foregroundServiceAvailable,
       fallSensorWarning: clearFallSensorWarning
@@ -158,6 +171,7 @@ class TrackingController extends StateNotifier<TrackingState> {
   FallDetectorService? _fallDetector;
   late final TrackingIntentSynchronizer _trackingIntentSync;
   int _trackingCommandGeneration = 0;
+  bool _fallNotificationPending = false;
   Future<void> _localLifecycleQueue = Future<void>.value();
   String? _lastKnownTrackingUserId;
 
@@ -236,8 +250,7 @@ class TrackingController extends StateNotifier<TrackingState> {
     );
     _fallDetector!.onPositive = (FallDetectResult result) {
       if (command != _trackingCommandGeneration) return;
-      if (state.pendingFall != null) return;
-      state = state.copyWith(pendingFall: result);
+      unawaited(acceptFallDetection(result));
     };
     _fallDetector!.onSensorError = (String sensorName) {
       if (!mounted || command != _trackingCommandGeneration) return;
@@ -361,6 +374,50 @@ class TrackingController extends StateNotifier<TrackingState> {
     state = state.copyWith(clearPendingFall: true);
   }
 
+  /// Schedules the local countdown notification as soon as the detector
+  /// accepts a fall, before changing provider state and triggering navigation.
+  @visibleForTesting
+  Future<void> acceptFallDetection(FallDetectResult result) async {
+    if (!mounted ||
+        !result.isFall ||
+        state.pendingFall != null ||
+        _fallNotificationPending) {
+      return;
+    }
+    _fallNotificationPending = true;
+    final DateTime startedAt = DateTime.now();
+    final DateTime deadline = startedAt.add(
+      Duration(seconds: result.countdownSec),
+    );
+    await _scheduleFallCheckNotification(result, startedAt, deadline);
+    if (!mounted || state.pendingFall != null) {
+      _fallNotificationPending = false;
+      return;
+    }
+    _fallNotificationPending = false;
+    state = state.copyWith(
+      pendingFall: result,
+      pendingFallStartedAt: startedAt,
+      pendingFallDeadline: deadline,
+    );
+  }
+
+  Future<void> _scheduleFallCheckNotification(
+    FallDetectResult result,
+    DateTime startedAt,
+    DateTime deadline,
+  ) async {
+    try {
+      await _ref.read(pushServiceProvider).showFallCheckNotification(
+            eventId: result.fallEventId,
+            startedAt: startedAt,
+            deadline: deadline,
+          );
+    } catch (error) {
+      debugPrint('اعلان بررسی سقوط زمان‌بندی نشد: $error');
+    }
+  }
+
   @override
   void dispose() {
     _positionSub?.cancel();
@@ -456,7 +513,7 @@ class TrackingController extends StateNotifier<TrackingState> {
         if (generation != _trackingCommandGeneration) return;
         state = state.copyWith(
           status: TrackingStatus.blocked,
-          error: AppException(
+          error: const AppException(
             message:
                 'دریافت موقعیت با مشکل مواجه شد. مکان‌یاب گوشی را بررسی کنید.',
             code: 'POSITION_STREAM',

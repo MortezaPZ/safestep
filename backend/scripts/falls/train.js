@@ -114,6 +114,9 @@ function stratifiedFolds(rows, count = 5, seed = SEED) {
 }
 
 export function groupFolds(rows, count = 5, seed = SEED) {
+  if (!Number.isInteger(count) || count < 2) {
+    throw new Error('Grouped cross-validation requires at least two folds.');
+  }
   const bySubject = new Map();
   for (const row of rows) {
     if (!row.subjectId) throw new Error('Subject-grouped validation requires subject_id for every row.');
@@ -146,19 +149,25 @@ export function groupFolds(rows, count = 5, seed = SEED) {
   const rowTarget = rows.length / count;
 
   for (const group of groups) {
+    const tieOrder = Array.from({ length: count }, (_, index) => index);
+    for (let index = tieOrder.length - 1; index > 0; index -= 1) {
+      const other = Math.floor(random() * (index + 1));
+      [tieOrder[index], tieOrder[other]] = [tieOrder[other], tieOrder[index]];
+    }
+    const emptyFold = tieOrder.find((index) => folds[index].rows.length === 0);
+    const candidates = emptyFold === undefined ? tieOrder : [emptyFold];
     let bestIndex = 0;
     let bestScore = Infinity;
-    const tieOrder = Array.from({ length: count }, (_, index) => index)
-      .sort(() => random() - 0.5);
-    for (const index of tieOrder) {
+    const normalizedSquaredError = (value, target) => ((value - target) / target) ** 2;
+    for (const index of candidates) {
       const fold = folds[index];
       const pos = fold.positive + group.positive;
       const neg = fold.negative + group.negative;
       const size = fold.rows.length + group.rows.length;
       const score =
-        ((pos - positiveTarget) / positiveTarget) ** 2 +
-        ((neg - negativeTarget) / negativeTarget) ** 2 +
-        ((size - rowTarget) / rowTarget) ** 2;
+        normalizedSquaredError(pos, positiveTarget) - normalizedSquaredError(fold.positive, positiveTarget) +
+        normalizedSquaredError(neg, negativeTarget) - normalizedSquaredError(fold.negative, negativeTarget) +
+        normalizedSquaredError(size, rowTarget) - normalizedSquaredError(fold.rows.length, rowTarget);
       if (score < bestScore) {
         bestScore = score;
         bestIndex = index;
@@ -167,6 +176,9 @@ export function groupFolds(rows, count = 5, seed = SEED) {
     folds[bestIndex].rows.push(...group.rows);
     folds[bestIndex].positive += group.positive;
     folds[bestIndex].negative += group.negative;
+  }
+  if (folds.some((fold) => fold.rows.length === 0)) {
+    throw new Error('Grouped cross-validation produced an empty fold.');
   }
   return folds.map((fold) => fold.rows);
 }

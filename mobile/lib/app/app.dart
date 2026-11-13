@@ -147,11 +147,24 @@ class _SafeStepAppState extends ConsumerState<SafeStepApp> {
       trackingControllerProvider
           .select((TrackingState state) => state.pendingFall),
       (FallDetectResult? previous, FallDetectResult? result) {
-        if (result?.isFall == true) {
-          router.go(
-            '${AppRoutes.fallCheck}?id=${Uri.encodeComponent(result!.fallEventId)}&sec=${result.countdownSec}',
-          );
+        if (result?.isFall != true ||
+            result!.fallEventId == previous?.fallEventId) {
+          return;
         }
+        final TrackingState acceptedFall = ref.read(trackingControllerProvider);
+        final DateTime startedAt =
+            acceptedFall.pendingFallStartedAt ?? DateTime.now();
+        final DateTime deadline = acceptedFall.pendingFallDeadline ??
+            startedAt.add(Duration(seconds: result.countdownSec));
+        router.go(
+          _fallCheckLocation(
+            FallNotificationPayload(
+              eventId: result.fallEventId,
+              startedAt: startedAt,
+              deadline: deadline,
+            ),
+          ),
+        );
       },
     );
     ref.listen<LiveAlert?>(
