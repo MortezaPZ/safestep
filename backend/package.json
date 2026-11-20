@@ -16,6 +16,7 @@
     "test": "vitest run --maxWorkers=1 --fileParallelism=false --hookTimeout=30000",
     "test:watch": "vitest",
     "create:admin": "node src/db/createAdmin.js",
+    "cleanup:pilot": "node scripts/cleanup-pilot-db.js",
     "train:fall": "node scripts/falls/train.js",
     "train:fall:real": "node scripts/falls/train_real.js",
     "train:fall:sisfall": "node scripts/falls/train_sisfall.js",

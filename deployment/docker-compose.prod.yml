@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: safestep-db
+    restart: always
+    environment:
+      POSTGRES_DB: safestep_prod
+      POSTGRES_USER: safestep_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U safestep_user -d safestep_prod"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - safestep-network
+
+  app:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: safestep-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4080
+      DATABASE_URL: postgres://safestep_user:${DB_PASSWORD}@db:5432/safestep_prod
+      DEMO_MODE: "false"
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      INVITE_CODE_PEPPER: ${INVITE_CODE_PEPPER}
+      IDENTITY_DATA_ENCRYPTION_KEY: ${IDENTITY_DATA_ENCRYPTION_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      NOTIFICATION_DRIVER: fcm
+      FCM_SERVICE_ACCOUNT_PATH: /run/secrets/safestep-fcm-service-account.json
+    volumes:
+      - ./secrets/safestep-fcm-service-account.json:/run/secrets/safestep-fcm-service-account.json:ro
+    ports:
+      - "127.0.0.1:4080:4080"
+    networks:
+      - safestep-network
+
+networks:
+  safestep-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

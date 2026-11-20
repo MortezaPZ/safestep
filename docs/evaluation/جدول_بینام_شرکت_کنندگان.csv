@@ -1,0 +1,21 @@
+participant_code,pair_id,system_role,age_bracket,gender,device_model,os_version,status
+P01,PAIR-01,primary,65-70,Female,Samsung Galaxy A14,Android 14,active
+C01,PAIR-01,guardian,35-40,Male,Xiaomi Redmi Note 12,Android 13,active
+P02,PAIR-02,primary,70-75,Male,Samsung Galaxy A24,Android 14,active
+C02,PAIR-02,guardian,40-45,Female,Samsung Galaxy A33,Android 14,active
+P03,PAIR-03,primary,60-65,Female,Xiaomi Poco M5,Android 13,active
+C03,PAIR-03,guardian,30-35,Female,Xiaomi 12 Lite,Android 13,active
+P04,PAIR-04,primary,75-80,Male,Samsung Galaxy A04s,Android 13,active
+C04,PAIR-04,guardian,45-50,Male,Samsung Galaxy S21 FE,Android 14,active
+P05,PAIR-05,primary,65-70,Male,Huawei Nova Y70,Android 12,active
+C05,PAIR-05,guardian,35-40,Male,Xiaomi Redmi 10,Android 12,active
+P06,PAIR-06,primary,70-75,Female,Samsung Galaxy A13,Android 13,active
+C06,PAIR-06,guardian,40-45,Female,Samsung Galaxy A54,Android 14,active
+P07,PAIR-07,primary,65-70,Female,Xiaomi Redmi 12C,Android 13,active
+C07,PAIR-07,guardian,30-35,Male,Xiaomi Redmi Note 11,Android 13,active
+P08,PAIR-08,primary,80-85,Male,Samsung Galaxy A12,Android 12,active
+C08,PAIR-08,guardian,50-55,Female,Samsung Galaxy A52s,Android 14,active
+P09,PAIR-09,primary,60-65,Male,Samsung Galaxy A23,Android 14,active
+C09,PAIR-09,guardian,25-30,Male,Xiaomi Poco X5 Pro,Android 13,active
+P10,PAIR-10,primary,70-75,Female,Motorola Moto G22,Android 12,active
+C10,PAIR-10,guardian,40-45,Female,Samsung Galaxy A34,Android 14,active

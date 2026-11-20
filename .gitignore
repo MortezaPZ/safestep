@@ -1,0 +1,6 @@
+*.apk
+*.jks
+*.zip
+*.rar
+.DS_Store
+Thumbs.db
